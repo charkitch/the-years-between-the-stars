@@ -1,0 +1,119 @@
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: var(--font-hud);
+  color: var(--color-hud);
+  font-size: var(--font-size-md);
+}
+
+.topLeft {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+}
+
+.topRight {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  text-align: right;
+}
+
+.bottomLeft {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+}
+
+.bottomRight {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+}
+
+.center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.crosshair {
+  width: 20px;
+  height: 20px;
+  position: relative;
+}
+
+.crosshair::before,
+.crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(51, 255, 136, 0.7);
+}
+
+.crosshair::before {
+  width: 2px;
+  height: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.crosshair::after {
+  height: 2px;
+  width: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.alertBanner {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 20px;
+  border: 1px solid var(--color-danger);
+  background: rgba(255, 34, 0, 0.15);
+  color: var(--color-danger);
+  font-size: var(--font-size-lg);
+  letter-spacing: 2px;
+  animation: blink 0.8s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0.4; }
+}
+
+.targetInfo {
+  padding: 8px 12px;
+  border: var(--hud-border);
+  background: var(--hud-bg);
+  font-size: var(--font-size-sm);
+  min-width: 160px;
+}
+
+.targetLabel {
+  color: var(--color-station);
+  margin-bottom: 4px;
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.credits {
+  color: var(--color-credits);
+  font-size: var(--font-size-md);
+}
+
+.systemInfo {
+  font-size: var(--font-size-sm);
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+.controls {
+  font-size: 10px;
+  opacity: 0.5;
+  margin-top: 8px;
+  line-height: 1.6;
+}

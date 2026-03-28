@@ -1,0 +1,86 @@
+@import './palette.css';
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-hud);
+  font-family: var(--font-hud);
+}
+
+canvas {
+  display: block;
+}
+
+button {
+  font-family: var(--font-hud);
+  cursor: pointer;
+  border: var(--hud-border);
+  background: var(--hud-bg);
+  color: var(--color-hud);
+  padding: 6px 14px;
+  font-size: var(--font-size-md);
+  transition: background 0.15s, color 0.15s;
+}
+
+button:hover {
+  background: rgba(51, 255, 136, 0.15);
+  color: #fff;
+}
+
+button:active {
+  background: rgba(51, 255, 136, 0.3);
+}
+
+/* ── Hyperspace charge glow ──────────────────────────────────────────── */
+
+.hyperChargeGlow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: inset 0 0 120px 30px rgba(136, 102, 255, 0.6);
+  animation: chargePulse 0.8s ease-in-out infinite;
+}
+
+@keyframes chargePulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+
+/* ── Entry/exit flash ────────────────────────────────────────────────── */
+
+.flashEntry {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  animation: flashEntryAnim 0.6s ease-out forwards;
+}
+
+@keyframes flashEntryAnim {
+  0%   { opacity: 0;   background: #ffffff; }
+  30%  { opacity: 1;   background: #8866ff; }
+  100% { opacity: 0;   background: transparent; }
+}
+
+.flashExit {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  animation: flashExitAnim 0.8s ease-out forwards;
+}
+
+@keyframes flashExitAnim {
+  0%   { opacity: 0;   background: #4422cc; }
+  40%  { opacity: 0.7; background: #4422cc; }
+  100% { opacity: 0;   background: transparent; }
+}

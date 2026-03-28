@@ -1,0 +1,27 @@
+:root {
+  --color-bg: #020408;
+  --color-hud: #33FF88;
+  --color-hud-dim: #1a8844;
+  --color-station: #44CCFF;
+  --color-danger: #FF2200;
+  --color-warning: #FFAA00;
+  --color-hyperspace: #4422CC;
+  --color-hyperspace-bright: #8866FF;
+  --color-star-g: #FFEE88;
+  --color-star-k: #FFAA44;
+  --color-star-m: #FF6633;
+  --color-star-f: #FFFFFF;
+  --color-star-a: #AABBFF;
+  --color-planet-rocky: #8B6914;
+  --color-planet-gas: #6688AA;
+  --color-credits: #FFD700;
+
+  --font-hud: 'Courier New', Courier, monospace;
+  --font-size-sm: 11px;
+  --font-size-md: 13px;
+  --font-size-lg: 16px;
+
+  --hud-border: 1px solid rgba(51, 255, 136, 0.4);
+  --hud-bg: rgba(0, 0, 0, 0.6);
+  --hud-bg-panel: rgba(0, 20, 10, 0.85);
+}

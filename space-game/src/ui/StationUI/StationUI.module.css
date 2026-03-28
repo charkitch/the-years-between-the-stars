@@ -1,0 +1,153 @@
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 4, 8, 0.95);
+  pointer-events: all;
+  z-index: 10;
+}
+
+.panel {
+  background: var(--hud-bg-panel);
+  border: var(--hud-border);
+  padding: 24px;
+  max-width: 700px;
+  width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: var(--hud-border);
+}
+
+.stationName {
+  font-size: var(--font-size-lg);
+  letter-spacing: 3px;
+  color: var(--color-station);
+}
+
+.credits {
+  color: var(--color-credits);
+  font-size: var(--font-size-lg);
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  flex: 1;
+  padding: 8px;
+  letter-spacing: 1px;
+  font-size: var(--font-size-sm);
+}
+
+.tab.active {
+  background: rgba(51, 255, 136, 0.2);
+  border-color: var(--color-hud);
+  color: #fff;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.table th {
+  text-align: left;
+  padding: 6px 8px;
+  color: var(--color-hud-dim);
+  border-bottom: var(--hud-border);
+  font-weight: normal;
+  letter-spacing: 1px;
+}
+
+.table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(51,255,136,0.1);
+}
+
+.table tr:hover td {
+  background: rgba(51,255,136,0.05);
+}
+
+.buyBtn, .sellBtn {
+  padding: 3px 10px;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+.sellBtn {
+  border-color: rgba(255,170,0,0.4);
+  color: var(--color-warning);
+}
+
+.sellBtn:hover {
+  background: rgba(255,170,0,0.15);
+}
+
+.cargo {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: var(--hud-border);
+  font-size: var(--font-size-sm);
+}
+
+.cargoTitle {
+  color: var(--color-hud-dim);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.cargoItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.undockBtn {
+  display: block;
+  width: 100%;
+  margin-top: 20px;
+  padding: 10px;
+  letter-spacing: 3px;
+  font-size: var(--font-size-lg);
+  border-color: var(--color-hud);
+}
+
+.refuelBtn {
+  padding: 6px 16px;
+  border-color: rgba(68,204,255,0.4);
+  color: var(--color-station);
+  letter-spacing: 1px;
+}
+
+.refuelBtn:hover {
+  background: rgba(68,204,255,0.15);
+}
+
+.infoRow {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 12px;
+  font-size: var(--font-size-sm);
+}
+
+.infoItem {
+  opacity: 0.7;
+}
+
+.infoValue {
+  color: var(--color-hud);
+}
