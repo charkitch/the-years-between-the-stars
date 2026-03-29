@@ -1,4 +1,4 @@
-# The Years Between The Stars
+# Time in Transit
 
 A browser-based space exploration and trading game inspired by classics like Elite and the works of Vernor Vinge and Alastair Reynolds. Fly your ship across a procedurally generated galaxy, trade goods between stations, navigate faction politics, and watch civilizations rise and fall as relativistic time passes with each hyperspace jump.
 
