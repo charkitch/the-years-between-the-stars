@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useGameState } from '../../game/GameState';
 import { HyperspaceSystem } from '../../game/mechanics/HyperspaceSystem';
+import { TradingSystem } from '../../game/mechanics/TradingSystem';
 import { jumpYearsElapsed } from '../../game/mechanics/RelativisticTime';
 import type { StarSystemData } from '../../game/generation/ClusterGenerator';
 import { HYPERSPACE } from '../../game/constants';
@@ -10,6 +11,7 @@ import type { FactionMemoryEntry } from '../../game/GameState';
 import styles from './ClusterMap.module.css';
 
 const hyperspace = new HyperspaceSystem();
+const trading = new TradingSystem();
 const MAP_W = 520;
 const MAP_H = 420;
 
@@ -20,6 +22,11 @@ function toCanvas(x: number, y: number): [number, number] {
 const STAR_TYPE_COLOR: Record<string, string> = {
   G: '#FFEE88', K: '#FFAA44', M: '#FF6633', F: '#FFFFFF', A: '#AABBFF',
 };
+
+function applyAlpha(hex: string, alpha: number): string {
+  const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
+  return `${hex}${a}`;
+}
 
 interface ClusterMapProps {
   onClose: () => void;
@@ -38,6 +45,7 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
   const jumpLog = useGameState(s => s.jumpLog);
   const factionMemory = useGameState(s => s.factionMemory);
   const knownFactions = useGameState(s => s.knownFactions);
+  const lastVisitYear = useGameState(s => s.lastVisitYear);
 
   const currentSys = cluster[currentSystemId];
   const reachable = hyperspace.getReachableSystems(currentSys, cluster);
@@ -127,15 +135,46 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
         ctx.stroke();
       }
 
+      // Staleness: visited stars dim over centuries
+      let starFill: string;
+      if (isCurrent) {
+        starFill = '#33FF88';
+      } else if (isTarget) {
+        starFill = '#44CCFF';
+      } else if (isVisited) {
+        const yearsSince = galaxyYear - (lastVisitYear[sys.id] ?? galaxyYear);
+        const staleness = Math.max(0.3, 1 - yearsSince / 1000);
+        starFill = applyAlpha(color, staleness);
+      } else {
+        starFill = `${color}66`;
+      }
+
       ctx.beginPath();
       ctx.arc(sx, sy, r, 0, Math.PI * 2);
-      ctx.fillStyle = isCurrent ? '#33FF88' : isTarget ? '#44CCFF' : isVisited ? color : `${color}66`;
+      ctx.fillStyle = starFill;
       ctx.fill();
 
       if (!isVisited && !isReachable && !isCurrent) {
         ctx.strokeStyle = 'rgba(255,255,255,0.15)';
         ctx.lineWidth = 1;
         ctx.stroke();
+      }
+
+      // Boom indicator for visited systems (based on last-known data — may be stale)
+      if (isVisited) {
+        const knownYear = lastVisitYear[sys.id] ?? galaxyYear;
+        const boomGood = trading.getMarketBoom(sys.id, knownYear);
+        if (boomGood) {
+          ctx.fillStyle = '#FFD700';
+          ctx.beginPath();
+          const dx = r + 4, dy = -(r + 2);
+          ctx.moveTo(sx + dx, sy + dy - 3);
+          ctx.lineTo(sx + dx + 2, sy + dy);
+          ctx.lineTo(sx + dx, sy + dy + 3);
+          ctx.lineTo(sx + dx - 2, sy + dy);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
 
       // Faction color pips for visited systems
@@ -172,7 +211,7 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
         ctx.fillText(sys.name.toUpperCase(), sx + 8, sy + 4);
       }
     }
-  }, [cluster, currentSystemId, visitedSystems, hyperspaceTarget, reachableIds, hovered, currentSys, factionMemory, knownFactions]);
+  }, [cluster, currentSystemId, visitedSystems, hyperspaceTarget, reachableIds, hovered, currentSys, factionMemory, knownFactions, lastVisitYear, galaxyYear]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -255,6 +294,24 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
                 })()}
                 <br />
                 TECH LV: {selectedSys.techLevel} · {selectedSys.economy}
+                {visitedSystems.has(selectedSys.id) && lastVisitYear[selectedSys.id] != null && (() => {
+                  const seen = lastVisitYear[selectedSys.id];
+                  const ago = galaxyYear - seen;
+                  const boomGood = trading.getMarketBoom(selectedSys.id, seen);
+                  return <>
+                    <br />
+                    <span style={{ color: 'var(--color-hud-dim)' }}>
+                      LAST SEEN: YEAR {seen.toLocaleString()}{ago > 0 ? ` (${ago.toLocaleString()} YRS AGO)` : ''}
+                    </span>
+                    {boomGood && <>
+                      <br />
+                      <span style={{ color: '#FFD700' }}>
+                        {ago > 0 ? 'HAD' : 'HAS'} BOOM: {boomGood.toUpperCase()}
+                        {ago > 0 && <span style={{ color: 'var(--color-hud-dim)', fontSize: '9px' }}> (STALE)</span>}
+                      </span>
+                    </>}
+                  </>;
+                })()}
                 {(() => {
                   const mem = factionMemory[selectedSys.id];
                   if (!mem) return null;
@@ -277,6 +334,12 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
             {previewYears !== null && !selectedSys && hovered && reachableIds.has(hovered.id) && (
               <div style={{ marginTop: '4px', color: 'var(--color-warning)', fontSize: '11px' }}>
                 HOVER: {hovered.name.toUpperCase()} +{previewYears.toLocaleString()} YRS
+                {visitedSystems.has(hovered.id) && lastVisitYear[hovered.id] != null && (() => {
+                  const ago = galaxyYear - lastVisitYear[hovered.id];
+                  return ago > 0
+                    ? <span style={{ color: 'var(--color-hud-dim)', marginLeft: 6 }}>SEEN {ago.toLocaleString()}Y AGO</span>
+                    : null;
+                })()}
                 {(() => {
                   const mem = factionMemory[hovered.id];
                   if (!mem) return null;

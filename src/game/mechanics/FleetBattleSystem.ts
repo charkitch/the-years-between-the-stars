@@ -236,9 +236,10 @@ export function generateFleetBattle(
     era,
   );
 
-  // Pick a planet as the battle site
-  if (systemData.planets.length === 0) return null;
-  const planet: PlanetData = rng.pick(systemData.planets);
+  // Pick a station planet as the battle site
+  const stationPlanets = systemData.planets.filter(p => p.hasStation);
+  if (stationPlanets.length === 0) return null;
+  const planet: PlanetData = rng.pick(stationPlanets);
 
   // Calculate planet position at orbit phase (initial position)
   const planetX = Math.cos(planet.orbitPhase) * planet.orbitRadius;

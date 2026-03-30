@@ -22,7 +22,17 @@ const ECONOMY_MODIFIERS: Record<EconomyType, Partial<Record<GoodName, number>>> 
   'Refinery':         { Radioactives: -60, Liquor: -40, Food: +20 },
 };
 
-const REPUTATION_SELL_BONUS = 0.02; // +2% sell price per rep point
+const REPUTATION_SELL_BONUS_PER_POINT = 0.02;
+const REPUTATION_DECAY_YEARS = 500;
+const BOOM_CHANCE = 0.08;
+const BOOM_SELL_MULTIPLIER = 3;
+const BOOM_CYCLE_MIN_YEARS = 30;
+const BOOM_CYCLE_MAX_YEARS = 80;
+const SELL_MARGIN = 0.85;
+const TECHNOCRACY_DISCOUNT = 0.90;
+const NORMAL_VARIANCE = 0.15;
+const ANARCHY_VARIANCE = 0.50;
+const MAX_STOCK = 30;
 
 export interface MarketEntry {
   good: GoodName;
@@ -30,9 +40,23 @@ export interface MarketEntry {
   sellPrice: number;
   stock: number;
   banned: boolean;
+  boom: boolean;
 }
 
 export class TradingSystem {
+  /**
+   * Return the good experiencing a boom in this system during the current
+   * boom cycle window, or null if none. Deterministic per (systemId, window).
+   */
+  getMarketBoom(systemId: number, galaxyYear: number): GoodName | null {
+    const cycleRng = PRNG.fromIndex(CLUSTER_SEED, systemId * 173);
+    const cycleLength = cycleRng.int(BOOM_CYCLE_MIN_YEARS, BOOM_CYCLE_MAX_YEARS);
+    const window = Math.floor(galaxyYear / cycleLength);
+    const rng = PRNG.fromIndex(CLUSTER_SEED, systemId * 97 + window * 31);
+    if (rng.float(0, 1) >= BOOM_CHANCE) return null;
+    return rng.pick(GOODS);
+  }
+
   /**
    * Generate market prices with civilization and player-choice modifiers.
    *
@@ -49,7 +73,6 @@ export class TradingSystem {
     galaxyYear?: number,
     lastVisitYear?: number,
   ): MarketEntry[] {
-    // Era-seeded PRNG as per design spec
     const era = civState?.era ?? 0;
     const rng = PRNG.fromIndex(CLUSTER_SEED, systemId * 53 + 7 + era * 1000);
 
@@ -63,7 +86,6 @@ export class TradingSystem {
     const techBonus = new Set<GoodName>(civState?.techBonus ?? []);
     const anarchyVariance = civState?.anarchyVariance ?? false;
     const choiceMod = systemChoices?.priceModifier ?? 1.0;
-    const REPUTATION_DECAY_YEARS = 500;
     const yearsSinceVisit = (galaxyYear !== undefined && lastVisitYear !== undefined)
       ? galaxyYear - lastVisitYear
       : 0;
@@ -71,36 +93,33 @@ export class TradingSystem {
     const effectiveRep = systemChoices
       ? systemChoices.tradingReputation * decayFactor
       : 0;
-    const repBonus = 1.0 + effectiveRep * REPUTATION_SELL_BONUS;
+    const repBonus = 1.0 + effectiveRep * REPUTATION_SELL_BONUS_PER_POINT;
+    const boomGood = galaxyYear !== undefined
+      ? this.getMarketBoom(systemId, galaxyYear)
+      : null;
 
     return GOODS.map(good => {
       const base = BASE_PRICES[good];
       const mod = mods[good] ?? 0;
 
-      let variance: number;
-      if (anarchyVariance) {
-        variance = rng.float(-0.50, 0.50);
-      } else {
-        variance = rng.float(-0.15, 0.15);
-      }
+      const maxVariance = anarchyVariance ? ANARCHY_VARIANCE : NORMAL_VARIANCE;
+      const variance = rng.float(-maxVariance, maxVariance);
 
       let price = Math.round((base + mod) * (1 + variance));
 
-      // Politics multiplier
       price = Math.round(price * politicsMod);
-      // Luxury extra
       if (good === 'Luxuries') price = Math.round(price * luxuryMod);
-      // Tech bonus (Technocracy discounts)
-      if (techBonus.has(good)) price = Math.round(price * 0.90);
-      // Player-choice multiplier
+      if (techBonus.has(good)) price = Math.round(price * TECHNOCRACY_DISCOUNT);
       price = Math.round(price * choiceMod);
 
+      const boom = good === boomGood;
       const buyPrice = Math.max(1, price);
-      const sellPrice = Math.max(1, Math.round(price * 0.85 * repBonus));
-      const stock = rng.int(0, 30);
+      const boomMod = boom ? BOOM_SELL_MULTIPLIER : 1;
+      const sellPrice = Math.max(1, Math.round(price * SELL_MARGIN * repBonus * boomMod));
+      const stock = rng.int(0, MAX_STOCK);
       const banned = bannedGoods.has(good);
 
-      return { good, buyPrice, sellPrice, stock, banned };
+      return { good, buyPrice, sellPrice, stock, banned, boom };
     });
   }
 

@@ -132,7 +132,7 @@ export function StationUI({ onUndock }: StationUIProps) {
               </tr>
             </thead>
             <tbody>
-              {market.map(({ good, buyPrice, sellPrice, stock, banned }) => {
+              {market.map(({ good, buyPrice, sellPrice, stock, banned, boom }) => {
                 const held = player.cargo[good] ?? 0;
                 const avgPaid = player.cargoCostBasis[good];
                 const canBuy = !banned && stock > 0 && cargoSpace > 0 && player.credits >= buyPrice;
@@ -145,6 +145,11 @@ export function StationUI({ onUndock }: StationUIProps) {
                       {banned && (
                         <span style={{ color: 'var(--color-danger)', fontSize: '9px', marginLeft: 6, letterSpacing: 1 }}>
                           PROHIBITED
+                        </span>
+                      )}
+                      {boom && !banned && (
+                        <span style={{ color: '#FFD700', fontSize: '9px', marginLeft: 6, letterSpacing: 1 }}>
+                          BOOM
                         </span>
                       )}
                     </td>
