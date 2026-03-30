@@ -1,0 +1,311 @@
+mod prng;
+mod types;
+mod cluster_generator;
+mod system_generator;
+mod civilization;
+mod factions;
+mod trading;
+mod events;
+mod simulation;
+
+use wasm_bindgen::prelude::*;
+use std::sync::Mutex;
+
+use types::*;
+use cluster_generator::generate_cluster;
+use system_generator::generate_solar_system;
+use civilization::get_civ_state;
+use factions::{get_faction, get_system_faction_state};
+use trading::get_market;
+use events::{select_event, select_secret_base_event};
+use simulation::{init_galaxy_state, simulate_galaxy};
+
+// ─── Persistent state across WASM calls ─────────────────────────────────────
+
+static ENGINE_STATE: Mutex<Option<EngineState>> = Mutex::new(None);
+
+struct EngineState {
+    cluster: Vec<StarSystemData>,
+    galaxy_state: GalaxyState,
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+fn build_cluster_summary(cluster: &[StarSystemData], galaxy_year: u32) -> Vec<ClusterSystemSummary> {
+    cluster.iter().map(|star| {
+        let civ = get_civ_state(star.id, galaxy_year, star.economy);
+        let faction = get_system_faction_state(star.id, galaxy_year, civ.politics);
+        ClusterSystemSummary {
+            id: star.id,
+            name: star.name.clone(),
+            x: star.x,
+            y: star.y,
+            star_type: star.star_type,
+            politics: civ.politics,
+            economy: civ.economy,
+            controlling_faction_id: faction.controlling_faction_id,
+            contesting_faction_id: faction.contesting_faction_id,
+            is_contested: faction.is_contested,
+            tech_level: star.tech_level,
+            population: star.population,
+        }
+    }).collect()
+}
+
+fn build_system_payload(
+    star: &StarSystemData,
+    galaxy_year: u32,
+    player_state: &PlayerState,
+    secret_base_id: Option<&str>,
+) -> SystemPayload {
+    let system = generate_solar_system(star);
+    let civ_state = get_civ_state(star.id, galaxy_year, star.economy);
+    let faction_state = get_system_faction_state(star.id, galaxy_year, civ_state.politics);
+
+    let system_choices = player_state.player_choices.get(&star.id);
+    let market = get_market(star.id, civ_state.economy, Some(&civ_state), system_choices);
+
+    // Select landing event
+    let event_seed = galaxy_year.wrapping_mul(31337).wrapping_add(star.id.wrapping_mul(1009));
+    let landing_event = if let Some(base_id) = secret_base_id {
+        // Find the secret base type
+        let base_type = system.secret_bases.iter()
+            .find(|b| b.id == base_id)
+            .map(|b| b.base_type);
+        base_type.and_then(|bt| select_secret_base_event(bt, system_choices, event_seed))
+    } else {
+        select_event(&civ_state, system_choices, event_seed)
+    };
+
+    // Build system entry lines
+    let mut lines = Vec::new();
+    lines.push(format!("ENTERING {}", star.name.to_uppercase()));
+
+    let control_faction = get_faction(&faction_state.controlling_faction_id);
+    let contest_faction = faction_state.contesting_faction_id.as_ref()
+        .and_then(|id| get_faction(id));
+
+    if faction_state.is_contested {
+        if let (Some(ctrl), Some(cont)) = (control_faction, contest_faction) {
+            lines.push(format!("CONTESTED — {} vs {}",
+                ctrl.name.to_uppercase(), cont.name.to_uppercase()));
+        }
+    } else if let Some(ctrl) = control_faction {
+        lines.push(format!("CONTROLLED BY {}", ctrl.name.to_uppercase()));
+    }
+
+    // Secret base hints
+    for base in &system.secret_bases {
+        match base.base_type {
+            SecretBaseType::Asteroid => lines.push("FAINT SIGNAL DETECTED IN ASTEROID BELT".to_string()),
+            SecretBaseType::OortCloud => lines.push("ANOMALOUS BEACON — EXTREME OUTER SYSTEM".to_string()),
+            SecretBaseType::MaximumSpace => lines.push("UNKNOWN TRANSMISSION FROM BEYOND SYSTEM EDGE".to_string()),
+        }
+    }
+
+    // Check faction memory for changes
+    if let Some(memory) = player_state.faction_memory.get(&star.id) {
+        if memory.faction_id != faction_state.controlling_faction_id {
+            if let Some(old_faction) = get_faction(&memory.faction_id) {
+                lines.push(format!("LAST VISIT: YEAR {}. {} NO LONGER HOLDS THIS SYSTEM.",
+                    memory.galaxy_year, old_faction.name.to_uppercase()));
+            }
+        }
+    }
+
+    SystemPayload {
+        system,
+        civ_state,
+        faction_state,
+        market,
+        landing_event,
+        system_entry_lines: lines,
+    }
+}
+
+fn jump_years_elapsed(distance: f64) -> u32 {
+    // Base: 20 years per unit distance, with some scaling
+    let years = (distance * 20.0).round() as u32;
+    years.max(10) // minimum 10 years per jump
+}
+
+// ─── WASM API ───────────────────────────────────────────────────────────────
+
+/// Initialize the game engine. Called once at game start or load.
+///
+/// Arguments:
+/// - `player_state_json`: JSON-serialized PlayerState (or empty string for new game)
+///
+/// Returns: JSON-serialized InitResult
+#[wasm_bindgen]
+pub fn init_game(player_state_json: &str) -> Result<String, JsValue> {
+    let cluster = generate_cluster();
+
+    let player_state: PlayerState = if player_state_json.is_empty() {
+        PlayerState {
+            credits: STARTING_CREDITS,
+            cargo: std::collections::HashMap::new(),
+            cargo_cost_basis: std::collections::HashMap::new(),
+            fuel: STARTING_FUEL,
+            shields: 100.0,
+            current_system_id: 0,
+            visited_systems: vec![0],
+            galaxy_year: GALAXY_YEAR_START,
+            player_choices: std::collections::HashMap::new(),
+            last_visit_year: std::collections::HashMap::new(),
+            known_factions: vec![],
+            faction_memory: std::collections::HashMap::new(),
+        }
+    } else {
+        serde_json::from_str(player_state_json)
+            .map_err(|e| JsValue::from_str(&format!("Failed to parse player state: {}", e)))?
+    };
+
+    let galaxy_state = init_galaxy_state(&cluster, player_state.galaxy_year);
+
+    let system_payload = build_system_payload(
+        &cluster[player_state.current_system_id as usize],
+        player_state.galaxy_year,
+        &player_state,
+        None,
+    );
+
+    let cluster_summary = build_cluster_summary(&cluster, player_state.galaxy_year);
+
+    // Store engine state
+    let mut state = ENGINE_STATE.lock().map_err(|e| JsValue::from_str(&e.to_string()))?;
+    *state = Some(EngineState {
+        cluster: cluster.clone(),
+        galaxy_state,
+    });
+
+    let result = InitResult {
+        system_payload,
+        cluster_summary,
+        cluster,
+    };
+
+    serde_json::to_string(&result)
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize: {}", e)))
+}
+
+/// Primary game call — execute a hyperspace jump.
+///
+/// Arguments:
+/// - `target_system_id`: destination system ID
+/// - `player_state_json`: JSON-serialized PlayerState
+///
+/// Returns: JSON-serialized JumpResult
+#[wasm_bindgen]
+pub fn jump_to_system(target_system_id: u32, player_state_json: &str) -> Result<String, JsValue> {
+    let player_state: PlayerState = serde_json::from_str(player_state_json)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse player state: {}", e)))?;
+
+    let mut engine = ENGINE_STATE.lock().map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let engine = engine.as_mut()
+        .ok_or_else(|| JsValue::from_str("Engine not initialized — call init_game first"))?;
+
+    let cluster = &engine.cluster;
+    let current = &cluster[player_state.current_system_id as usize];
+    let target = &cluster[target_system_id as usize];
+
+    // Calculate distance and years
+    let dx = target.x - current.x;
+    let dy = target.y - current.y;
+    let distance = (dx * dx + dy * dy).sqrt();
+    let years_elapsed = jump_years_elapsed(distance);
+    let new_galaxy_year = player_state.galaxy_year + years_elapsed;
+
+    // Simulate the galaxy forward
+    simulate_galaxy(cluster, &mut engine.galaxy_state, &player_state, years_elapsed);
+
+    // Build the destination system payload
+    let system_payload = build_system_payload(
+        target,
+        new_galaxy_year,
+        &player_state,
+        None,
+    );
+
+    let cluster_summary = build_cluster_summary(cluster, new_galaxy_year);
+
+    let result = JumpResult {
+        system_payload,
+        cluster_summary,
+        years_elapsed,
+        new_galaxy_year,
+    };
+
+    serde_json::to_string(&result)
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize: {}", e)))
+}
+
+/// Get market prices for a specific system (used when docked).
+///
+/// Returns: JSON-serialized Vec<MarketEntry>
+#[wasm_bindgen]
+pub fn get_system_market(system_id: u32, player_state_json: &str) -> Result<String, JsValue> {
+    let player_state: PlayerState = serde_json::from_str(player_state_json)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse player state: {}", e)))?;
+
+    let engine = ENGINE_STATE.lock().map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let engine = engine.as_ref()
+        .ok_or_else(|| JsValue::from_str("Engine not initialized"))?;
+
+    let star = &engine.cluster[system_id as usize];
+    let civ_state = get_civ_state(system_id, player_state.galaxy_year, star.economy);
+    let system_choices = player_state.player_choices.get(&system_id);
+    let market = get_market(system_id, civ_state.economy, Some(&civ_state), system_choices);
+
+    serde_json::to_string(&market)
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize: {}", e)))
+}
+
+/// Select a landing event for a station dock.
+///
+/// Returns: JSON-serialized Option<LandingEvent>
+#[wasm_bindgen]
+pub fn get_landing_event(
+    system_id: u32,
+    player_state_json: &str,
+    secret_base_id: &str,
+) -> Result<String, JsValue> {
+    let player_state: PlayerState = serde_json::from_str(player_state_json)
+        .map_err(|e| JsValue::from_str(&format!("Failed to parse player state: {}", e)))?;
+
+    let engine = ENGINE_STATE.lock().map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let engine = engine.as_ref()
+        .ok_or_else(|| JsValue::from_str("Engine not initialized"))?;
+
+    let star = &engine.cluster[system_id as usize];
+    let civ_state = get_civ_state(system_id, player_state.galaxy_year, star.economy);
+    let system_choices = player_state.player_choices.get(&system_id);
+    let event_seed = player_state.galaxy_year.wrapping_mul(31337).wrapping_add(system_id.wrapping_mul(1009));
+
+    let event = if secret_base_id.is_empty() {
+        select_event(&civ_state, system_choices, event_seed)
+    } else {
+        let system = generate_solar_system(star);
+        let base_type = system.secret_bases.iter()
+            .find(|b| b.id == secret_base_id)
+            .map(|b| b.base_type);
+        base_type.and_then(|bt| select_secret_base_event(bt, system_choices, event_seed))
+    };
+
+    serde_json::to_string(&event)
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize: {}", e)))
+}
+
+/// Get the current cluster summary (all 30 systems' state).
+///
+/// Returns: JSON-serialized Vec<ClusterSystemSummary>
+#[wasm_bindgen]
+pub fn get_cluster_summary(galaxy_year: u32) -> Result<String, JsValue> {
+    let engine = ENGINE_STATE.lock().map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let engine = engine.as_ref()
+        .ok_or_else(|| JsValue::from_str("Engine not initialized"))?;
+
+    let summary = build_cluster_summary(&engine.cluster, galaxy_year);
+    serde_json::to_string(&summary)
+        .map_err(|e| JsValue::from_str(&format!("Failed to serialize: {}", e)))
+}

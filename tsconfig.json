@@ -14,7 +14,10 @@
     "strict": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "engine-wasm": ["./engine/pkg/time_in_transit_engine"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "engine/pkg"]
 }
