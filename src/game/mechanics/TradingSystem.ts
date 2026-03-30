@@ -46,6 +46,8 @@ export class TradingSystem {
     economy: EconomyType,
     civState?: CivilizationState,
     systemChoices?: SystemChoices,
+    galaxyYear?: number,
+    lastVisitYear?: number,
   ): MarketEntry[] {
     // Era-seeded PRNG as per design spec
     const era = civState?.era ?? 0;
@@ -61,9 +63,15 @@ export class TradingSystem {
     const techBonus = new Set<GoodName>(civState?.techBonus ?? []);
     const anarchyVariance = civState?.anarchyVariance ?? false;
     const choiceMod = systemChoices?.priceModifier ?? 1.0;
-    const repBonus = systemChoices
-      ? 1.0 + systemChoices.tradingReputation * REPUTATION_SELL_BONUS
-      : 1.0;
+    const REPUTATION_DECAY_YEARS = 500;
+    const yearsSinceVisit = (galaxyYear !== undefined && lastVisitYear !== undefined)
+      ? galaxyYear - lastVisitYear
+      : 0;
+    const decayFactor = Math.max(0, 1 - yearsSinceVisit / REPUTATION_DECAY_YEARS);
+    const effectiveRep = systemChoices
+      ? systemChoices.tradingReputation * decayFactor
+      : 0;
+    const repBonus = 1.0 + effectiveRep * REPUTATION_SELL_BONUS;
 
     return GOODS.map(good => {
       const base = BASE_PRICES[good];

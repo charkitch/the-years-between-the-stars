@@ -32,7 +32,8 @@ export function StationUI({ onUndock }: StationUIProps) {
   if (!starData) return null;
   const civState = getCivState(currentSystemId, galaxyYear, starData.economy);
   const systemChoices = playerChoices[currentSystemId];
-  const market = trading.getMarket(currentSystemId, civState.economy, civState, systemChoices);
+  const lastVisitYear = useGameState(s => s.lastVisitYear);
+  const market = trading.getMarket(currentSystemId, civState.economy, civState, systemChoices, galaxyYear, lastVisitYear[currentSystemId]);
   const cargoTotal = trading.cargoTotal(player.cargo);
   const cargoSpace = MAX_CARGO - cargoTotal;
 

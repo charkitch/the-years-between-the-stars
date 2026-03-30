@@ -11,7 +11,7 @@ import { selectEvent, selectSecretBaseEvent } from './data/events';
 import { generateSolarSystem } from './generation/SystemGenerator';
 import { useGameState } from './GameState';
 import type { SystemChoices } from './GameState';
-import { HYPERSPACE, FUEL_HARVEST, GAS_GIANT_SCOOP } from './constants';
+import { HYPERSPACE, FUEL_HARVEST, GAS_GIANT_SCOOP, ERA_LENGTH } from './constants';
 import type { GoodName } from './constants';
 import type { ChoiceEffect } from './data/events';
 import { MAX_CARGO } from './constants';
@@ -31,6 +31,7 @@ export class Game {
   private gasGiantScoopingFuel = false;
   private harvestingFuel = false;
   private isDead = false;
+  private preJumpEra = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.sceneRenderer = new SceneRenderer(canvas);
@@ -456,6 +457,7 @@ export class Game {
     const yearsElapsed = jumpYearsElapsed(dist);
 
     state.setFuel(state.player.fuel - cost);
+    this.preJumpEra = Math.floor(state.galaxyYear / ERA_LENGTH);
     state.advanceGalaxyYear(yearsElapsed);
     state.addJumpLogEntry({
       fromSystemId: state.currentSystemId,
@@ -521,6 +523,20 @@ export class Game {
     if (contestFaction) state.addKnownFaction(contestFaction.id);
 
     const lines: string[] = [];
+
+    // Era transition narration
+    const currentEra = Math.floor(state.galaxyYear / ERA_LENGTH);
+    if (currentEra !== this.preJumpEra) {
+      const erasCrossed = currentEra - this.preJumpEra;
+      lines.push(`— ERA ${currentEra} — GALAXY YEAR ${state.galaxyYear.toLocaleString()} —`);
+      if (erasCrossed === 1) {
+        lines.push('Centuries have passed. Empires have risen and fallen in your absence.');
+      } else {
+        lines.push(`${erasCrossed} eras have passed. The galaxy you knew is ancient history.`);
+      }
+      lines.push('');
+    }
+
     lines.push(`ENTERING ${starData.name.toUpperCase()}`);
 
     if (factionState.isContested && contestFaction && controlFaction) {
