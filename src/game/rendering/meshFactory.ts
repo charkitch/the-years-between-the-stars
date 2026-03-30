@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { PALETTE } from '../constants';
 import { loadTexture } from './textureCache';
 import type { PlanetSkin } from './planetSkins';
-import type { SurfaceType } from '../generation/SystemGenerator';
+import type { SurfaceType, GasGiantType } from '../generation/SystemGenerator';
 
 /** Creates a group with filled mesh + wireframe overlay */
 export function makeWireframeObject(
@@ -219,27 +219,158 @@ export function makePlanet(
   return group;
 }
 
-/** Gas giant with vertex color banding */
-export function makeGasGiant(radius: number, baseColor: number, rng: () => number): THREE.Group {
-  const geo = new THREE.IcosahedronGeometry(radius, 2);
-  const colors: number[] = [];
-  const color = new THREE.Color(baseColor);
-  const positions = geo.attributes.position;
+// Gas giant type index for GLSL: 0=jovian, 1=saturnian, 2=neptunian, 3=inferno, 4=chromatic
+const GAS_TYPE_INDEX: Record<GasGiantType, number> = {
+  jovian: 0, saturnian: 1, neptunian: 2, inferno: 3, chromatic: 4,
+};
 
-  for (let i = 0; i < positions.count; i++) {
-    const y = positions.getY(i);
-    const band = Math.sin(y * 0.05 + rng() * 2) * 0.5 + 0.5;
-    const c = color.clone().lerp(new THREE.Color(0xFFFFFF), band * 0.3);
-    colors.push(c.r, c.g, c.b);
-  }
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
+/** Procedural gas giant — type drives banding style and palette */
+export function makeGasGiant(
+  radius: number, baseColor: number, rng: () => number,
+  seed: number = 0, gasType: GasGiantType = 'jovian',
+): THREE.Group {
   const group = new THREE.Group();
-  const fillMat = new THREE.MeshLambertMaterial({ vertexColors: true });
-  group.add(new THREE.Mesh(geo, fillMat));
+  const geo = new THREE.SphereGeometry(radius, 32, 24);
 
-  const edgesGeo = new THREE.EdgesGeometry(geo);
-  const wireMat = new THREE.LineBasicMaterial({ color: PALETTE.wireframe, transparent: true, opacity: 0.4 });
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      seed: { value: seed },
+      baseColor: { value: new THREE.Color(baseColor) },
+      gasType: { value: GAS_TYPE_INDEX[gasType] },
+    },
+    vertexShader: `
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPosition;
+      varying vec3 vLocalPos;
+      void main() {
+        vLocalPos = position;
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPos.xyz;
+        vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `,
+    fragmentShader: `
+      ${GLSL_NOISE}
+      uniform float seed;
+      uniform vec3 baseColor;
+      uniform int gasType;
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPosition;
+      varying vec3 vLocalPos;
+
+      void main() {
+        vec3 toStar = normalize(-vWorldPosition);
+        float sunDot = dot(vWorldNormal, toStar);
+
+        vec3 norm = normalize(vLocalPos);
+        // Latitude — drives horizontal banding
+        float lat = norm.y;
+
+        // Noise inputs
+        vec3 np = norm * 3.0 + vec3(seed * 7.7, seed * 3.1, seed * 11.3);
+        float n1 = snoise(np);
+        float n2 = snoise(np * 2.5 + vec3(50.0));
+        float n3 = fbm(np * 1.5);
+
+        vec3 surfaceColor;
+
+        if (gasType == 0) {
+          // ── Jovian: bold warm bands, Great Red Spot style storms ──
+          float band = sin(lat * 18.0 + n1 * 1.5) * 0.5 + 0.5;
+          float fineBand = sin(lat * 45.0 + n2 * 0.8) * 0.5 + 0.5;
+          vec3 bright = vec3(0.9, 0.75, 0.5);
+          vec3 dark = vec3(0.6, 0.35, 0.15);
+          vec3 belt = vec3(0.75, 0.55, 0.3);
+          surfaceColor = mix(dark, bright, band);
+          surfaceColor = mix(surfaceColor, belt, fineBand * 0.3);
+          // Storm spots
+          float storm = smoothstep(0.55, 0.7, n3) * smoothstep(0.2, 0.0, abs(lat - 0.3 - seed * 0.1));
+          vec3 stormColor = vec3(0.85, 0.3, 0.15);
+          surfaceColor = mix(surfaceColor, stormColor, storm * 0.8);
+
+        } else if (gasType == 1) {
+          // ── Saturnian: pale gold/cream with subtle delicate bands ──
+          float band = sin(lat * 25.0 + n1 * 0.6) * 0.5 + 0.5;
+          float whisper = sin(lat * 60.0 + n2 * 0.4) * 0.5 + 0.5;
+          vec3 cream = vec3(0.92, 0.85, 0.65);
+          vec3 gold = vec3(0.8, 0.7, 0.45);
+          vec3 pale = vec3(0.95, 0.92, 0.8);
+          surfaceColor = mix(gold, cream, band);
+          surfaceColor = mix(surfaceColor, pale, whisper * 0.2);
+          // Faint polar hexagon hint
+          float polar = smoothstep(0.75, 0.9, abs(lat));
+          float hex = sin(atan(norm.z, norm.x) * 6.0) * 0.5 + 0.5;
+          surfaceColor = mix(surfaceColor, vec3(0.7, 0.65, 0.5), polar * hex * 0.15);
+
+        } else if (gasType == 2) {
+          // ── Neptunian: deep blue-cyan with bright white cloud streaks ──
+          float band = sin(lat * 14.0 + n1 * 2.0) * 0.5 + 0.5;
+          vec3 deep = vec3(0.05, 0.1, 0.4);
+          vec3 mid = vec3(0.1, 0.25, 0.6);
+          vec3 bright = vec3(0.2, 0.45, 0.8);
+          surfaceColor = mix(deep, mid, band);
+          surfaceColor = mix(surfaceColor, bright, band * band * 0.5);
+          // Bright white cloud wisps — elongated along latitude
+          float wisp = smoothstep(0.5, 0.8, snoise(vec3(norm.x * 8.0 + seed, lat * 3.0, norm.z * 8.0)));
+          surfaceColor = mix(surfaceColor, vec3(0.8, 0.9, 1.0), wisp * 0.6);
+          // Dark spot
+          float spot = smoothstep(0.6, 0.75, n3) * smoothstep(0.25, 0.0, abs(lat + 0.2));
+          surfaceColor = mix(surfaceColor, vec3(0.02, 0.04, 0.2), spot * 0.7);
+
+        } else if (gasType == 3) {
+          // ── Inferno: hot Jupiter, close-orbit scorched giant ──
+          float band = sin(lat * 12.0 + n1 * 2.5) * 0.5 + 0.5;
+          vec3 molten = vec3(0.95, 0.3, 0.05);
+          vec3 dark = vec3(0.3, 0.05, 0.02);
+          vec3 bright = vec3(1.0, 0.7, 0.2);
+          surfaceColor = mix(dark, molten, band);
+          // Roiling convection cells
+          float cells = abs(n3);
+          surfaceColor = mix(surfaceColor, bright, cells * 0.4);
+          // Incandescent glow on star-facing side
+          float scorchMask = smoothstep(-0.2, 0.6, sunDot);
+          surfaceColor = mix(surfaceColor, vec3(1.0, 0.85, 0.4), scorchMask * 0.25);
+          // Dark terminator storms
+          float terminator = smoothstep(0.1, 0.0, abs(sunDot)) * smoothstep(0.3, 0.6, n3);
+          surfaceColor = mix(surfaceColor, vec3(0.15, 0.02, 0.0), terminator * 0.5);
+
+        } else {
+          // ── Chromatic: alien, iridescent, shifting prismatic bands ──
+          float band = sin(lat * 20.0 + n1 * 1.8) * 0.5 + 0.5;
+          float shift = sin(lat * 35.0 + n2 * 1.2 + seed * 5.0) * 0.5 + 0.5;
+          // Rainbow cycle driven by latitude + noise
+          float hue = fract(lat * 0.8 + n1 * 0.3 + seed * 0.1);
+          // HSV to RGB approximation
+          vec3 rainbow = 0.5 + 0.5 * cos(6.28318 * (hue + vec3(0.0, 0.33, 0.67)));
+          rainbow = pow(rainbow, vec3(0.8)); // desaturate slightly
+          vec3 dark = rainbow * 0.3;
+          surfaceColor = mix(dark, rainbow, band);
+          // Metallic sheen bands
+          float sheen = pow(shift, 3.0);
+          surfaceColor = mix(surfaceColor, vec3(0.95, 0.95, 1.0), sheen * 0.2);
+          // Deep vortex swirls
+          float vortex = smoothstep(0.45, 0.7, abs(snoise(np * 3.0)));
+          surfaceColor = mix(surfaceColor, surfaceColor * 0.4, vortex * 0.3);
+        }
+
+        // Lighting
+        float lighting = smoothstep(-0.3, 0.8, sunDot) * 0.8 + 0.2;
+
+        gl_FragColor = vec4(surfaceColor * lighting, 1.0);
+      }
+    `,
+  });
+
+  group.add(new THREE.Mesh(geo, mat));
+
+  // Wireframe overlay
+  const edgesGeo = new THREE.EdgesGeometry(geo, 15);
+  const wireMat = new THREE.LineBasicMaterial({
+    color: PALETTE.wireframe,
+    transparent: true,
+    opacity: 0.12,
+  });
   group.add(new THREE.LineSegments(edgesGeo, wireMat));
 
   return group;
@@ -486,7 +617,14 @@ export function makeTexturedGasGiant(
   fallbackColor: number,
   skin: PlanetSkin | null,
   wireOverlay: boolean,
+  seed: number = 0,
+  gasType: GasGiantType = 'jovian',
 ): THREE.Group {
+  // No skin — use procedural shader
+  if (!skin) {
+    return makeGasGiant(radius, fallbackColor, () => 0, seed, gasType);
+  }
+
   const geo = new THREE.SphereGeometry(radius, 32, 24);
   const mat = new THREE.MeshStandardMaterial({
     color: fallbackColor,
@@ -494,10 +632,8 @@ export function makeTexturedGasGiant(
     metalness: 0.0,
   });
 
-  if (skin) {
-    mat.map = loadTexture(skin.albedo);
-    if (skin.normal) mat.normalMap = loadTexture(skin.normal);
-  }
+  mat.map = loadTexture(skin.albedo);
+  if (skin.normal) mat.normalMap = loadTexture(skin.normal);
 
   const group = new THREE.Group();
   group.add(new THREE.Mesh(geo, mat));

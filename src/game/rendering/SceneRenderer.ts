@@ -152,11 +152,11 @@ export class SceneRenderer {
         const category = planet.type === 'gas_giant' ? 'gas' : 'rocky';
         const skin = selectSkin(category, skinRng);
         planetGroup = planet.type === 'gas_giant'
-          ? makeTexturedGasGiant(planet.radius, planet.color, skin, wireOverlay)
+          ? makeTexturedGasGiant(planet.radius, planet.color, skin, wireOverlay, planetSeed, planet.gasType)
           : makeTexturedPlanet(planet.radius, planet.color, skin, wireOverlay, planetSeed, planet.surfaceType);
       } else {
         planetGroup = planet.type === 'gas_giant'
-          ? makeGasGiant(planet.radius, planet.color, () => rng.next())
+          ? makeGasGiant(planet.radius, planet.color, () => rng.next(), planetSeed, planet.gasType)
           : makePlanet(planet.radius, planet.color, 1, planetSeed, planet.surfaceType);
       }
       // City lights + sun atmosphere for non-gas-giant planets
