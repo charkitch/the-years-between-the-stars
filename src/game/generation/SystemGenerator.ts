@@ -95,13 +95,19 @@ export function generateSolarSystem(star: StarSystemData): SolarSystemData {
   for (let i = 0; i < innerCount; i++) {
     const orbitRadius = orbitBase + rng.float(200, 600);
     orbitBase = orbitRadius + rng.float(300, 500);
+    const planetRadius = rng.float(60, 120);
     const moonCount = rng.int(0, 2);
     const moons: MoonData[] = [];
+    // Each moon orbit starts beyond planet surface + previous moon
+    let moonOrbitMin = planetRadius * 1.5;
     for (let m = 0; m < moonCount; m++) {
+      const moonRadius = rng.float(20, 40);
+      const moonOrbit = moonOrbitMin + moonRadius + rng.float(20, 80);
+      moonOrbitMin = moonOrbit + moonRadius;
       moons.push({
         id: `${star.id}-p${i}-m${m}`,
-        radius: rng.float(20, 40),
-        orbitRadius: rng.float(120, 280),
+        radius: moonRadius,
+        orbitRadius: moonOrbit,
         orbitSpeed: rng.float(0.0003, 0.001),
         orbitPhase: rng.float(0, Math.PI * 2),
         color: rng.pick(MOON_COLORS),
@@ -113,7 +119,7 @@ export function generateSolarSystem(star: StarSystemData): SolarSystemData {
       type: 'rocky',
       surfaceType: rng.pick(SURFACE_TYPES),
       gasType: 'jovian',
-      radius: rng.float(60, 120),
+      radius: planetRadius,
       orbitRadius,
       orbitSpeed: rng.float(0.00005, 0.0002),
       orbitPhase: rng.float(0, Math.PI * 2),
@@ -136,13 +142,24 @@ export function generateSolarSystem(star: StarSystemData): SolarSystemData {
   for (let i = 0; i < outerCount; i++) {
     const orbitRadius = orbitBase + rng.float(1000, 3000);
     orbitBase = orbitRadius + rng.float(1500, 3000);
+    // Generate planet properties before moons so orbit placement can account for them
+    const gasType = rng.pick(GAS_GIANT_TYPES);
+    const planetRadius = rng.float(180, 300);
+    const hasRings = rng.next() < 0.6;
+    // Ring outer edge matches SceneRenderer: radius * 2.2
+    const ringOuterEdge = hasRings ? planetRadius * 2.2 : 0;
     const moonCount = rng.int(2, 6);
     const moons: MoonData[] = [];
+    // Each moon starts beyond the ring (or planet surface) and clears the previous moon
+    let moonOrbitMin = Math.max(planetRadius * 1.5, ringOuterEdge + 40);
     for (let m = 0; m < moonCount; m++) {
+      const moonRadius = rng.float(25, 55);
+      const moonOrbit = moonOrbitMin + moonRadius + rng.float(40, 180);
+      moonOrbitMin = moonOrbit + moonRadius;
       moons.push({
         id: `${star.id}-g${i}-m${m}`,
-        radius: rng.float(25, 55),
-        orbitRadius: rng.float(250, 700),
+        radius: moonRadius,
+        orbitRadius: moonOrbit,
         orbitSpeed: rng.float(0.0001, 0.0006),
         orbitPhase: rng.float(0, Math.PI * 2),
         color: rng.pick(MOON_COLORS),
@@ -153,13 +170,13 @@ export function generateSolarSystem(star: StarSystemData): SolarSystemData {
       name: planetName(star.name, innerCount + i),
       type: 'gas_giant',
       surfaceType: 'continental',
-      gasType: rng.pick(GAS_GIANT_TYPES),
-      radius: rng.float(180, 300),
+      gasType,
+      radius: planetRadius,
       orbitRadius,
       orbitSpeed: rng.float(0.000008, 0.00003),
       orbitPhase: rng.float(0, Math.PI * 2),
       color: rng.pick(GAS_COLORS),
-      hasRings: rng.next() < 0.6,
+      hasRings,
       moons,
       hasStation: false,
     });

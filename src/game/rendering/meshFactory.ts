@@ -838,6 +838,122 @@ export function addSunAtmosphere(group: THREE.Group, radius: number): void {
   group.add(new THREE.Mesh(geo, mat));
 }
 
+/**
+ * Rare lightning flashes on the dark side of planets and gas giants.
+ * Returns the ShaderMaterial so the caller can update uTime each frame.
+ */
+export function addLightning(
+  group: THREE.Group, radius: number, seed: number,
+): THREE.ShaderMaterial {
+  const geo = new THREE.SphereGeometry(radius * 1.002, 32, 24);
+
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime: { value: 0.0 },
+      seed:  { value: seed },
+    },
+    vertexShader: `
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPosition;
+      varying vec3 vLocalPos;
+      void main() {
+        vLocalPos = position;
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPos.xyz;
+        vWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vWorldNormal;
+      varying vec3 vWorldPosition;
+      varying vec3 vLocalPos;
+      uniform float uTime;
+      uniform float seed;
+
+      float hashv(vec2 p, float s) {
+        return fract(sin(dot(p, vec2(127.1, 311.7)) + s) * 43758.5453);
+      }
+
+      float distToSeg(vec2 p, vec2 a, vec2 b) {
+        vec2 ab = b - a, ap = p - a;
+        float t = clamp(dot(ap, ab) / dot(ab, ab), 0.0, 1.0);
+        return length(p - (a + ab * t));
+      }
+
+      void main() {
+        vec3 toStar = normalize(-vWorldPosition);
+        float sunDot = dot(vWorldNormal, toStar);
+        // Only on dark side; fade away near the terminator
+        float darkMask = smoothstep(0.05, -0.2, sunDot);
+        if (darkMask <= 0.001) discard;
+
+        // Spherical UV for cell grid
+        vec3 n = normalize(vLocalPos);
+        float theta = atan(n.z, n.x) / 3.14159265;  // -1..1
+        float phi   = acos(clamp(n.y, -1.0, 1.0)) / 3.14159265; // 0..1
+
+        float gridScale = 9.0;
+        vec2 uvGrid  = vec2(theta * gridScale, phi * gridScale * 0.55);
+        vec2 cellCoord = floor(uvGrid);
+        vec2 local     = fract(uvGrid) - 0.5; // -0.5..0.5
+
+        // ~12% of cells are storm cells
+        float cHash = hashv(cellCoord, seed);
+        if (cHash < 0.88) discard;
+
+        // Rare, brief flash — 0.15-0.35 Hz, visible ~4% of period
+        float flashRate = 0.15 + cHash * 0.2;
+        float phase = fract(uTime * flashRate + cHash * 17.3);
+        float flash = smoothstep(0.0, 0.008, phase) * smoothstep(0.04, 0.022, phase);
+        if (flash <= 0.001) discard;
+
+        // Jagged bolt: 3 connected segments
+        float h1 = hashv(cellCoord, seed + 1.0);
+        float h2 = hashv(cellCoord, seed + 2.0);
+        float h3 = hashv(cellCoord, seed + 3.0);
+        float h4 = hashv(cellCoord, seed + 4.0);
+        float h5 = hashv(cellCoord, seed + 5.0);
+
+        vec2 p0 = vec2((h1 - 0.5) * 0.22, -0.43);
+        vec2 p1 = vec2((h2 - 0.5) * 0.38, -0.12 + (h3 - 0.5) * 0.08);
+        vec2 p2 = vec2((h4 - 0.5) * 0.3,   0.12);
+        vec2 p3 = vec2((h5 - 0.5) * 0.22,  0.43);
+
+        float w = 0.013;
+        float d = min(distToSeg(local, p0, p1),
+                  min(distToSeg(local, p1, p2),
+                      distToSeg(local, p2, p3)));
+        float bolt = smoothstep(w, w * 0.15, d);
+
+        // One sub-branch off the mid-segment
+        float h6 = hashv(cellCoord, seed + 6.0);
+        float h7 = hashv(cellCoord, seed + 7.0);
+        vec2 bStart = mix(p1, p2, 0.45);
+        vec2 bEnd   = bStart + vec2((h6 - 0.5) * 0.17, (h7 * 0.12 + 0.08));
+        float branch = smoothstep(w * 0.8, w * 0.12,
+                         distToSeg(local, bStart, bEnd)) * 0.6;
+
+        // Soft glow halo
+        float glow = smoothstep(w * 5.0, 0.0, d) * 0.25;
+
+        float total = max(bolt, branch) + glow;
+        float alpha = total * flash * darkMask;
+        if (alpha <= 0.001) discard;
+
+        vec3 color = mix(vec3(0.55, 0.75, 1.0), vec3(1.0, 1.0, 1.0), bolt);
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
+  });
+
+  group.add(new THREE.Mesh(geo, mat));
+  return mat;
+}
+
 /** Planetary ring */
 export function makeRingMesh(innerR: number, outerR: number): THREE.Mesh {
   const geo = new THREE.RingGeometry(innerR, outerR, 64);

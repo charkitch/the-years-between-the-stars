@@ -12,7 +12,7 @@ import {
   makeAsteroidBelt, makeRingMesh, makeNPCShipMesh, makeFleetShipMesh,
   makeAsteroidBase, makeOortCloudBase, makeMaximumSpaceBase,
   makeTexturedPlanet, makeTexturedGasGiant, makeTexturedRing,
-  addCityLights, addSunAtmosphere,
+  addCityLights, addSunAtmosphere, addLightning,
 } from './meshFactory';
 import { selectSkin } from './planetSkins';
 import { disposeAll as disposeTextureCache } from './textureCache';
@@ -53,6 +53,7 @@ export class SceneRenderer {
   private hyperspacePoints: THREE.Points | null = null;
   private hyperspaceGrid: THREE.LineSegments | null = null;
   private systemObjects: THREE.Object3D[] = [];
+  private lightningMaterials: THREE.ShaderMaterial[] = [];
   private battleProjectiles: THREE.Points | null = null;
   private battleExplosions: BattleExplosions | null = null;
   private fleetBattleData: FleetBattle | null = null;
@@ -102,6 +103,7 @@ export class SceneRenderer {
     // Remove old system objects
     this.systemObjects.forEach(o => this.scene.remove(o));
     this.systemObjects = [];
+    this.lightningMaterials = [];
     this.entities.clear();
     this.npcShips.clear();
     this.battleProjectiles = null;
@@ -164,6 +166,7 @@ export class SceneRenderer {
         addCityLights(planetGroup, planet.radius, planetSeed, planet.surfaceType);
         addSunAtmosphere(planetGroup, planet.radius);
       }
+      this.lightningMaterials.push(addLightning(planetGroup, planet.radius, planetSeed));
 
       planetGroup.position.set(planet.orbitRadius, 0, 0);
       this.scene.add(planetGroup);
@@ -225,6 +228,7 @@ export class SceneRenderer {
         }
         addCityLights(moonGroup, moon.radius, moonSeed);
         addSunAtmosphere(moonGroup, moon.radius);
+        this.lightningMaterials.push(addLightning(moonGroup, moon.radius, moonSeed));
         this.scene.add(moonGroup);
         this.systemObjects.push(moonGroup);
         this.entities.set(moon.id, {
@@ -517,6 +521,11 @@ export class SceneRenderer {
 
         entity.worldPos.copy(entity.group.position);
       }
+    }
+
+    // Tick lightning shaders
+    for (const mat of this.lightningMaterials) {
+      mat.uniforms.uTime.value = time;
     }
 
     // Battle projectile + explosion animation
