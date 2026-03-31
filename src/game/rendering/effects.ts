@@ -100,11 +100,37 @@ export interface BattleProjectileData {
   tValues: Float32Array;
   sourceIndices: Uint8Array;
   targetIndices: Uint8Array;
+  sourceSides: Uint8Array;
   colors: Float32Array; // r,g,b per projectile
   colorA: THREE.Color;
   colorB: THREE.Color;
   aliveA: boolean[];
   aliveB: boolean[];
+}
+
+const BATTLE_PROJECTILE_COUNT = 80;
+const BATTLE_PROJECTILE_SPEED = 1.1;
+
+function configureBattleProjectile(
+  data: Pick<BattleProjectileData, 'tValues' | 'sourceIndices' | 'targetIndices' | 'sourceSides' | 'colors' | 'colorA' | 'colorB'>,
+  index: number,
+  fromA: boolean,
+  shipsA: THREE.Vector3[],
+  shipsB: THREE.Vector3[],
+  initialT = 0,
+): void {
+  const sources = fromA ? shipsA : shipsB;
+  const targets = fromA ? shipsB : shipsA;
+  const color = fromA ? data.colorA : data.colorB;
+
+  data.sourceSides[index] = fromA ? 0 : 1;
+  data.sourceIndices[index] = Math.floor(Math.random() * sources.length);
+  data.targetIndices[index] = Math.floor(Math.random() * targets.length);
+  data.tValues[index] = initialT;
+
+  data.colors[index * 3] = color.r;
+  data.colors[index * 3 + 1] = color.g;
+  data.colors[index * 3 + 2] = color.b;
 }
 
 export function createBattleProjectiles(
@@ -115,30 +141,35 @@ export function createBattleProjectiles(
   colorA: number,
   colorB: number,
 ): THREE.Points {
-  const count = 80;
+  const count = BATTLE_PROJECTILE_COUNT;
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
   const tValues = new Float32Array(count);
   const sourceIndices = new Uint8Array(count);
   const targetIndices = new Uint8Array(count);
+  const sourceSides = new Uint8Array(count);
 
   const cA = new THREE.Color(colorA);
   const cB = new THREE.Color(colorB);
 
+  const data: BattleProjectileData = {
+    tValues,
+    sourceIndices,
+    targetIndices,
+    sourceSides,
+    colors,
+    colorA: cA,
+    colorB: cB,
+    aliveA: shipsA.map(() => true),
+    aliveB: shipsB.map(() => true),
+  };
+
   for (let i = 0; i < count; i++) {
-    const fromA = Math.random() < 0.5;
+    configureBattleProjectile(data, i, i % 2 === 0, shipsA, shipsB, Math.random());
+
+    const fromA = sourceSides[i] === 0;
     const sources = fromA ? shipsA : shipsB;
     const targets = fromA ? shipsB : shipsA;
-    const color = fromA ? cA : cB;
-
-    sourceIndices[i] = Math.floor(Math.random() * sources.length);
-    targetIndices[i] = Math.floor(Math.random() * targets.length);
-    tValues[i] = Math.random();
-
-    colors[i * 3] = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
-
     const src = sources[sourceIndices[i]];
     const tgt = targets[targetIndices[i]];
     positions[i * 3] = src.x + (tgt.x - src.x) * tValues[i];
@@ -161,16 +192,6 @@ export function createBattleProjectiles(
 
   const points = new THREE.Points(geo, mat);
 
-  const data: BattleProjectileData = {
-    tValues,
-    sourceIndices,
-    targetIndices,
-    colors,
-    colorA: cA,
-    colorB: cB,
-    aliveA: shipsA.map(() => true),
-    aliveB: shipsB.map(() => true),
-  };
   (points as any)._battleData = data;
   (points as any)._shipsA = shipsA;
   (points as any)._shipsB = shipsB;
@@ -194,7 +215,7 @@ export function updateBattleProjectiles(
   const count = data.tValues.length;
 
   for (let i = 0; i < count; i++) {
-    data.tValues[i] += dt * 1.5;
+    data.tValues[i] += dt * BATTLE_PROJECTILE_SPEED;
 
     if (data.tValues[i] >= 1) {
       // Spawn explosion at impact point
@@ -208,23 +229,11 @@ export function updateBattleProjectiles(
         spawnExplosion(explosions, impactX, impactY, impactZ, r, g, b);
       }
 
-      // Reset with new random source/target
-      data.tValues[i] = 0;
-      const fromA = Math.random() < 0.5;
-      const sources = fromA ? shipsA : shipsB;
-      const targets = fromA ? shipsB : shipsA;
-      const color = fromA ? data.colorA : data.colorB;
-
-      data.sourceIndices[i] = Math.floor(Math.random() * sources.length);
-      data.targetIndices[i] = Math.floor(Math.random() * targets.length);
-
-      data.colors[i * 3] = color.r;
-      data.colors[i * 3 + 1] = color.g;
-      data.colors[i * 3 + 2] = color.b;
+      // Preserve balanced crossfire by keeping each slot assigned to one side.
+      configureBattleProjectile(data, i, data.sourceSides[i] === 0, shipsA, shipsB, 0);
     }
 
-    const fromA = data.colors[i * 3] === data.colorA.r &&
-                  data.colors[i * 3 + 1] === data.colorA.g;
+    const fromA = data.sourceSides[i] === 0;
     const sources = fromA ? shipsA : shipsB;
     const targets = fromA ? shipsB : shipsA;
 

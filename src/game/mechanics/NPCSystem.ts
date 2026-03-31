@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { SolarSystemData } from '../generation/SystemGenerator';
 import type { GoodName } from '../constants';
 import { PRNG } from '../generation/prng';
-import { CLUSTER_SEED, GOODS } from '../constants';
+import { CLUSTER_SEED, MARKET_GOODS } from '../constants';
 
 export interface NPCCargoEntry {
   good: GoodName;
@@ -102,7 +102,7 @@ export function generateNPCShips(
       let good: GoodName;
       let attempts = 0;
       do {
-        good = cargoRng.pick(GOODS) as GoodName;
+        good = cargoRng.pick(MARKET_GOODS) as GoodName;
         attempts++;
       } while (usedGoods.has(good) && attempts < 20);
       usedGoods.add(good);

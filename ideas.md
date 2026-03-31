@@ -29,3 +29,7 @@ a planet bound jump gate that is instanenous, allowing our player to experience 
 in progress dyson spheres, built dyson spheres, abandoned dyson spheres
 same for rings
 sad commentary about seeing wonders and the corpses of wonders. 
+
+
+-----
+

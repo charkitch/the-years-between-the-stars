@@ -74,7 +74,7 @@ export const STAR_COLORS: Record<string, number> = {
   A: PALETTE.starA,
 };
 
-export const GOODS = [
+const BUYABLE_GOODS = [
   'Food',
   'Textiles',
   'Radioactives',
@@ -84,7 +84,17 @@ export const GOODS = [
   'Computers',
 ] as const;
 
+export const COMBAT_INTELLIGENCE_GOOD = 'Combat Intelligence' as const;
+
+export const GOODS = [
+  ...BUYABLE_GOODS,
+  COMBAT_INTELLIGENCE_GOOD,
+] as const;
+
 export type GoodName = typeof GOODS[number];
+
+export const MARKET_GOODS: readonly GoodName[] = BUYABLE_GOODS;
+export const SELL_ONLY_GOODS: readonly GoodName[] = [COMBAT_INTELLIGENCE_GOOD];
 
 export const ECONOMY_TYPES = ['Agricultural', 'Industrial', 'High Tech', 'Rich Industrial', 'Poor Agricultural', 'Refinery'] as const;
 export type EconomyType = typeof ECONOMY_TYPES[number];

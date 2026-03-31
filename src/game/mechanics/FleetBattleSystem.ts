@@ -6,6 +6,9 @@ import { getCivState } from './CivilizationSystem';
 import type { SolarSystemData, PlanetData } from '../generation/SystemGenerator';
 import type { StarSystemData } from '../generation/ClusterGenerator';
 
+export const BATTLE_WEAPONS_RANGE = 600;
+export const BATTLE_DANGER_RANGE = 350;
+
 export interface FleetShip {
   id: string;
   localOffset: THREE.Vector3;
@@ -253,7 +256,7 @@ export function generateFleetBattle(
   // of the engagement to drift back through the star.
   const outward = planetPos.clone().normalize();
   const tangent = new THREE.Vector3(-outward.z, 0, outward.x);
-  const battleOffset = planet.radius * 4 + 300;
+  const battleOffset = planet.radius * 3.3 + 240;
   const tangentialOffset = rng.float(-140, 140);
   const battlePos = planetPos
     .clone()
@@ -261,17 +264,23 @@ export function generateFleetBattle(
     .addScaledVector(tangent, tangentialOffset);
 
   // Keep the entire battle footprint outside the star.
-  // Account for fleet spread (±200) + jitter (±75) + margin (75) = 350.
-  const starSafeRadius = systemData.starRadius + 350;
+  // Account for wider fleet separation, ship jitter, and a safety margin.
+  const starSafeRadius = systemData.starRadius + 400;
   const distFromStar = battlePos.length();
   if (distFromStar < starSafeRadius) {
     battlePos.copy(outward).multiplyScalar(starSafeRadius);
   }
 
+  const stationOrbitRadius = planet.radius * 2.5;
+  const battleZoneRadius = Math.max(
+    BATTLE_WEAPONS_RANGE,
+    battlePos.distanceTo(planetPos) + stationOrbitRadius + 40,
+  );
+
   // Generate two fleets
   const countA = rng.int(5, 8);
   const countB = rng.int(5, 8);
-  const fleetSpread = 400;
+  const fleetSpread = 480;
 
   const shipsA = generateFleetShips(
     rng, countA, factionState.controllingFactionId,
@@ -290,7 +299,7 @@ export function generateFleetBattle(
     position: battlePos,
     shipsA,
     shipsB,
-    noGoRadius: 600,
+    noGoRadius: battleZoneRadius,
   };
 }
 

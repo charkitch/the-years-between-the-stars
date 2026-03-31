@@ -1,5 +1,11 @@
 import { PRNG } from '../generation/prng';
-import { GOODS, CLUSTER_SEED, type GoodName, type EconomyType } from '../constants';
+import {
+  GOODS,
+  MARKET_GOODS,
+  CLUSTER_SEED,
+  type GoodName,
+  type EconomyType,
+} from '../constants';
 import type { CivilizationState } from './CivilizationSystem';
 import type { SystemChoices } from '../GameState';
 
@@ -11,6 +17,7 @@ const BASE_PRICES: Record<GoodName, number> = {
   'Luxuries':      440,
   'Narcotics':     490,
   'Computers':     853,
+  'Combat Intelligence': 620,
 };
 
 const ECONOMY_MODIFIERS: Record<EconomyType, Partial<Record<GoodName, number>>> = {
@@ -41,6 +48,7 @@ export interface MarketEntry {
   stock: number;
   banned: boolean;
   boom: boolean;
+  buyable: boolean;
 }
 
 export class TradingSystem {
@@ -54,7 +62,7 @@ export class TradingSystem {
     const window = Math.floor(galaxyYear / cycleLength);
     const rng = PRNG.fromIndex(CLUSTER_SEED, systemId * 97 + window * 31);
     if (rng.float(0, 1) >= BOOM_CHANCE) return null;
-    return rng.pick(GOODS);
+    return rng.pick(MARKET_GOODS);
   }
 
   /**
@@ -98,6 +106,8 @@ export class TradingSystem {
       ? this.getMarketBoom(systemId, galaxyYear)
       : null;
 
+    const buyableGoods = new Set<GoodName>(MARKET_GOODS);
+
     return GOODS.map(good => {
       const base = BASE_PRICES[good];
       const mod = mods[good] ?? 0;
@@ -113,13 +123,14 @@ export class TradingSystem {
       price = Math.round(price * choiceMod);
 
       const boom = good === boomGood;
-      const buyPrice = Math.max(1, price);
+      const buyable = buyableGoods.has(good);
+      const buyPrice = buyable ? Math.max(1, price) : 0;
       const boomMod = boom ? BOOM_SELL_MULTIPLIER : 1;
       const sellPrice = Math.max(1, Math.round(price * SELL_MARGIN * repBonus * boomMod));
-      const stock = rng.int(0, MAX_STOCK);
-      const banned = bannedGoods.has(good);
+      const stock = buyable ? rng.int(0, MAX_STOCK) : 0;
+      const banned = buyable && bannedGoods.has(good);
 
-      return { good, buyPrice, sellPrice, stock, banned, boom };
+      return { good, buyPrice, sellPrice, stock, banned, boom, buyable };
     });
   }
 

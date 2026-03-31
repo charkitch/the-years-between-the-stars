@@ -37,8 +37,8 @@ export function StationUI({ onUndock }: StationUIProps) {
   const cargoTotal = trading.cargoTotal(player.cargo);
   const cargoSpace = MAX_CARGO - cargoTotal;
 
-  const handleBuy = (good: GoodName, price: number, stock: number, banned: boolean) => {
-    if (banned || stock === 0 || cargoSpace === 0 || player.credits < price) return;
+  const handleBuy = (good: GoodName, price: number, stock: number, banned: boolean, buyable: boolean) => {
+    if (!buyable || banned || stock === 0 || cargoSpace === 0 || player.credits < price) return;
     addCredits(-price);
     addCargo(good, 1, price);
   };
@@ -132,16 +132,21 @@ export function StationUI({ onUndock }: StationUIProps) {
               </tr>
             </thead>
             <tbody>
-              {market.map(({ good, buyPrice, sellPrice, stock, banned, boom }) => {
+              {market.map(({ good, buyPrice, sellPrice, stock, banned, boom, buyable }) => {
                 const held = player.cargo[good] ?? 0;
                 const avgPaid = player.cargoCostBasis[good];
-                const canBuy = !banned && stock > 0 && cargoSpace > 0 && player.credits >= buyPrice;
+                const canBuy = buyable && !banned && stock > 0 && cargoSpace > 0 && player.credits >= buyPrice;
                 const canSell = held > 0;
                 const profit = avgPaid !== undefined ? sellPrice - avgPaid : null;
                 return (
                   <tr key={good} style={banned ? { opacity: 0.45 } : undefined}>
                     <td>
                       {good}
+                      {!buyable && (
+                        <span style={{ color: 'var(--color-station)', fontSize: '9px', marginLeft: 6, letterSpacing: 1 }}>
+                          SELL-ONLY
+                        </span>
+                      )}
                       {banned && (
                         <span style={{ color: 'var(--color-danger)', fontSize: '9px', marginLeft: 6, letterSpacing: 1 }}>
                           PROHIBITED
@@ -153,8 +158,8 @@ export function StationUI({ onUndock }: StationUIProps) {
                         </span>
                       )}
                     </td>
-                    <td style={{ color: banned ? 'inherit' : 'var(--color-hud)' }}>
-                      {banned ? '—' : buyPrice}
+                    <td style={{ color: banned || !buyable ? 'inherit' : 'var(--color-hud)' }}>
+                      {buyable && !banned ? buyPrice : '—'}
                     </td>
                     <td>
                       <span style={{ color: profit === null ? 'var(--color-warning)' : profit >= 0 ? '#44FF88' : '#FF4422' }}>
@@ -169,13 +174,13 @@ export function StationUI({ onUndock }: StationUIProps) {
                     <td style={{ opacity: held > 0 ? 1 : 0.35, color: 'var(--color-hud-dim)' }}>
                       {avgPaid !== undefined ? Math.round(avgPaid) : '—'}
                     </td>
-                    <td style={{ opacity: 0.7 }}>{banned ? '—' : stock}</td>
+                    <td style={{ opacity: 0.7 }}>{buyable && !banned ? stock : '—'}</td>
                     <td style={{ color: held > 0 ? 'var(--color-station)' : 'inherit' }}>{held}</td>
                     <td style={{ display: 'flex', gap: '4px' }}>
                       <button
                         className={styles.buyBtn}
                         disabled={!canBuy}
-                        onClick={() => handleBuy(good, buyPrice, stock, banned)}
+                        onClick={() => handleBuy(good, buyPrice, stock, banned, buyable)}
                       >BUY</button>
                       <button
                         className={`${styles.buyBtn} ${styles.sellBtn}`}

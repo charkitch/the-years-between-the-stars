@@ -7,15 +7,24 @@ import { HyperspaceSystem } from './mechanics/HyperspaceSystem';
 import { jumpYearsElapsed } from './mechanics/RelativisticTime';
 import { getCivState } from './mechanics/CivilizationSystem';
 import { getSystemFactionState, getFaction } from './mechanics/FactionSystem';
+import { BATTLE_DANGER_RANGE } from './mechanics/FleetBattleSystem';
 import { selectEvent, selectSecretBaseEvent } from './data/events';
 import { generateSolarSystem } from './generation/SystemGenerator';
 import { useGameState } from './GameState';
 import type { SystemChoices } from './GameState';
-import { HYPERSPACE, FUEL_HARVEST, GAS_GIANT_SCOOP, ERA_LENGTH } from './constants';
+import {
+  HYPERSPACE,
+  FUEL_HARVEST,
+  GAS_GIANT_SCOOP,
+  ERA_LENGTH,
+  COMBAT_INTELLIGENCE_GOOD,
+} from './constants';
 import type { GoodName } from './constants';
 import type { ChoiceEffect } from './data/events';
 import { MAX_CARGO } from './constants';
 import type { SecretBaseType } from './generation/SystemGenerator';
+
+const COMBAT_INTEL_INTERVAL = 8;
 
 export class Game {
   private sceneRenderer: SceneRenderer;
@@ -30,6 +39,7 @@ export class Game {
   private scoopingFuel = false;
   private gasGiantScoopingFuel = false;
   private harvestingFuel = false;
+  private combatIntelTimer = 0;
   private isDead = false;
   private preJumpEra = 0;
 
@@ -57,6 +67,7 @@ export class Game {
 
   private loadCurrentSystem(): void {
     const state = useGameState.getState();
+    this.combatIntelTimer = 0;
     const starData = state.cluster[state.currentSystemId];
     const systemData = generateSolarSystem(starData);
     state.setCurrentSystem(state.currentSystemId, systemData);
@@ -292,11 +303,15 @@ export class Game {
     state: ReturnType<typeof useGameState.getState>,
   ): void {
     const battle = this.sceneRenderer.getFleetBattle();
-    if (!battle) return;
+    if (!battle) {
+      this.combatIntelTimer = 0;
+      return;
+    }
 
     const dist = pos.distanceTo(battle.position);
     if (dist < battle.noGoRadius) {
-      if (dist < 350) {
+      const gatheringIntel = this.collectCombatIntelligence(dt, state);
+      if (dist < BATTLE_DANGER_RANGE) {
         // Danger zone — take damage
         state.setShields(state.player.shields - 20 * dt);
         state.setHeat(state.player.heat + 25 * dt);
@@ -305,10 +320,38 @@ export class Game {
           this.triggerDeath();
         }
       } else {
-        // Warning zone
-        state.setAlert('WARNING: ACTIVE COMBAT ZONE');
+        state.setAlert(gatheringIntel ? 'COLLECTING COMBAT INTELLIGENCE' : 'WARNING: ACTIVE COMBAT ZONE');
       }
+      return;
     }
+
+    this.combatIntelTimer = 0;
+  }
+
+  private collectCombatIntelligence(
+    dt: number,
+    state: ReturnType<typeof useGameState.getState>,
+  ): boolean {
+    let cargoUsed = Object.values(state.player.cargo).reduce((sum, qty) => sum + (qty ?? 0), 0);
+    if (cargoUsed >= MAX_CARGO) {
+      this.combatIntelTimer = 0;
+      return false;
+    }
+
+    this.combatIntelTimer += dt;
+    let collected = false;
+    while (this.combatIntelTimer >= COMBAT_INTEL_INTERVAL && cargoUsed < MAX_CARGO) {
+      state.addCargo(COMBAT_INTELLIGENCE_GOOD, 1, 0);
+      this.combatIntelTimer -= COMBAT_INTEL_INTERVAL;
+      cargoUsed++;
+      collected = true;
+    }
+
+    if (cargoUsed >= MAX_CARGO) {
+      this.combatIntelTimer = 0;
+    }
+
+    return collected || cargoUsed < MAX_CARGO;
   }
 
   private tryDock(): void {
@@ -488,6 +531,7 @@ export class Game {
 
   private arriveInSystem(targetId: number): void {
     const state = useGameState.getState();
+    this.combatIntelTimer = 0;
     state.setHyperspaceTarget(null);
     state.setHyperspaceCountdown(0);
     this.hyperspaceActive = false;
@@ -612,6 +656,7 @@ export class Game {
     state.resetGame();
     state.setDeathMessage(null);
     this.isDead = false;
+    this.combatIntelTimer = 0;
     this.hyperspaceActive = false;
     this.hyperspaceTimer = 0;
     this.sceneRenderer.stopHyperspace();
@@ -627,6 +672,7 @@ export class Game {
     state.setHeat(0);
     state.setDeathMessage(null);
     this.isDead = false;
+    this.combatIntelTimer = 0;
     state.setUIMode('docked');
   }
 
