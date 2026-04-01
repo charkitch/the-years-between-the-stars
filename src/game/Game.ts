@@ -139,6 +139,8 @@ export class Game {
       state.galaxyYear,
       starData.name,
       result.systemPayload.factionState,
+      starData.x,
+      starData.y,
     );
 
     // Place ship near the main station
@@ -685,6 +687,8 @@ export class Game {
       state.galaxyYear,
       starData.name,
       payload.factionState,
+      starData.x,
+      starData.y,
     );
 
     // Appear at system edge, facing inward toward star

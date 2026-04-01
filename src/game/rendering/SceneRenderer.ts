@@ -36,6 +36,9 @@ const _streamVecF = new THREE.Vector3();
 const _streamVecG = new THREE.Vector3();
 const _streamVecH = new THREE.Vector3();
 const _streamVecI = new THREE.Vector3();
+const GALAXY_SEED = 0x5AFEF00D;
+const STARFIELD_POS_SCALE = (Math.PI / 2) / 100;
+const STARFIELD_YEAR_SCALE = 0.0002;
 
 interface XRayTransferStream {
   donorId: string;
@@ -418,13 +421,13 @@ export class SceneRenderer {
 
     this.camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 1, 80000);
 
-    // Ship group: camera + starfield attached here
+    // Ship group: camera attached here
     this.shipGroup = new THREE.Group();
     this.shipGroup.add(this.camera);
     this.scene.add(this.shipGroup);
 
-    this.starfield = createStarfield();
-    this.shipGroup.add(this.starfield); // moves with ship = infinite parallax
+    this.starfield = createStarfield(GALAXY_SEED);
+    this.scene.add(this.starfield);
 
     // Ambient light
     this.scene.add(new THREE.AmbientLight(PALETTE.ambient, 0.3));
@@ -447,6 +450,8 @@ export class SceneRenderer {
     galaxyYear = 0,
     systemName = '',
     factionState?: SystemFactionState,
+    galaxyX = 0,
+    galaxyY = 0,
   ): void {
     // Remove old system objects
     this.systemObjects.forEach(o => this.scene.remove(o));
@@ -459,6 +464,14 @@ export class SceneRenderer {
     this.fleetBattleData = null;
     this.xRayTransferStreams = [];
     this.xbDiskGroup = null;
+
+    this.scene.remove(this.starfield);
+    this.starfield.geometry.dispose();
+    (this.starfield.material as THREE.Material).dispose();
+    const yaw = galaxyX * STARFIELD_POS_SCALE + galaxyYear * STARFIELD_YEAR_SCALE;
+    const pitch = galaxyY * STARFIELD_POS_SCALE;
+    this.starfield = createStarfield(GALAXY_SEED, yaw, pitch);
+    this.scene.add(this.starfield);
 
     // Star
     const starColor = STAR_COLORS[data.starType] ?? PALETTE.starG;
@@ -934,6 +947,27 @@ export class SceneRenderer {
     }
 
     this.rebuildCollidables();
+
+    if (import.meta.env.DEV) {
+      this.renderer.compile(this.scene, this.camera);
+      const failed: string[] = [];
+      this.scene.traverse((obj) => {
+        if (obj instanceof THREE.Mesh && obj.material instanceof THREE.ShaderMaterial) {
+          const prog = (this.renderer.properties.get(obj.material) as any)?.currentProgram;
+          if (!prog) {
+            failed.push(obj.name || obj.uuid);
+          }
+        }
+      });
+      if (failed.length > 0) {
+        const msg = `SHADER COMPILATION FAILED:\n${failed.join('\n')}`;
+        console.error(msg);
+        const div = document.createElement('div');
+        div.style.cssText = 'position:fixed;top:0;left:0;width:100%;padding:16px;background:#a00;color:#fff;font:bold 14px monospace;white-space:pre-wrap;z-index:99999';
+        div.textContent = msg;
+        document.body.appendChild(div);
+      }
+    }
   }
 
   private rebuildCollidables(): void {
@@ -1254,6 +1288,7 @@ export class SceneRenderer {
   }
 
   render(): void {
+    this.camera.getWorldPosition(this.starfield.position);
     this.renderer.render(this.scene, this.camera);
   }
 
