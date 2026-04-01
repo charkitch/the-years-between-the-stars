@@ -20,56 +20,25 @@ import type { GoodName } from './constants';
 import { MAX_CARGO } from './constants';
 import {
   initEngine, engineInitGame, engineJumpToSystem, engineGetLandingEvent, engineGetMarket,
-  type WasmPlayerState, type ChoiceEffect, type SecretBaseType, type SystemPayload,
+  type ChoiceEffect, type SecretBaseType, type SystemPayload,
 } from './engine';
+import {
+  buildWasmPlayerState,
+  discoverFactionsFromSystem,
+  placeShipNearMainStation,
+} from './systems/systemLoad';
+import {
+  applyBattleZoneEffects,
+  checkProximityAlerts,
+  checkXRayStreamHazard,
+} from './systems/flightHazards';
+import {
+  applyJumpExecution,
+  applySystemArrival,
+} from './systems/jumpFlow';
 
 const COMBAT_INTEL_INTERVAL = 8;
 const INFINITE_FUEL_DEV = import.meta.env.DEV;
-
-function buildWasmPlayerState(state: ReturnType<typeof useGameState.getState>): WasmPlayerState {
-  // Convert Zustand state → WasmPlayerState for Rust JSON boundary
-  const cargo: Record<string, number> = {};
-  for (const [k, v] of Object.entries(state.player.cargo)) {
-    if (v) cargo[k] = v;
-  }
-  const cargoCostBasis: Record<string, number> = {};
-  for (const [k, v] of Object.entries(state.player.cargoCostBasis)) {
-    if (v !== undefined) cargoCostBasis[k] = v;
-  }
-  const playerChoices: WasmPlayerState['playerChoices'] = {};
-  for (const [k, v] of Object.entries(state.playerChoices)) {
-    playerChoices[Number(k)] = {
-      tradingReputation: v.tradingReputation,
-      bannedGoods: v.bannedGoods,
-      priceModifier: v.priceModifier,
-      factionTag: v.factionTag,
-      completedEventIds: v.completedEventIds,
-    };
-  }
-  const factionMemory: WasmPlayerState['factionMemory'] = {};
-  for (const [k, v] of Object.entries(state.factionMemory)) {
-    factionMemory[Number(k)] = {
-      factionId: v.factionId,
-      contestingFactionId: v.contestingFactionId,
-      galaxyYear: v.galaxyYear,
-    };
-  }
-  return {
-    credits: state.player.credits,
-    cargo,
-    cargoCostBasis,
-    fuel: state.player.fuel,
-    shields: state.player.shields,
-    currentSystemId: state.currentSystemId,
-    visitedSystems: Array.from(state.visitedSystems),
-    galaxyYear: state.galaxyYear,
-    playerChoices,
-    lastVisitYear: { ...state.lastVisitYear },
-    knownFactions: Array.from(state.knownFactions),
-    factionMemory,
-    seenSystemDialogIds: [...state.seenSystemDialogIds],
-  };
-}
 
 export class Game {
   private sceneRenderer: SceneRenderer;
@@ -127,10 +96,7 @@ export class Game {
     state.markVisited(state.currentSystemId);
     state.setSystemEntryLines(result.systemPayload.systemEntryLines);
 
-    // Discover factions from init payload
-    const factionState = result.systemPayload.factionState;
-    if (factionState.controllingFactionId) state.addKnownFaction(factionState.controllingFactionId);
-    if (factionState.contestingFactionId) state.addKnownFaction(factionState.contestingFactionId);
+    discoverFactionsFromSystem(state, result.systemPayload.factionState);
 
     const starData = result.cluster[state.currentSystemId];
     this.sceneRenderer.loadSystem(
@@ -143,29 +109,7 @@ export class Game {
       starData.y,
     );
 
-    // Place ship near the main station
-    const mainPlanetId = systemData.mainStationPlanetId;
-    const mainPlanet = systemData.planets.find(p => p.id === mainPlanetId);
-    if (mainPlanet) {
-      const angle = mainPlanet.orbitPhase;
-      const planetX = Math.cos(angle) * mainPlanet.orbitRadius;
-      const planetZ = Math.sin(angle) * mainPlanet.orbitRadius;
-      const radialX = Math.cos(angle);
-      const radialZ = Math.sin(angle);
-      const spawnDist = mainPlanet.radius * 3 + 80;
-      const lateralOffset = -10;
-      this.sceneRenderer.shipGroup.position.set(
-        planetX + radialX * spawnDist + radialZ * lateralOffset,
-        0,
-        planetZ + radialZ * spawnDist - radialX * lateralOffset,
-      );
-      this.sceneRenderer.shipGroup.rotation.set(0.1, Math.atan2(radialX, radialZ), 0);
-
-      const stationEntity = this.sceneRenderer.getAllEntities().get(`station-${mainPlanetId}`);
-      if (stationEntity) {
-        stationEntity.orbitPhase = angle + Math.PI;
-      }
-    }
+    placeShipNearMainStation(this.sceneRenderer, systemData);
 
     this.flightModel.reset(this.sceneRenderer.shipGroup.position);
   }
@@ -335,14 +279,36 @@ export class Game {
       state.setShields(state.player.shields + 5 * dt);
     }
 
-    // Proximity alerts
-    this.checkProximityAlerts(pos, state);
+    checkProximityAlerts({
+      pos,
+      state,
+      entities: this.sceneRenderer.getAllEntities(),
+      scoopingFuel: this.scoopingFuel,
+      gasGiantScoopingFuel: this.gasGiantScoopingFuel,
+      harvestingFuel: this.harvestingFuel,
+    });
 
-    // Battle zone danger
-    this.checkBattleZone(pos, dt, state);
+    this.combatIntelTimer = applyBattleZoneEffects({
+      pos,
+      dt,
+      state,
+      battle: this.sceneRenderer.getFleetBattle(),
+      battleDangerRange: BATTLE_DANGER_RANGE,
+      combatIntelTimer: this.combatIntelTimer,
+      combatIntelInterval: COMBAT_INTEL_INTERVAL,
+      maxCargo: MAX_CARGO,
+      combatIntelGood: COMBAT_INTELLIGENCE_GOOD,
+      isDead: this.isDead,
+      onDeath: () => this.triggerDeath(),
+    });
 
-    // X-ray binary donor stream hazard
-    this.checkXRayStream(pos, dt, state);
+    checkXRayStreamHazard({
+      pos,
+      dt,
+      state,
+      curve: this.sceneRenderer.getXRayStreamCurveBuffer(),
+      hazardRadius: XB_STREAM_HAZARD_RADIUS,
+    });
 
     // Hyperspace countdown
     if (state.ui.hyperspaceCountdown > 0) {
@@ -355,118 +321,6 @@ export class Game {
         state.setAlert(`JUMP IN ${Math.ceil(remaining)}s`);
       }
     }
-  }
-
-  private checkProximityAlerts(
-    pos: THREE.Vector3,
-    state: ReturnType<typeof useGameState.getState>
-  ): void {
-    if (this.scoopingFuel || this.gasGiantScoopingFuel || this.harvestingFuel) return;
-
-    const entities = this.sceneRenderer.getAllEntities();
-    for (const [, entity] of entities) {
-      const alertDist = entity.collisionRadius > 0
-        ? entity.collisionRadius * 1.5
-        : 150;
-      const dist = pos.distanceTo(entity.worldPos);
-      if (dist < alertDist) {
-        state.setAlert(`WARNING: ${entity.type.toUpperCase()} PROXIMITY`);
-        return;
-      }
-    }
-
-    if (!this.scoopingFuel && !this.gasGiantScoopingFuel && state.ui.hyperspaceCountdown === 0) {
-      state.setAlert(null);
-    }
-  }
-
-  private checkXRayStream(
-    pos: THREE.Vector3,
-    dt: number,
-    state: ReturnType<typeof useGameState.getState>,
-  ): void {
-    const curve = this.sceneRenderer.getXRayStreamCurveBuffer();
-    if (!curve) return;
-
-    const pointCount = curve.length / 3;
-    let minDistSq = Infinity;
-
-    // Find closest approach to any segment of the stream curve
-    for (let i = 0; i < pointCount - 1; i++) {
-      const ax = curve[i * 3], ay = curve[i * 3 + 1], az = curve[i * 3 + 2];
-      const bx = curve[(i + 1) * 3], by = curve[(i + 1) * 3 + 1], bz = curve[(i + 1) * 3 + 2];
-      const abx = bx - ax, aby = by - ay, abz = bz - az;
-      const abLenSq = abx * abx + aby * aby + abz * abz;
-      if (abLenSq < 1e-6) continue;
-      const t = Math.max(0, Math.min(1, ((pos.x - ax) * abx + (pos.y - ay) * aby + (pos.z - az) * abz) / abLenSq));
-      const dx = pos.x - (ax + t * abx);
-      const dy = pos.y - (ay + t * aby);
-      const dz = pos.z - (az + t * abz);
-      const dSq = dx * dx + dy * dy + dz * dz;
-      if (dSq < minDistSq) minDistSq = dSq;
-    }
-
-    if (minDistSq < XB_STREAM_HAZARD_RADIUS * XB_STREAM_HAZARD_RADIUS) {
-      state.setHeat(state.player.heat + 30 * dt);
-      state.setAlert('WARNING: X-RAY TRANSFER STREAM');
-    }
-  }
-
-  private checkBattleZone(
-    pos: THREE.Vector3,
-    dt: number,
-    state: ReturnType<typeof useGameState.getState>,
-  ): void {
-    const battle = this.sceneRenderer.getFleetBattle();
-    if (!battle) {
-      this.combatIntelTimer = 0;
-      return;
-    }
-
-    const dist = pos.distanceTo(battle.position);
-    if (dist < battle.noGoRadius) {
-      const gatheringIntel = this.collectCombatIntelligence(dt, state);
-      if (dist < BATTLE_DANGER_RANGE) {
-        // Danger zone — take damage
-        state.setShields(state.player.shields - 20 * dt);
-        state.setHeat(state.player.heat + 25 * dt);
-        state.setAlert('TAKING FIRE — COMBAT ZONE');
-        if (state.player.shields <= 0 && !this.isDead) {
-          this.triggerDeath();
-        }
-      } else {
-        state.setAlert(gatheringIntel ? 'COLLECTING COMBAT INTELLIGENCE' : 'WARNING: ACTIVE COMBAT ZONE');
-      }
-      return;
-    }
-
-    this.combatIntelTimer = 0;
-  }
-
-  private collectCombatIntelligence(
-    dt: number,
-    state: ReturnType<typeof useGameState.getState>,
-  ): boolean {
-    let cargoUsed = Object.values(state.player.cargo).reduce((sum, qty) => sum + (qty ?? 0), 0);
-    if (cargoUsed >= MAX_CARGO) {
-      this.combatIntelTimer = 0;
-      return false;
-    }
-
-    this.combatIntelTimer += dt;
-    let collected = false;
-    while (this.combatIntelTimer >= COMBAT_INTEL_INTERVAL && cargoUsed < MAX_CARGO) {
-      state.addCargo(COMBAT_INTELLIGENCE_GOOD, 1, 0);
-      this.combatIntelTimer -= COMBAT_INTEL_INTERVAL;
-      cargoUsed++;
-      collected = true;
-    }
-
-    if (cargoUsed >= MAX_CARGO) {
-      this.combatIntelTimer = 0;
-    }
-
-    return collected || cargoUsed < MAX_CARGO;
   }
 
   private tryDock(): void {
@@ -626,31 +480,16 @@ export class Game {
     const targetSys = state.cluster[targetId];
     const cost = this.hyperspace.jumpCost(currentSys, targetSys);
 
-    if (!INFINITE_FUEL_DEV) {
-      state.setFuel(state.player.fuel - cost);
-    } else if (state.player.fuel < HYPERSPACE.tankSize) {
-      state.setFuel(HYPERSPACE.tankSize);
-    }
-
-    // Call Rust engine for the jump — computes years, simulates galaxy, generates system
-    const wasmState = buildWasmPlayerState(state);
-    const jumpResult = engineJumpToSystem(targetId, wasmState);
-
-    // Store the system payload for use in arriveInSystem
-    this.pendingSystemPayload = jumpResult.systemPayload;
-
-    // Advance state from Rust results
-    state.setClusterSummary(jumpResult.clusterSummary);
-    state.setGalaxySimState(jumpResult.galaxySimState);
-    state.advanceGalaxyYear(jumpResult.yearsElapsed);
-    state.addJumpLogEntry({
-      fromSystemId: state.currentSystemId,
-      toSystemId: targetId,
-      yearsElapsed: jumpResult.yearsElapsed,
-      galaxyYearAfter: jumpResult.newGalaxyYear,
+    const jumpResult = engineJumpToSystem(targetId, buildWasmPlayerState(state));
+    this.pendingSystemPayload = applyJumpExecution({
+      state,
+      targetId,
+      jumpCost: cost,
+      infiniteFuelDev: INFINITE_FUEL_DEV,
+      hyperspaceTankSize: HYPERSPACE.tankSize,
+      jumpResult,
     });
 
-    state.setUIMode('hyperspace');
     this.hyperspaceActive = true;
     this.hyperspaceTimer = HYPERSPACE.duration;
     this.sceneRenderer.startHyperspace();
@@ -674,61 +513,14 @@ export class Game {
     this.pendingSystemPayload = null;
 
     if (!payload) return;
-
-    const systemData = payload.system;
-    const starData = state.cluster[targetId];
-
-    state.setCurrentSystemPayload(targetId, payload);
-    state.markVisited(targetId);
-
-    this.sceneRenderer.loadSystem(
-      systemData,
+    applySystemArrival({
+      state,
       targetId,
-      state.galaxyYear,
-      starData.name,
-      payload.factionState,
-      starData.x,
-      starData.y,
-    );
-
-    // Appear at system edge, facing inward toward star
-    this.sceneRenderer.shipGroup.position.set(0, 0, 8000);
-    this.sceneRenderer.shipGroup.rotation.set(0, 0, 0);
-    this.flightModel.reset(this.sceneRenderer.shipGroup.position);
-    this.flightModel.velocity.set(0, 0, -150);
-
-    // Queue system entry dialog (iron star first arrival, etc.) — shown before entry lines
-    if (payload.systemEntryDialog) {
-      state.setPendingSystemEntryDialog(payload.systemEntryDialog);
-    }
-
-    // Use entry lines from Rust (includes era transitions, faction info, secret base hints)
-    const lines = [...payload.systemEntryLines];
-
-    // Battle detection — added TS-side since fleet battles are a TS real-time system
-    const battle = this.sceneRenderer.getFleetBattle();
-    if (battle) {
-      const battlePlanet = systemData.planets.find(p => p.id === battle.planetId);
-      const planetName = battlePlanet ? battlePlanet.id.replace(`${targetId}-`, '') : 'UNKNOWN';
-      lines.push(`FLEET ENGAGEMENT DETECTED NEAR ${planetName.toUpperCase()}`);
-    }
-
-    state.setSystemEntryLines(lines);
-
-    // Discover factions from payload
-    const factionState = payload.factionState;
-    if (factionState.controllingFactionId) state.addKnownFaction(factionState.controllingFactionId);
-    if (factionState.contestingFactionId) state.addKnownFaction(factionState.contestingFactionId);
-
-    // Update faction memory
-    state.setFactionMemory(targetId, {
-      factionId: factionState.controllingFactionId,
-      contestingFactionId: factionState.contestingFactionId,
-      galaxyYear: state.galaxyYear,
+      payload,
+      sceneRenderer: this.sceneRenderer,
+      flightModel: this.flightModel,
+      discoverFactions: discoverFactionsFromSystem,
     });
-
-    // Arrive in free flight
-    state.setUIMode('flight');
   }
 
   private triggerDeath(deathMessage: string[] | null = null): void {

@@ -9,9 +9,9 @@ import {
 } from './effects';
 import {
   makePlanet, makeGasGiant, makeStation, makeGlowSprite,
-  makeAsteroidBelt, makeRingMesh, makeNPCShipMesh, makeFleetShipMesh,
+  makeAsteroidBelt, makeNPCShipMesh, makeFleetShipMesh,
   makeAsteroidBase, makeOortCloudBase, makeMaximumSpaceBase,
-  makeTexturedPlanet, makeTexturedGasGiant, makeTexturedRing,
+  makeTexturedPlanet, makeTexturedGasGiant,
   makeRingSystem,
   addCityLights, addSunAtmosphere, addLightning, addCloudLayer,
   makeDysonShellSegment, addDysonWeatherLayer,
@@ -26,366 +26,20 @@ import type { FleetBattle } from '../mechanics/FleetBattleSystem';
 import { getFaction } from '../data/factions';
 import { PRNG } from '../generation/prng';
 import { CLUSTER_SEED, RENDER_CONFIG } from '../constants';
+import { createBlackHoleGroup } from './scene/blackHoleVisuals';
+import type { SceneEntity, XRayTransferStream } from './scene/types';
+import { createXRayTransferStream, updateXRayTransferStreams } from './scene/xrayStreams';
+import {
+  rotateStations,
+  updateFleetShipWorldPositions,
+  updateNPCShips,
+  updateOrbitalEntities,
+} from './scene/orbitAndNpcUpdates';
+export type { SceneEntity } from './scene/types';
 
-const _npcCollisionVec = new THREE.Vector3();
-const _streamVecA = new THREE.Vector3();
-const _streamVecB = new THREE.Vector3();
-const _streamVecC = new THREE.Vector3();
-const _streamVecD = new THREE.Vector3();
-const _streamVecE = new THREE.Vector3();
-const _streamVecF = new THREE.Vector3();
-const _streamVecG = new THREE.Vector3();
-const _streamVecH = new THREE.Vector3();
-const _streamVecI = new THREE.Vector3();
 const GALAXY_SEED = 0x5AFEF00D;
 const STARFIELD_POS_SCALE = (Math.PI / 2) / 100;
 const STARFIELD_YEAR_SCALE = 0.0002;
-
-interface XRayTransferStream {
-  donorId: string;
-  accretorId: string;
-  curveBias: number;
-  phase: number;
-  flowSpeed: number;
-  diskImpactRadius: number;
-  curveBuffer: Float32Array;
-  spine: THREE.Mesh;
-  ribbon: THREE.Mesh;
-  donorColor: THREE.Color;
-  highlightColor: THREE.Color;
-}
-
-let xRayStreamRibbonTexture: THREE.CanvasTexture | null = null;
-
-interface BlackHoleVisualStyle {
-  diskColor: string;
-  midColor: string;
-  hotColor: string;
-  crescentColor: string;
-  outerGlowColor: number;
-  brightArcColor: number;
-  outerGlowOpacity: number;
-}
-
-function createBlackHoleDiskTexture(style: BlackHoleVisualStyle): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    return new THREE.CanvasTexture(canvas);
-  }
-
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  const outer = canvas.width * 0.46;
-  const inner = canvas.width * 0.2;
-  const grad = ctx.createRadialGradient(cx, cy, inner, cx, cy, outer);
-  grad.addColorStop(0.0, style.hotColor);
-  grad.addColorStop(0.2, style.diskColor);
-  grad.addColorStop(0.4, style.midColor);
-  grad.addColorStop(0.66, style.crescentColor.replace('0.95', '0.24'));
-  grad.addColorStop(1.0, style.crescentColor.replace('0.95', '0'));
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(cx, cy, outer, 0, Math.PI * 2);
-  ctx.arc(cx, cy, inner, 0, Math.PI * 2, true);
-  ctx.fill();
-
-  const crescent = ctx.createRadialGradient(cx + canvas.width * 0.11, cy - canvas.height * 0.06, canvas.width * 0.03, cx, cy, outer);
-  crescent.addColorStop(0.0, style.crescentColor);
-  crescent.addColorStop(0.24, style.diskColor.replace('0.92', '0.74'));
-  crescent.addColorStop(0.56, style.midColor.replace('0.72', '0.14'));
-  crescent.addColorStop(1.0, style.midColor.replace('0.72', '0'));
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.fillStyle = crescent;
-  ctx.beginPath();
-  ctx.ellipse(cx + canvas.width * 0.06, cy - canvas.height * 0.04, canvas.width * 0.36, canvas.height * 0.22, -0.28, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalCompositeOperation = 'source-over';
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  return texture;
-}
-
-function createBlackHoleGroup(radius: number, xRayMode = false): THREE.Group {
-  const group = new THREE.Group();
-  const style: BlackHoleVisualStyle = xRayMode
-    ? {
-      diskColor: 'rgba(255,214,248,0.92)',
-      midColor: 'rgba(154,208,255,0.72)',
-      hotColor: 'rgba(245,248,255,0.98)',
-      crescentColor: 'rgba(255,255,255,0.95)',
-      outerGlowColor: 0x8FD4FF,
-      brightArcColor: 0xFEE0FF,
-      outerGlowOpacity: 0.3,
-    }
-    : {
-      diskColor: 'rgba(255,210,150,0.92)',
-      midColor: 'rgba(255,144,72,0.72)',
-      hotColor: 'rgba(255,250,235,0.98)',
-      crescentColor: 'rgba(255,255,245,0.95)',
-      outerGlowColor: 0xFF7A2E,
-      brightArcColor: 0xFFF1CF,
-      outerGlowOpacity: 0.24,
-    };
-
-  const disk = new THREE.Mesh(
-    new THREE.RingGeometry(radius * 1.6, radius * 2.9, 96),
-    new THREE.MeshBasicMaterial({
-      map: createBlackHoleDiskTexture(style),
-      transparent: true,
-      opacity: 0.95,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    }),
-  );
-  disk.rotation.x = Math.PI / 2;
-  disk.rotation.z = 0.45;
-  disk.scale.set(1.2, 0.68, 1);
-  group.add(disk);
-
-  const innerRing = new THREE.Mesh(
-    new THREE.TorusGeometry(radius * 1.62, radius * 0.09, 10, 72),
-    new THREE.MeshBasicMaterial({
-      color: style.brightArcColor,
-      transparent: true,
-      opacity: xRayMode ? 0.5 : 0.42,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    }),
-  );
-  innerRing.rotation.x = Math.PI / 2;
-  innerRing.rotation.z = 0.54;
-  innerRing.scale.set(1.08, 0.72, 1);
-  group.add(innerRing);
-
-  const outerGlow = makeGlowSprite(style.outerGlowColor, radius * (xRayMode ? 5.6 : 5.2));
-  const outerGlowMat = outerGlow.material as THREE.SpriteMaterial;
-  outerGlowMat.opacity = style.outerGlowOpacity;
-  group.add(outerGlow);
-
-  const brightArc = new THREE.Mesh(
-    new THREE.TorusGeometry(radius * 1.78, radius * 0.16, 10, 96, Math.PI * 1.12),
-    new THREE.MeshBasicMaterial({
-      color: style.brightArcColor,
-      transparent: true,
-      opacity: xRayMode ? 0.86 : 0.88,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    }),
-  );
-  brightArc.rotation.x = Math.PI / 2;
-  brightArc.rotation.z = 0.62;
-  brightArc.position.x = radius * 0.16;
-  brightArc.scale.set(1.06, 0.64, 1);
-  group.add(brightArc);
-
-  const shadowCore = new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 24, 24),
-    new THREE.MeshBasicMaterial({ color: 0x020202 }),
-  );
-  group.add(shadowCore);
-
-  const innerShadow = new THREE.Mesh(
-    new THREE.SphereGeometry(radius * 1.08, 20, 20),
-    new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      transparent: true,
-      opacity: 0.2,
-      depthWrite: false,
-    }),
-  );
-  group.add(innerShadow);
-
-  group.userData.blackHole = true;
-  return group;
-}
-
-function getXRayStreamRibbonTexture(): THREE.CanvasTexture {
-  if (xRayStreamRibbonTexture) return xRayStreamRibbonTexture;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    xRayStreamRibbonTexture = new THREE.CanvasTexture(canvas);
-    return xRayStreamRibbonTexture;
-  }
-
-  const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-  gradient.addColorStop(0.0, 'rgba(255,255,255,0.02)');
-  gradient.addColorStop(0.18, 'rgba(255,255,255,0.28)');
-  gradient.addColorStop(0.42, 'rgba(255,255,255,0.1)');
-  gradient.addColorStop(0.68, 'rgba(255,255,255,0.32)');
-  gradient.addColorStop(1.0, 'rgba(255,255,255,0.02)');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  const vertical = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  vertical.addColorStop(0.0, 'rgba(255,255,255,0)');
-  vertical.addColorStop(0.2, 'rgba(255,255,255,0.55)');
-  vertical.addColorStop(0.5, 'rgba(255,255,255,1)');
-  vertical.addColorStop(0.8, 'rgba(255,255,255,0.55)');
-  vertical.addColorStop(1.0, 'rgba(255,255,255,0)');
-  ctx.globalCompositeOperation = 'destination-in';
-  ctx.fillStyle = vertical;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.globalCompositeOperation = 'lighter';
-
-  for (let i = 0; i < 18; i++) {
-    const x = (i / 18) * canvas.width;
-    const w = 18 + (i % 5) * 12;
-    const band = ctx.createLinearGradient(x - w, 0, x + w, 0);
-    band.addColorStop(0.0, 'rgba(255,255,255,0)');
-    band.addColorStop(0.5, 'rgba(255,255,255,0.22)');
-    band.addColorStop(1.0, 'rgba(255,255,255,0)');
-    ctx.fillStyle = band;
-    ctx.fillRect(x - w, 0, w * 2, canvas.height);
-  }
-
-  ctx.globalCompositeOperation = 'source-over';
-  xRayStreamRibbonTexture = new THREE.CanvasTexture(canvas);
-  xRayStreamRibbonTexture.wrapS = THREE.RepeatWrapping;
-  xRayStreamRibbonTexture.wrapT = THREE.ClampToEdgeWrapping;
-  xRayStreamRibbonTexture.repeat.set(2.4, 1);
-  xRayStreamRibbonTexture.needsUpdate = true;
-  return xRayStreamRibbonTexture;
-}
-
-function createXRayTransferStream(donorColorValue: number, diskImpactRadius: number): XRayTransferStream {
-  const donorColor = new THREE.Color(donorColorValue);
-  const highlightColor = donorColor.clone().lerp(new THREE.Color(0xFFF7EE), 0.62);
-  const ribbonSegmentCount = 44;
-
-  // Curve centerline — written each frame, sampled by both tube and ribbon
-  const curveBuffer = new Float32Array(36 * 3);
-
-  // Pre-allocate tube mesh (cylinder along the stream spine)
-  const tubeSeg = 20;
-  const tubeSides = 6;
-  const tubePositions = new Float32Array(tubeSeg * tubeSides * 3);
-  const tubeIndices = new Uint16Array((tubeSeg - 1) * tubeSides * 6);
-  for (let s = 0; s < tubeSeg - 1; s++) {
-    for (let n = 0; n < tubeSides; n++) {
-      const idx = (s * tubeSides + n) * 6;
-      const a = s * tubeSides + n;
-      const b = s * tubeSides + (n + 1) % tubeSides;
-      const c = (s + 1) * tubeSides + n;
-      const d = (s + 1) * tubeSides + (n + 1) % tubeSides;
-      tubeIndices[idx] = a; tubeIndices[idx + 1] = b; tubeIndices[idx + 2] = c;
-      tubeIndices[idx + 3] = b; tubeIndices[idx + 4] = d; tubeIndices[idx + 5] = c;
-    }
-  }
-  const spine = new THREE.Mesh(
-    new THREE.BufferGeometry()
-      .setAttribute('position', new THREE.BufferAttribute(tubePositions, 3))
-      .setIndex(new THREE.BufferAttribute(tubeIndices, 1)),
-    new THREE.MeshBasicMaterial({
-      color: highlightColor,
-      transparent: true,
-      opacity: 0.72,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }),
-  );
-
-  const ribbonPositions = new Float32Array(ribbonSegmentCount * 2 * 3);
-  const ribbonColors = new Float32Array(ribbonSegmentCount * 2 * 3);
-  const ribbonUvs = new Float32Array(ribbonSegmentCount * 2 * 2);
-  const ribbonIndices = new Uint16Array((ribbonSegmentCount - 1) * 6);
-  for (let i = 0; i < ribbonSegmentCount; i++) {
-    const t = i / (ribbonSegmentCount - 1);
-    const color = donorColor.clone().lerp(highlightColor, 0.18 + Math.sin(t * Math.PI) * 0.4);
-    for (let side = 0; side < 2; side++) {
-      const vertexIndex = i * 2 + side;
-      ribbonColors[vertexIndex * 3] = color.r;
-      ribbonColors[vertexIndex * 3 + 1] = color.g;
-      ribbonColors[vertexIndex * 3 + 2] = color.b;
-      ribbonUvs[vertexIndex * 2] = t;
-      ribbonUvs[vertexIndex * 2 + 1] = side;
-    }
-    if (i < ribbonSegmentCount - 1) {
-      const idx = i * 6;
-      const base = i * 2;
-      ribbonIndices[idx] = base;
-      ribbonIndices[idx + 1] = base + 1;
-      ribbonIndices[idx + 2] = base + 2;
-      ribbonIndices[idx + 3] = base + 1;
-      ribbonIndices[idx + 4] = base + 3;
-      ribbonIndices[idx + 5] = base + 2;
-    }
-  }
-
-  const ribbon = new THREE.Mesh(
-    new THREE.BufferGeometry()
-      .setAttribute('position', new THREE.BufferAttribute(ribbonPositions, 3))
-      .setAttribute('color', new THREE.BufferAttribute(ribbonColors, 3))
-      .setAttribute('uv', new THREE.BufferAttribute(ribbonUvs, 2))
-      .setIndex(new THREE.BufferAttribute(ribbonIndices, 1)),
-    new THREE.MeshBasicMaterial({
-      color: highlightColor,
-      map: getXRayStreamRibbonTexture(),
-      alphaMap: getXRayStreamRibbonTexture(),
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.5,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    }),
-  );
-
-  return {
-    donorId: 'companion-star',
-    accretorId: 'star',
-    curveBias: 0.22,
-    phase: Math.random() * Math.PI * 2,
-    flowSpeed: 0.065,
-    diskImpactRadius,
-    curveBuffer,
-    spine,
-    ribbon,
-    donorColor,
-    highlightColor,
-  };
-}
-
-function writeQuadraticPoint(
-  target: Float32Array,
-  offset: number,
-  start: THREE.Vector3,
-  control: THREE.Vector3,
-  end: THREE.Vector3,
-  t: number,
-): void {
-  const omt = 1 - t;
-  const a = omt * omt;
-  const b = 2 * omt * t;
-  const c = t * t;
-  target[offset] = start.x * a + control.x * b + end.x * c;
-  target[offset + 1] = start.y * a + control.y * b + end.y * c;
-  target[offset + 2] = start.z * a + control.z * b + end.z * c;
-}
-
-export interface SceneEntity {
-  id: string;
-  group: THREE.Object3D;
-  orbitRadius: number;
-  orbitSpeed: number;
-  orbitPhase: number;
-  orbitInclination?: number;
-  orbitNode?: number;
-  shellCurveRadius?: number;
-  parentId?: string;
-  type: 'planet' | 'station' | 'star' | 'moon' | 'npc_ship' | 'fleet_ship' | 'dyson_shell';
-  worldPos: THREE.Vector3; // updated each frame
-  collisionRadius: number;
-}
 
 export class SceneRenderer {
   renderer: THREE.WebGLRenderer;
@@ -628,7 +282,13 @@ export class SceneRenderer {
       this.scene.add(transferStream.ribbon);
       this.systemObjects.push(transferStream.spine, transferStream.ribbon);
       this.xRayTransferStreams.push(transferStream);
-      this.updateXRayTransferStreams(0);
+      updateXRayTransferStreams({
+        streams: this.xRayTransferStreams,
+        entities: this.entities,
+        camera: this.camera,
+        xbDiskGroup: this.xbDiskGroup,
+        time: 0,
+      });
     }
 
     const rng = PRNG.fromIndex(CLUSTER_SEED, systemId * 97 + 13);
@@ -781,6 +441,7 @@ export class SceneRenderer {
           r * sinA * sinI,
           r * (sinN * cosA + cosN * sinA * cosI),
         );
+        shellGroup.up.set(sinN * sinI, cosI, -cosN * sinI);
       }
       shellGroup.lookAt(0, 0, 0);
       shellGroup.rotateY(Math.PI);
@@ -1041,113 +702,22 @@ export class SceneRenderer {
   }
 
   updateOrbits(time: number, dt = 0): void {
-    for (const [, entity] of this.entities) {
-      if (entity.type === 'star' && entity.orbitRadius === 0) continue;
-      if (entity.type === 'npc_ship' || entity.type === 'fleet_ship') continue;
-
-      const angle = entity.orbitPhase + time * entity.orbitSpeed;
-
-      if (entity.parentId) {
-        const parent = this.entities.get(entity.parentId);
-        if (parent) {
-          entity.group.position.set(
-            parent.worldPos.x + Math.cos(angle) * entity.orbitRadius,
-            parent.worldPos.y,
-            parent.worldPos.z + Math.sin(angle) * entity.orbitRadius,
-          );
-        }
-      } else if (entity.type === 'dyson_shell' && entity.orbitInclination != null && entity.orbitNode != null) {
-        const [x, y, z] = this.computeDysonShellPosition(
-          angle, entity.orbitRadius, entity.orbitInclination, entity.orbitNode,
-        );
-        entity.group.position.set(x, y, z);
-      } else {
-        entity.group.position.set(
-          Math.cos(angle) * entity.orbitRadius,
-          0,
-          Math.sin(angle) * entity.orbitRadius,
-        );
-      }
-
-      if (entity.type === 'dyson_shell') {
-        entity.group.lookAt(0, 0, 0);
-        entity.group.rotateY(Math.PI);
-        // worldPos must be the shell surface center, not the orbital position.
-        // The panel geometry is centered at local (0,0,-curveRadius); after
-        // lookAt+rotateY that point lands on the star-facing side of the group.
-        entity.worldPos.set(0, 0, -(entity.shellCurveRadius ?? 0));
-        entity.group.localToWorld(entity.worldPos);
-      } else {
-        entity.worldPos.copy(entity.group.position);
-      }
-    }
-
-    this.updateXRayTransferStreams(time);
-
-    // Fleet ships are children of the battle group, so their local position is
-    // not their world position. Keep scanner/targeting coordinates in world
-    // space and avoid the generic orbit code snapping them back to the origin.
-    for (const [, entity] of this.entities) {
-      if (entity.type !== 'fleet_ship') continue;
-      entity.group.getWorldPosition(entity.worldPos);
-    }
-
-    // Station slowly rotates
-    for (const [id, entity] of this.entities) {
-      if (entity.type === 'station') {
-        entity.group.rotation.z += 0.001;
-      }
-      void id;
-    }
-
-    // NPC ship patrol movement
-    if (dt > 0) {
-      for (const [, npcState] of this.npcShips) {
-        const entity = this.entities.get(npcState.id);
-        if (!entity) continue;
-
-        // Keep waypoints tracking orbiting planets
-        const pa = this.entities.get(npcState.planetIdA);
-        const pb = this.entities.get(npcState.planetIdB);
-        if (pa) npcState.waypointA.copy(pa.worldPos);
-        if (pb) npcState.waypointB.copy(pb.worldPos);
-
-        const dist = npcState.waypointA.distanceTo(npcState.waypointB);
-        if (dist < 1) continue;
-
-        npcState.t += (npcState.speed * dt / dist) * npcState.direction;
-        if (npcState.t >= 1) { npcState.t = 1; npcState.direction = -1; }
-        if (npcState.t <= 0) { npcState.t = 0; npcState.direction = 1; }
-
-        entity.group.position.lerpVectors(npcState.waypointA, npcState.waypointB, npcState.t);
-
-        // Push NPC out of any collidable body
-        for (const body of this.collidables) {
-          const diff = _npcCollisionVec.copy(entity.group.position).sub(body.worldPos);
-          const dist = diff.length();
-          const minDist = body.collisionRadius + 10;
-          if (dist < minDist && dist > 0.001) {
-            const normal = diff.normalize();
-            entity.group.position.copy(body.worldPos).addScaledVector(normal, minDist);
-          }
-        }
-
-        // Separate NPC ships from each other
-        const NPC_SEPARATION = 30;
-        for (const [otherId, otherState] of this.npcShips) {
-          if (otherId === npcState.id) continue;
-          const otherEntity = this.entities.get(otherState.id);
-          if (!otherEntity) continue;
-          const diff = entity.group.position.clone().sub(otherEntity.worldPos);
-          const d = diff.length();
-          if (d < NPC_SEPARATION && d > 0.001) {
-            entity.group.position.addScaledVector(diff.normalize(), (NPC_SEPARATION - d) * 0.5);
-          }
-        }
-
-        entity.worldPos.copy(entity.group.position);
-      }
-    }
+    updateOrbitalEntities(this.entities, time);
+    updateXRayTransferStreams({
+      streams: this.xRayTransferStreams,
+      entities: this.entities,
+      camera: this.camera,
+      xbDiskGroup: this.xbDiskGroup,
+      time,
+    });
+    updateFleetShipWorldPositions(this.entities);
+    rotateStations(this.entities);
+    updateNPCShips({
+      npcShips: this.npcShips,
+      entities: this.entities,
+      collidables: this.collidables,
+      dt,
+    });
 
     // Tick lightning shaders
     for (const mat of this.lightningMaterials) {
@@ -1160,174 +730,6 @@ export class SceneRenderer {
     }
     if (this.battleExplosions && dt > 0) {
       updateBattleExplosions(this.battleExplosions, dt);
-    }
-  }
-
-  private computeDysonShellPosition(
-    angle: number, r: number, incl: number, node: number,
-  ): [number, number, number] {
-    const cosN = Math.cos(node), sinN = Math.sin(node);
-    const cosA = Math.cos(angle), sinA = Math.sin(angle);
-    const cosI = Math.cos(incl), sinI = Math.sin(incl);
-    return [
-      r * (cosN * cosA - sinN * sinA * cosI),
-      r * sinA * sinI,
-      r * (sinN * cosA + cosN * sinA * cosI),
-    ];
-  }
-
-  private updateXRayTransferStreams(time: number): void {
-    for (const stream of this.xRayTransferStreams) {
-      const donor = this.entities.get(stream.donorId);
-      const accretor = this.entities.get(stream.accretorId);
-      if (!donor || !accretor) continue;
-
-      const donorPos = donor.worldPos;
-      const accretorPos = accretor.worldPos;
-      const diskTarget = _streamVecE.copy(donorPos).sub(accretorPos);
-      diskTarget.y = 0;
-      if (diskTarget.lengthSq() < 1e-6) {
-        diskTarget.set(1, 0, 0);
-      } else {
-        diskTarget.normalize();
-      }
-      const diskDirX = diskTarget.x;
-      diskTarget.multiplyScalar(stream.diskImpactRadius).add(accretorPos);
-      // Tilt the disk impact point to match the accretion disk's rotation.z = 0.45
-      diskTarget.y = accretorPos.y + diskDirX * stream.diskImpactRadius * Math.tan(0.45);
-
-      const flow = _streamVecA.copy(diskTarget).sub(donorPos);
-      const dist = flow.length();
-      if (dist < 1) continue;
-
-      flow.normalize();
-      const lateral = _streamVecB.set(-flow.z, 0, flow.x).normalize();
-      const control = _streamVecC.copy(donorPos).lerp(diskTarget, 0.58);
-      control.addScaledVector(lateral, Math.max(dist * stream.curveBias, 65));
-      control.y += Math.sin(time * 0.32 + stream.phase) * Math.max(dist * 0.015, 4);
-
-      // Write bezier centerline into curveBuffer
-      const curveBuffer = stream.curveBuffer;
-      const curvePointCount = curveBuffer.length / 3;
-      for (let i = 0; i < curvePointCount; i++) {
-        const t = i / (curvePointCount - 1);
-        writeQuadraticPoint(curveBuffer, i * 3, donorPos, control, diskTarget, t);
-      }
-
-      // Build tube mesh from curveBuffer using a stable perpendicular frame
-      const tubeAttr = stream.spine.geometry.attributes.position as THREE.BufferAttribute;
-      const tubeArr = tubeAttr.array as Float32Array;
-      const tubeSeg = 20;
-      const tubeSides = 6;
-      const ribbonHalfWidth = Math.max(dist * 0.026, 20);
-      for (let s = 0; s < tubeSeg; s++) {
-        const t = s / (tubeSeg - 1);
-        const ci = Math.min(Math.floor(t * (curvePointCount - 1)), curvePointCount - 2);
-        const ct = t * (curvePointCount - 1) - ci;
-        const cOff = ci * 3;
-        const nOff = (ci + 1) * 3;
-        const cx = curveBuffer[cOff] + (curveBuffer[nOff] - curveBuffer[cOff]) * ct;
-        const cy = curveBuffer[cOff + 1] + (curveBuffer[nOff + 1] - curveBuffer[cOff + 1]) * ct;
-        const cz = curveBuffer[cOff + 2] + (curveBuffer[nOff + 2] - curveBuffer[cOff + 2]) * ct;
-        const pIdx = Math.max(0, ci - 1) * 3;
-        const fIdx = Math.min(curvePointCount - 1, ci + 2) * 3;
-        const tubeTangent = _streamVecF.set(
-          curveBuffer[fIdx] - curveBuffer[pIdx],
-          curveBuffer[fIdx + 1] - curveBuffer[pIdx + 1],
-          curveBuffer[fIdx + 2] - curveBuffer[pIdx + 2],
-        ).normalize();
-        // Stable frame: cross with world-up, fallback to world-X if near-parallel
-        const tubeN1 = _streamVecH.set(0, 1, 0).cross(tubeTangent);
-        if (tubeN1.lengthSq() < 0.01) tubeN1.set(1, 0, 0);
-        tubeN1.normalize();
-        const tubeN2 = _streamVecI.crossVectors(tubeTangent, tubeN1).normalize();
-        const endTaper = 0.28 + 0.72 * Math.cos(t * Math.PI / 2);
-        const midBulge = Math.pow(Math.sin(t * Math.PI), 0.7);
-        const tubeRadius = ribbonHalfWidth * (0.38 * endTaper + 0.62 * midBulge) * 0.28;
-        for (let n = 0; n < tubeSides; n++) {
-          const angle = (n / tubeSides) * Math.PI * 2;
-          const ca = Math.cos(angle);
-          const sa = Math.sin(angle);
-          const vi = (s * tubeSides + n) * 3;
-          tubeArr[vi] = cx + (tubeN1.x * ca + tubeN2.x * sa) * tubeRadius;
-          tubeArr[vi + 1] = cy + (tubeN1.y * ca + tubeN2.y * sa) * tubeRadius;
-          tubeArr[vi + 2] = cz + (tubeN1.z * ca + tubeN2.z * sa) * tubeRadius;
-        }
-      }
-      tubeAttr.needsUpdate = true;
-
-      const spineMat = stream.spine.material as THREE.MeshBasicMaterial;
-      spineMat.color.copy(stream.highlightColor);
-
-      const cameraPos = this.camera.getWorldPosition(_streamVecG);
-      const ribbonAttr = stream.ribbon.geometry.attributes.position as THREE.BufferAttribute;
-      const ribbonArr = ribbonAttr.array as Float32Array;
-      const ribbonSegments = ribbonArr.length / 6;
-      for (let i = 0; i < ribbonSegments; i++) {
-        const t = i / (ribbonSegments - 1);
-        const sample = t * (curvePointCount - 1);
-        const basePoint = Math.floor(sample);
-        const nextPoint = Math.min(curvePointCount - 1, basePoint + 1);
-        const blend = sample - basePoint;
-        const baseOffset = basePoint * 3;
-        const nextOffset = nextPoint * 3;
-        const px = curveBuffer[baseOffset] + (curveBuffer[nextOffset] - curveBuffer[baseOffset]) * blend;
-        const py = curveBuffer[baseOffset + 1] + (curveBuffer[nextOffset + 1] - curveBuffer[baseOffset + 1]) * blend;
-        const pz = curveBuffer[baseOffset + 2] + (curveBuffer[nextOffset + 2] - curveBuffer[baseOffset + 2]) * blend;
-
-        const prevPoint = Math.max(0, basePoint - 1);
-        const futurePoint = Math.min(curvePointCount - 1, nextPoint + 1);
-        const prevOffset = prevPoint * 3;
-        const futureOffset = futurePoint * 3;
-        const tangent = _streamVecF.set(
-          curveBuffer[futureOffset] - curveBuffer[prevOffset],
-          curveBuffer[futureOffset + 1] - curveBuffer[prevOffset + 1],
-          curveBuffer[futureOffset + 2] - curveBuffer[prevOffset + 2],
-        ).normalize();
-        const toCamera = _streamVecE.set(cameraPos.x - px, cameraPos.y - py, cameraPos.z - pz).normalize();
-        const side = _streamVecD.crossVectors(toCamera, tangent);
-        if (side.lengthSq() < 1e-6) {
-          side.copy(lateral);
-        } else {
-          side.normalize();
-        }
-
-        // Taper to 0.28 at disk end (not zero) so stream stays visible as it enters the disk
-        const endTaper = 0.28 + 0.72 * Math.cos(t * Math.PI / 2);  // 1→0.28
-        const midBulge = Math.pow(Math.sin(t * Math.PI), 0.7); // peaks in middle
-        const envelope = 0.38 * endTaper + 0.62 * midBulge;
-        const pulse = 0.94 + 0.06 * Math.sin(time * stream.flowSpeed * 18 - t * 9 + stream.phase);
-        const width = ribbonHalfWidth * envelope * pulse;
-
-        const leftIndex = i * 6;
-        ribbonArr[leftIndex] = px + side.x * width;
-        ribbonArr[leftIndex + 1] = py + side.y * width;
-        ribbonArr[leftIndex + 2] = pz + side.z * width;
-        ribbonArr[leftIndex + 3] = px - side.x * width;
-        ribbonArr[leftIndex + 4] = py - side.y * width;
-        ribbonArr[leftIndex + 5] = pz - side.z * width;
-      }
-      ribbonAttr.needsUpdate = true;
-
-      const ribbonMat = stream.ribbon.material as THREE.MeshBasicMaterial;
-      ribbonMat.color.copy(stream.highlightColor);
-      ribbonMat.opacity = 0.34 + Math.sin(time * 0.22 + stream.phase) * 0.04;
-      if (ribbonMat.map) {
-        ribbonMat.map.offset.x = -time * stream.flowSpeed;
-      }
-      if (ribbonMat.alphaMap) {
-        ribbonMat.alphaMap.offset.x = -time * stream.flowSpeed;
-      }
-    }
-
-    if (this.xbDiskGroup) {
-      // Children order from createBlackHoleGroup: disk, innerRing, outerGlow, brightArc, shadowCore, innerShadow
-      const disk = this.xbDiskGroup.children[0] as THREE.Mesh;
-      const innerRing = this.xbDiskGroup.children[1] as THREE.Mesh;
-      const brightArc = this.xbDiskGroup.children[3] as THREE.Mesh;
-      disk.rotation.z = 0.45 + time * 0.06;
-      innerRing.rotation.z = 0.54 + time * 0.10;
-      brightArc.rotation.z = 0.62 + time * 0.08;
     }
   }
 
