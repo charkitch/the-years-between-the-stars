@@ -130,6 +130,26 @@ fn build_system_payload(
         }
     }
 
+    // Iron star arrival dialog — shown only once per save
+    let system_entry_dialog = if star.star_type == StarType::Iron
+        && !player_state.seen_system_dialog_ids.iter().any(|id| id == "iron_star_arrival")
+    {
+        Some(SystemEntryDialog {
+            id: "iron_star_arrival".to_string(),
+            title: "IRON STAR".to_string(),
+            body_lines: vec![
+                "A long time ago, when you were a child, you learned Iron Stars would not exist for trillions upon trillions of years, until after the white dwarfs had gone black and quantum chance had done its patient work".to_string(),
+                "Slightly less long ago, you learned that Iron Stars would never exist, as the life expectancy of this universe was hastily shortened by changes in the predicted collapse of expansion.".to_string(),
+                "Today, you learned, yet again, that things that cannot be sometimes are, and that the universe continues to suprise.".to_string(),
+                "The system around the Iron Star has a Dyson Shell in the habitable zone. Iron Stars don't have habitable zones.".to_string(),
+                "Today will be a good day. You might not think of the past even once.".to_string(),
+            ],
+            show_once: true,
+        })
+    } else {
+        None
+    };
+
     SystemPayload {
         system,
         civ_state,
@@ -137,6 +157,7 @@ fn build_system_payload(
         market,
         landing_event,
         system_entry_lines: lines,
+        system_entry_dialog,
     }
 }
 
@@ -170,6 +191,7 @@ pub fn init_game(player_state_json: &str) -> Result<String, JsValue> {
             last_visit_year: std::collections::HashMap::new(),
             known_factions: vec![],
             faction_memory: std::collections::HashMap::new(),
+            seen_system_dialog_ids: vec![],
         }
     } else {
         serde_json::from_str(player_state_json)

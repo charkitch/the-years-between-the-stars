@@ -8,6 +8,7 @@ import type {
   ClusterSystemSummary,
   SystemPayload,
   MarketEntry,
+  SystemEntryDialog,
 } from './engine';
 import { STARTING_CREDITS, STARTING_FUEL, HYPERSPACE, GALAXY_YEAR_START, type GoodName } from './constants';
 import type { NPCCargoEntry } from './mechanics/NPCSystem';
@@ -94,6 +95,8 @@ export interface GameStateData {
   knownFactions: Set<string>;
   factionMemory: Record<number, FactionMemoryEntry>;
   systemEntryLines: string[] | null;
+  pendingSystemEntryDialog: SystemEntryDialog | null;
+  seenSystemDialogIds: string[];
 
   // ── Galaxy simulation state (from Rust) ─────────────────────────────────
   galaxySimState: SystemSimState[] | null;
@@ -135,6 +138,8 @@ export interface GameActions {
   addKnownFaction: (id: string) => void;
   setFactionMemory: (systemId: number, data: FactionMemoryEntry) => void;
   setSystemEntryLines: (lines: string[] | null) => void;
+  setPendingSystemEntryDialog: (dialog: SystemEntryDialog | null) => void;
+  markSystemDialogSeen: (id: string) => void;
 
   // ── Engine integration actions ────────────────────────────────────────
   setCluster: (cluster: StarSystemData[]) => void;
@@ -172,6 +177,7 @@ interface SaveData {
   lastVisitYear: Record<number, number>;
   knownFactions: string[];
   factionMemory: Record<number, FactionMemoryEntry>;
+  seenSystemDialogIds: string[];
 }
 
 function migrateLegacyGoodKeys<T>(record: Partial<Record<GoodName, T>> | undefined): Partial<Record<GoodName, T>> | undefined {
@@ -219,6 +225,8 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
   knownFactions: new Set(),
   factionMemory: {},
   systemEntryLines: null,
+  pendingSystemEntryDialog: null,
+  seenSystemDialogIds: [],
 
   // Galaxy simulation state
   galaxySimState: null,
@@ -312,6 +320,12 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
     factionMemory: { ...s.factionMemory, [systemId]: data },
   })),
   setSystemEntryLines: (lines) => set({ systemEntryLines: lines }),
+  setPendingSystemEntryDialog: (dialog) => set({ pendingSystemEntryDialog: dialog }),
+  markSystemDialogSeen: (id) => set(s => ({
+    seenSystemDialogIds: s.seenSystemDialogIds.includes(id)
+      ? s.seenSystemDialogIds
+      : [...s.seenSystemDialogIds, id],
+  })),
   setCluster: (cluster) => {
     CLUSTER = cluster;
     set({ cluster });
@@ -338,6 +352,8 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
       knownFactions: new Set(),
       factionMemory: {},
       systemEntryLines: null,
+      pendingSystemEntryDialog: null,
+      seenSystemDialogIds: [],
       galaxySimState: null,
       ui: { mode: 'flight', alertMessage: null, hyperspaceTarget: null, hyperspaceCountdown: 0, deathMessage: null },
     });
@@ -363,6 +379,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
       lastVisitYear: saved.lastVisitYear ?? {},
       knownFactions: new Set(saved.knownFactions ?? []),
       factionMemory: saved.factionMemory ?? {},
+      seenSystemDialogIds: saved.seenSystemDialogIds ?? [],
     }));
   },
 
@@ -382,6 +399,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
       lastVisitYear: s.lastVisitYear,
       knownFactions: Array.from(s.knownFactions),
       factionMemory: s.factionMemory,
+      seenSystemDialogIds: s.seenSystemDialogIds,
     };
     localStorage.setItem('space-game-save', JSON.stringify(data));
   },

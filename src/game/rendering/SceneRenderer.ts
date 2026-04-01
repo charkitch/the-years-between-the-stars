@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PALETTE, STAR_COLORS } from '../constants';
+import { PALETTE, STAR_COLORS, STAR_ATTRIBUTES } from '../constants';
 import {
   createStarfield, createHyperspaceTunnel, updateHyperspaceTunnel,
   createHyperspaceGrid, updateHyperspaceGrid,
@@ -399,6 +399,7 @@ export class SceneRenderer {
   private fleetBattleData: FleetBattle | null = null;
   private collidables: SceneEntity[] = [];
   private xRayTransferStreams: XRayTransferStream[] = [];
+  private xbDiskGroup: THREE.Group | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     // Prefer WebGL2, with WebGL1 fallback for older environments.
@@ -457,6 +458,7 @@ export class SceneRenderer {
     this.battleExplosions = null;
     this.fleetBattleData = null;
     this.xRayTransferStreams = [];
+    this.xbDiskGroup = null;
 
     // Star
     const starColor = STAR_COLORS[data.starType] ?? PALETTE.starG;
@@ -478,7 +480,8 @@ export class SceneRenderer {
       const companion = data.companion;
 
       // Compact accretor — same visual language as BH, but brighter in X-ray.
-      starGroup.add(createBlackHoleGroup(data.starRadius, true));
+      this.xbDiskGroup = createBlackHoleGroup(data.starRadius, true);
+      starGroup.add(this.xbDiskGroup);
 
       const diskHalo = makeGlowSprite(0xA9DCFF, data.starRadius * 10.5);
       const diskHaloMat = diskHalo.material as THREE.SpriteMaterial;
@@ -538,12 +541,12 @@ export class SceneRenderer {
       const starMat = new THREE.MeshBasicMaterial({ color: starColor });
       starGroup.add(new THREE.Mesh(starGeo, starMat));
 
-      // Glow sprite — larger for intense objects, slightly larger for WD
-      const glowMul = isIntense ? 12
-        : data.starType === 'WD' ? 8
-        : 6;
-      const glow = makeGlowSprite(starColor, data.starRadius * glowMul);
-      starGroup.add(glow);
+      // Glow sprite — size and presence driven by star attributes
+      const starAttrs = STAR_ATTRIBUTES[data.starType];
+      if (starAttrs?.glow) {
+        const glow = makeGlowSprite(starColor, data.starRadius * starAttrs.glowMul);
+        starGroup.add(glow);
+      }
 
       // Pulsar beam jets — tapered cones anchored at the star surface
       if (data.starType === 'PU') {
@@ -603,7 +606,7 @@ export class SceneRenderer {
     });
 
     if (data.starType === 'XB' && data.companion) {
-      const transferStream = createXRayTransferStream(data.companion.color, data.starRadius * 2.8);
+      const transferStream = createXRayTransferStream(data.companion.color, data.starRadius * 1.9);
       this.scene.add(transferStream.spine);
       this.scene.add(transferStream.ribbon);
       this.systemObjects.push(transferStream.spine, transferStream.ribbon);
@@ -1119,7 +1122,7 @@ export class SceneRenderer {
         if (tubeN1.lengthSq() < 0.01) tubeN1.set(1, 0, 0);
         tubeN1.normalize();
         const tubeN2 = _streamVecI.crossVectors(tubeTangent, tubeN1).normalize();
-        const endTaper = Math.cos(t * Math.PI / 2);
+        const endTaper = 0.28 + 0.72 * Math.cos(t * Math.PI / 2);
         const midBulge = Math.pow(Math.sin(t * Math.PI), 0.7);
         const tubeRadius = ribbonHalfWidth * (0.38 * endTaper + 0.62 * midBulge) * 0.28;
         for (let n = 0; n < tubeSides; n++) {
@@ -1170,8 +1173,8 @@ export class SceneRenderer {
           side.normalize();
         }
 
-        // Taper to near-zero at disk end (t=1), moderate width at donor end (t=0)
-        const endTaper = Math.cos(t * Math.PI / 2);        // 1 at t=0, 0 at t=1
+        // Taper to 0.28 at disk end (not zero) so stream stays visible as it enters the disk
+        const endTaper = 0.28 + 0.72 * Math.cos(t * Math.PI / 2);  // 1→0.28
         const midBulge = Math.pow(Math.sin(t * Math.PI), 0.7); // peaks in middle
         const envelope = 0.38 * endTaper + 0.62 * midBulge;
         const pulse = 0.94 + 0.06 * Math.sin(time * stream.flowSpeed * 18 - t * 9 + stream.phase);
@@ -1196,6 +1199,16 @@ export class SceneRenderer {
       if (ribbonMat.alphaMap) {
         ribbonMat.alphaMap.offset.x = -time * stream.flowSpeed;
       }
+    }
+
+    if (this.xbDiskGroup) {
+      // Children order from createBlackHoleGroup: disk, innerRing, outerGlow, brightArc, shadowCore, innerShadow
+      const disk = this.xbDiskGroup.children[0] as THREE.Mesh;
+      const innerRing = this.xbDiskGroup.children[1] as THREE.Mesh;
+      const brightArc = this.xbDiskGroup.children[3] as THREE.Mesh;
+      disk.rotation.z = 0.45 + time * 0.06;
+      innerRing.rotation.z = 0.54 + time * 0.10;
+      brightArc.rotation.z = 0.62 + time * 0.08;
     }
   }
 

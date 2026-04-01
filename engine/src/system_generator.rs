@@ -14,7 +14,7 @@ fn star_color(st: StarType) -> u32 {
         StarType::F   => 0xFFFFFF,
         StarType::A   => 0xAABBFF,
         StarType::WD  => 0xF0F0FF,
-        StarType::HE  => 0x88CCAA,
+
         StarType::NS  => 0xCCDDFF,
         StarType::PU  => 0x44AAFF,
         StarType::XB  => 0xFF6688,
@@ -22,13 +22,15 @@ fn star_color(st: StarType) -> u32 {
         StarType::BH  => 0x220022,
         StarType::XBB => 0xFF4466,
         StarType::SGR => 0xFFAA22,
+        StarType::Iron => 0x2A2A2A,
     }
 }
 
 fn star_radius_range(st: StarType) -> (f64, f64) {
     match st {
-        StarType::WD  => (30.0, 50.0),
-        StarType::HE  => (200.0, 280.0),
+        StarType::WD   => (30.0, 50.0),
+        StarType::Iron => (5.0, 10.0),
+
         StarType::NS  => (60.0, 100.0),
         StarType::PU  => (60.0, 100.0),
         StarType::XB  => (36.0, 64.0),
@@ -63,6 +65,115 @@ const MOON_SURFACE_WEIGHTS: &[(SurfaceType, f64)] = &[
     (SurfaceType::Marsh, 0.004),
     (SurfaceType::ForestMoon, 0.001),
 ];
+
+// Dead stars (WD, HE) — post-stellar-evolution, stripped atmospheres
+const ROCKY_WEIGHTS_DEAD: &[(SurfaceType, f64)] = &[
+    (SurfaceType::Barren,      0.38),
+    (SurfaceType::Desert,      0.26),
+    (SurfaceType::Ice,         0.20),
+    (SurfaceType::Volcanic,    0.08),
+    (SurfaceType::Venus,       0.05),
+    (SurfaceType::Continental, 0.03),
+];
+const MOON_WEIGHTS_DEAD: &[(SurfaceType, f64)] = &[
+    (SurfaceType::Barren,   0.55),
+    (SurfaceType::Ice,      0.30),
+    (SurfaceType::Volcanic, 0.09),
+    (SurfaceType::Desert,   0.06),
+];
+
+// Harsh compact (NS, PU, MG, SGR) — radiation-flooded, no habitable worlds
+const ROCKY_WEIGHTS_HARSH: &[(SurfaceType, f64)] = &[
+    (SurfaceType::Barren,   0.50),
+    (SurfaceType::Volcanic, 0.28),
+    (SurfaceType::Desert,   0.12),
+    (SurfaceType::Venus,    0.06),
+    (SurfaceType::Ice,      0.04),
+];
+const MOON_WEIGHTS_HARSH: &[(SurfaceType, f64)] = &[
+    (SurfaceType::Barren,   0.65),
+    (SurfaceType::Volcanic, 0.25),
+    (SurfaceType::Desert,   0.10),
+];
+const GAS_HARSH: &[GasGiantType] = &[
+    GasGiantType::Jovian, GasGiantType::Neptunian, GasGiantType::Inferno,
+];
+
+// Iron star — things that cannot be, sometimes are
+const ROCKY_WEIGHTS_IRON: &[(SurfaceType, f64)] = &[
+    (SurfaceType::Barren,   0.70),
+    (SurfaceType::Volcanic, 0.20),
+    (SurfaceType::Desert,   0.10),
+];
+const MOON_WEIGHTS_IRON: &[(SurfaceType, f64)] = &[
+    (SurfaceType::Barren,   0.85),
+    (SurfaceType::Volcanic, 0.15),
+];
+
+// Exotic compact (BH, XB, XBB) — maximum hostility, tidal disruption
+const ROCKY_WEIGHTS_EXOTIC: &[(SurfaceType, f64)] = &[
+    (SurfaceType::Barren,   0.55),
+    (SurfaceType::Volcanic, 0.30),
+    (SurfaceType::Desert,   0.10),
+    (SurfaceType::Venus,    0.05),
+];
+const MOON_WEIGHTS_EXOTIC: &[(SurfaceType, f64)] = &[
+    (SurfaceType::Barren,   0.75),
+    (SurfaceType::Volcanic, 0.25),
+];
+const GAS_EXOTIC: &[GasGiantType] = &[
+    GasGiantType::Inferno, GasGiantType::Jovian,
+];
+
+struct SystemProfile {
+    rocky_weights:   &'static [(SurfaceType, f64)],
+    moon_weights:    &'static [(SurfaceType, f64)],
+    gas_giant_types: &'static [GasGiantType],
+    inner_count:     (i32, i32),
+    outer_count:     (i32, i32),
+    asteroid_chance: f64,
+    ring_chance:     f64,
+}
+
+fn system_profile_for(st: StarType) -> SystemProfile {
+    match st {
+        StarType::G | StarType::K | StarType::M | StarType::F | StarType::A => SystemProfile {
+            rocky_weights:   ROCKY_SURFACE_WEIGHTS,
+            moon_weights:    MOON_SURFACE_WEIGHTS,
+            gas_giant_types: GasGiantType::ALL,
+            inner_count: (1, 3), outer_count: (1, 3),
+            asteroid_chance: 0.50, ring_chance: 0.60,
+        },
+        StarType::WD => SystemProfile {
+            rocky_weights:   ROCKY_WEIGHTS_DEAD,
+            moon_weights:    MOON_WEIGHTS_DEAD,
+            gas_giant_types: GasGiantType::ALL,
+            inner_count: (1, 2), outer_count: (1, 2),
+            asteroid_chance: 0.65, ring_chance: 0.50,
+        },
+        StarType::NS | StarType::PU | StarType::MG | StarType::SGR => SystemProfile {
+            rocky_weights:   ROCKY_WEIGHTS_HARSH,
+            moon_weights:    MOON_WEIGHTS_HARSH,
+            gas_giant_types: GAS_HARSH,
+            inner_count: (0, 2), outer_count: (1, 2),
+            asteroid_chance: 0.70, ring_chance: 0.40,
+        },
+        StarType::BH | StarType::XB | StarType::XBB => SystemProfile {
+            rocky_weights:   ROCKY_WEIGHTS_EXOTIC,
+            moon_weights:    MOON_WEIGHTS_EXOTIC,
+            gas_giant_types: GAS_EXOTIC,
+            inner_count: (0, 1), outer_count: (1, 2),
+            asteroid_chance: 0.80, ring_chance: 0.35,
+        },
+        StarType::Iron => SystemProfile {
+            rocky_weights:   ROCKY_WEIGHTS_IRON,
+            moon_weights:    MOON_WEIGHTS_IRON,
+            gas_giant_types: &[GasGiantType::Helium],
+            inner_count: (0, 1), outer_count: (0, 1),
+            asteroid_chance: 0.90, ring_chance: 0.15,
+        },
+    }
+}
 
 const ASTEROID_BASE_NAMES: &[&str] = &[
     "Hollowed Rock", "Cinder Station", "Belt Refuge", "The Burrow",
@@ -167,6 +278,7 @@ fn generate_great_spot(rng: &mut PRNG, gas_type: GasGiantType) -> (bool, f64, f6
         GasGiantType::Inferno => 0.40,
         GasGiantType::Chromatic => 0.35,
         GasGiantType::Saturnian => 0.25,
+        GasGiantType::Helium => 0.20,
     };
     let has = rng.next() < chance;
     let lat = match gas_type {
@@ -181,10 +293,11 @@ fn generate_great_spot(rng: &mut PRNG, gas_type: GasGiantType) -> (bool, f64, f6
 
 pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
     let mut rng = PRNG::from_index(CLUSTER_SEED, star.id.wrapping_mul(97).wrapping_add(13));
+    let profile = system_profile_for(star.star_type);
 
-    let inner_count = rng.int(1, 3);
-    let outer_count = rng.int(1, 3);
-    let has_asteroids = rng.next() < 0.5;
+    let inner_count = rng.int(profile.inner_count.0, profile.inner_count.1);
+    let outer_count = rng.int(profile.outer_count.0, profile.outer_count.1);
+    let has_asteroids = rng.next() < profile.asteroid_chance;
     let (radius_min, radius_max) = star_radius_range(star.star_type);
     let star_radius = rng.float(radius_min, radius_max);
 
@@ -229,7 +342,7 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
             let moon_radius = generate_rocky_moon_radius(&mut rng);
             let moon_orbit = moon_orbit_min + moon_radius + rng.float(20.0, 80.0);
             moon_orbit_min = moon_orbit + moon_radius;
-            let moon_surface = pick_weighted_surface(&mut rng, MOON_SURFACE_WEIGHTS);
+            let moon_surface = pick_weighted_surface(&mut rng, profile.moon_weights);
             let (moon_has_clouds, moon_cloud_density) = generate_moon_clouds(&mut rng, moon_surface);
             moons.push(MoonData {
                 id: format!("{}-p{}-m{}", star.id, i, m),
@@ -243,7 +356,7 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
                 cloud_density: moon_cloud_density,
             });
         }
-        let rocky_surface = pick_weighted_surface(&mut rng, ROCKY_SURFACE_WEIGHTS);
+        let rocky_surface = pick_weighted_surface(&mut rng, profile.rocky_weights);
         let (has_clouds, cloud_density) = generate_rocky_clouds(&mut rng, rocky_surface);
         planets.push(PlanetData {
             id: format!("{}-p{}", star.id, i),
@@ -288,9 +401,9 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
     for i in 0..outer_count {
         let orbit_radius = orbit_base + rng.float(1000.0, 3000.0);
         orbit_base = orbit_radius + rng.float(1500.0, 3000.0);
-        let gas_type = rng.pick_clone(GasGiantType::ALL);
+        let gas_type = rng.pick_clone(profile.gas_giant_types);
         let planet_radius = rng.float(180.0, 300.0);
-        let has_rings = rng.next() < 0.6;
+        let has_rings = rng.next() < profile.ring_chance;
         let ring_roll = rng.next();
         let ring_count = if !has_rings { 1 } else if ring_roll < 0.05 { 3 } else if ring_roll < 0.20 { 2 } else { 1 };
         let ring_inclination = if has_rings { rng.float(-0.38, 0.38) } else { 0.0 };
@@ -303,7 +416,7 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
             let moon_radius = rng.float(25.0, 55.0);
             let moon_orbit = moon_orbit_min + moon_radius + rng.float(40.0, 180.0);
             moon_orbit_min = moon_orbit + moon_radius;
-            let moon_surface = pick_weighted_surface(&mut rng, MOON_SURFACE_WEIGHTS);
+            let moon_surface = pick_weighted_surface(&mut rng, profile.moon_weights);
             let (moon_has_clouds, moon_cloud_density) = generate_moon_clouds(&mut rng, moon_surface);
             moons.push(MoonData {
                 id: format!("{}-g{}-m{}", star.id, i, m),
@@ -341,11 +454,6 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
             has_station: false,
         });
     }
-
-    let main_station_planet_id = planets.iter()
-        .find(|p| p.has_station)
-        .map(|p| p.id.clone())
-        .unwrap_or_else(|| planets[0].id.clone());
 
     // Secret bases
     let mut secret_bases: Vec<SecretBaseData> = Vec::new();
@@ -389,6 +497,12 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
             orbit_speed: rng.float(0.0000005, 0.000002),
         });
     }
+
+    let main_station_planet_id = planets.iter()
+        .find(|p| p.has_station)
+        .or_else(|| planets.first())
+        .map(|p| p.id.clone())
+        .unwrap_or_default();
 
     SolarSystemData {
         star_type: star.star_type,

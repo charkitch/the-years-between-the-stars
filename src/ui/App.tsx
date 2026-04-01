@@ -9,6 +9,7 @@ import { ClusterMap } from './ClusterMap/ClusterMap';
 import { SystemMap } from './SystemMap/SystemMap';
 import { StationUI } from './StationUI/StationUI';
 import { LandingDialog } from './LandingDialog/LandingDialog';
+import { SystemEntryDialog } from './SystemEntryDialog/SystemEntryDialog';
 import { CommDialog } from './CommDialog/CommDialog';
 import type { SceneEntity } from '../game/rendering/SceneRenderer';
 import type { GoodName } from '../game/constants';
@@ -21,6 +22,7 @@ export function App() {
   const uiMode = useGameState(s => s.ui.mode);
   const hyperspaceCountdown = useGameState(s => s.ui.hyperspaceCountdown);
   const setUIMode = useGameState(s => s.setUIMode);
+  const pendingSystemEntryDialog = useGameState(s => s.pendingSystemEntryDialog);
 
   const prevUiModeRef = useRef<UIMode>('flight');
   const [flashPhase, setFlashPhase] = useState<'none' | 'entry' | 'exit'>('none');
@@ -78,6 +80,10 @@ export function App() {
     gameRef.current?.tradeWithNPC(action, good);
   };
 
+  const handleSystemEntryDialogDismiss = () => {
+    gameRef.current?.dismissSystemEntryDialog();
+  };
+
   const handleCommDismiss = () => {
     gameRef.current?.completeComm();
   };
@@ -105,7 +111,10 @@ export function App() {
         <HUD getEntities={getEntities} getShipPos={getShipPos} getCamera={getCamera} />
       )}
 
-      {uiMode === 'flight' && <SystemEntryText />}
+      {uiMode === 'flight' && !pendingSystemEntryDialog && <SystemEntryText />}
+      {pendingSystemEntryDialog && (
+        <SystemEntryDialog onDismiss={handleSystemEntryDialogDismiss} />
+      )}
 
       {uiMode === 'hyperspace' && (
         <div style={{

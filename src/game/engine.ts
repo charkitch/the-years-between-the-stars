@@ -18,7 +18,7 @@ import type { GoodName, EconomyType, PoliticalType } from './constants';
 
 // ─── Types matching Rust camelCase serde output ─────────────────────────────
 
-export type StarType = 'G' | 'K' | 'M' | 'F' | 'A' | 'WD' | 'HE' | 'NS' | 'PU' | 'XB' | 'MG' | 'BH' | 'XBB' | 'SGR';
+export type StarType = 'G' | 'K' | 'M' | 'F' | 'A' | 'WD' | 'NS' | 'PU' | 'XB' | 'MG' | 'BH' | 'XBB' | 'SGR' | 'IRON';
 
 export type SurfaceType =
   | 'continental'
@@ -31,7 +31,7 @@ export type SurfaceType =
   | 'volcanic'
   | 'forest_moon';
 
-export type GasGiantType = 'jovian' | 'saturnian' | 'neptunian' | 'inferno' | 'chromatic';
+export type GasGiantType = 'jovian' | 'saturnian' | 'neptunian' | 'inferno' | 'chromatic' | 'helium';
 
 export interface StarSystemData {
   id: number;
@@ -185,6 +185,13 @@ export interface ClusterSystemSummary {
   population: number;
 }
 
+export interface SystemEntryDialog {
+  id: string;
+  title: string;
+  bodyLines: string[];
+  showOnce: boolean;
+}
+
 export interface SystemPayload {
   system: SolarSystemData;
   civState: CivilizationState;
@@ -192,6 +199,7 @@ export interface SystemPayload {
   market: MarketEntry[];
   landingEvent: LandingEvent | null;
   systemEntryLines: string[];
+  systemEntryDialog: SystemEntryDialog | null;
 }
 
 export interface JumpResult {
@@ -244,6 +252,7 @@ export interface WasmPlayerState {
     contestingFactionId: string | null;
     galaxyYear: number;
   }>;
+  seenSystemDialogIds: string[];
 }
 
 // ─── Engine API ─────────────────────────────────────────────────────────────

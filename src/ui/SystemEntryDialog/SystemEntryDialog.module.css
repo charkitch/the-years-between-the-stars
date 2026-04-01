@@ -1,0 +1,68 @@
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(1, 2, 6, 0.97);
+  pointer-events: all;
+  z-index: 25;
+}
+
+.panel {
+  background: var(--hud-bg-panel);
+  border: 1px solid rgba(107, 91, 69, 0.5);
+  padding: 36px 40px;
+  max-width: 580px;
+  width: 92vw;
+  font-family: 'Courier New', monospace;
+}
+
+.title {
+  font-size: 20px;
+  letter-spacing: 6px;
+  color: #9E8860;
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(107, 91, 69, 0.3);
+}
+
+.narrative {
+  border-left: 2px solid rgba(107, 91, 69, 0.3);
+  padding-left: 18px;
+  margin-bottom: 28px;
+}
+
+.line {
+  margin: 0 0 16px 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: rgba(210, 200, 185, 0.88);
+  letter-spacing: 0.3px;
+}
+
+.line:last-child {
+  margin-bottom: 0;
+  color: rgba(230, 220, 200, 0.95);
+  font-style: italic;
+}
+
+.dismissBtn {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(107, 91, 69, 0.08);
+  border: 1px solid rgba(107, 91, 69, 0.4);
+  color: #9E8860;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 3px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.dismissBtn:hover {
+  background: rgba(107, 91, 69, 0.18);
+  border-color: #9E8860;
+}

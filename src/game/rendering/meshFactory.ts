@@ -354,9 +354,9 @@ export function addCloudLayer(
   group.add(new THREE.Mesh(geo, mat));
 }
 
-// Gas giant type index for GLSL: 0=jovian, 1=saturnian, 2=neptunian, 3=inferno, 4=chromatic
+// Gas giant type index for GLSL: 0=jovian, 1=saturnian, 2=neptunian, 3=inferno, 4=chromatic, 5=helium
 const GAS_TYPE_INDEX: Record<GasGiantType, number> = {
-  jovian: 0, saturnian: 1, neptunian: 2, inferno: 3, chromatic: 4,
+  jovian: 0, saturnian: 1, neptunian: 2, inferno: 3, chromatic: 4, helium: 5,
 };
 
 /** Procedural gas giant — type drives banding style and palette */
@@ -404,6 +404,7 @@ export function makeGasGiant(
       void main() {
         vec3 toStar = normalize(-vWorldPosition);
         float sunDot = dot(vWorldNormal, toStar);
+        vec3 viewDir = normalize(cameraPosition - vWorldPosition);
 
         vec3 norm = normalize(vLocalPos);
         // Latitude — drives horizontal banding
@@ -477,7 +478,7 @@ export function makeGasGiant(
           float terminator = smoothstep(0.1, 0.0, abs(sunDot)) * smoothstep(0.3, 0.6, n3);
           surfaceColor = mix(surfaceColor, vec3(0.15, 0.02, 0.0), terminator * 0.5);
 
-        } else {
+        } else if (gasType == 4) {
           // ── Chromatic: alien, iridescent, shifting prismatic bands ──
           float band = sin(lat * 20.0 + n1 * 1.8) * 0.5 + 0.5;
           float shift = sin(lat * 35.0 + n2 * 1.2 + seed * 5.0) * 0.5 + 0.5;
@@ -494,6 +495,20 @@ export function makeGasGiant(
           // Deep vortex swirls
           float vortex = smoothstep(0.45, 0.7, abs(snoise(np * 3.0)));
           surfaceColor = mix(surfaceColor, surfaceColor * 0.4, vortex * 0.3);
+
+        } else {
+          // ── Helium: near-featureless silver-white, faint ghost bands ──
+          // Stripped atmosphere — almost no colour, just subtle structure
+          vec3 pale  = vec3(0.88, 0.90, 0.94); // cold white with a blue cast
+          vec3 frost = vec3(0.72, 0.76, 0.82); // slightly darker grey-blue
+          float band = sin(lat * 22.0 + n1 * 0.5) * 0.5 + 0.5;
+          surfaceColor = mix(frost, pale, band * 0.35 + 0.65);
+          // Very faint wisps — barely visible texture
+          float wisp = smoothstep(0.55, 0.75, snoise(np * 5.0 + vec3(seed)));
+          surfaceColor = mix(surfaceColor, vec3(0.60, 0.65, 0.72), wisp * 0.12);
+          // Limb darkening — edges go slightly cooler
+          float limb = 1.0 - pow(max(0.0, dot(vWorldNormal, viewDir)), 0.6);
+          surfaceColor = mix(surfaceColor, vec3(0.45, 0.50, 0.60), limb * 0.18);
         }
 
         // ── Great Spot ──
@@ -525,10 +540,13 @@ export function makeGasGiant(
           } else if (gasType == 3) {
             // Inferno: intensely bright convection mega-cell
             spotColor = mix(vec3(1.0, 0.6, 0.1), vec3(1.0, 0.9, 0.3), swirl + 0.5);
-          } else {
+          } else if (gasType == 4) {
             // Chromatic: iridescent vortex eye with contrasting hue
             float spotHue = fract(uSpotLat * 0.5 + 0.5);
             spotColor = 0.5 + 0.5 * cos(6.28318 * (spotHue + vec3(0.5, 0.83, 0.17)));
+          } else {
+            // Helium: faint dark-grey depression
+            spotColor = mix(vec3(0.40, 0.44, 0.52), vec3(0.55, 0.58, 0.64), swirl + 0.5);
           }
           surfaceColor = mix(surfaceColor, spotColor, spotMask * 0.85);
         }
@@ -865,6 +883,7 @@ const RING_PALETTES: Record<GasGiantType, readonly RGB[]> = {
   neptunian: [[118, 142, 178], [98,  122, 168], [138, 162, 188], [108, 135, 172]],
   inferno:   [[205, 98,  52],  [225, 118,  62], [182,  78,  42], [215, 108,  58]],
   chromatic: [[168, 118, 208], [118, 208, 168], [208, 168, 118], [168, 208, 118]],
+  helium:    [[178, 185, 198], [162, 170, 185], [192, 198, 210], [172, 178, 195]],
 };
 
 /** Generate a procedural ring canvas texture with radial bands and Cassini-style gaps */

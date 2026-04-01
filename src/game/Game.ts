@@ -14,6 +14,7 @@ import {
   FUEL_HARVEST,
   GAS_GIANT_SCOOP,
   COMBAT_INTELLIGENCE_GOOD,
+  STAR_ATTRIBUTES,
 } from './constants';
 import type { GoodName } from './constants';
 import { MAX_CARGO } from './constants';
@@ -23,6 +24,7 @@ import {
 } from './engine';
 
 const COMBAT_INTEL_INTERVAL = 8;
+const INFINITE_FUEL_DEV = import.meta.env.DEV;
 
 function buildWasmPlayerState(state: ReturnType<typeof useGameState.getState>): WasmPlayerState {
   // Convert Zustand state → WasmPlayerState for Rust JSON boundary
@@ -65,6 +67,7 @@ function buildWasmPlayerState(state: ReturnType<typeof useGameState.getState>): 
     lastVisitYear: { ...state.lastVisitYear },
     knownFactions: Array.from(state.knownFactions),
     factionMemory,
+    seenSystemDialogIds: [...state.seenSystemDialogIds],
   };
 }
 
@@ -182,6 +185,9 @@ export class Game {
     this.lastTime = now;
 
     const state = useGameState.getState();
+    if (INFINITE_FUEL_DEV && state.player.fuel < HYPERSPACE.tankSize) {
+      state.setFuel(HYPERSPACE.tankSize);
+    }
     const uiMode = state.ui.mode;
 
     if (uiMode === 'flight') {
@@ -206,7 +212,11 @@ export class Game {
       inp,
       this.sceneRenderer.shipGroup,
       state.player.fuel,
-      (amount) => state.setFuel(state.player.fuel - amount),
+      (amount) => {
+        if (!INFINITE_FUEL_DEV) {
+          state.setFuel(state.player.fuel - amount);
+        }
+      },
     );
 
     // Collision avoidance — push ship out of celestial bodies
@@ -226,23 +236,29 @@ export class Game {
     // Fuel scooping near star
     const starEntity = this.sceneRenderer.getAllEntities().get('star');
     const starPos = starEntity?.worldPos ?? null;
+    const starType = state.currentSystem?.starType;
+    const starAttrs = starType ? STAR_ATTRIBUTES[starType] : null;
     let coolingAllowed = true;
     if (starPos && starEntity) {
-      const distToStar = pos.distanceTo(starPos);
-      const scoopRange = starEntity.collisionRadius + 200;
-      if (distToStar < scoopRange) {
-        const scoopRate = 0.3 * dt;
-        state.setFuel(state.player.fuel + scoopRate);
-        state.setHeat(state.player.heat + 15 * dt);
-        this.scoopingFuel = true;
-        this.gasGiantScoopingFuel = false;
-        state.setAlert('FUEL SCOOPING');
-        coolingAllowed = false;
-      } else {
-        if (this.scoopingFuel) {
-          this.scoopingFuel = false;
-          state.setAlert(null);
+      if (starAttrs?.stellarEffects) {
+        const distToStar = pos.distanceTo(starPos);
+        const scoopRange = starEntity.collisionRadius + 200;
+        if (distToStar < scoopRange) {
+          const scoopRate = 0.3 * dt;
+          state.setFuel(state.player.fuel + scoopRate);
+          state.setHeat(state.player.heat + 15 * dt);
+          this.scoopingFuel = true;
+          this.gasGiantScoopingFuel = false;
+          state.setAlert('FUEL SCOOPING');
+          coolingAllowed = false;
+        } else {
+          if (this.scoopingFuel) {
+            this.scoopingFuel = false;
+            state.setAlert(null);
+          }
         }
+      } else if (this.scoopingFuel) {
+        this.scoopingFuel = false;
       }
 
       // Overheat damage
@@ -588,7 +604,8 @@ export class Game {
 
     const currentSys = state.cluster[state.currentSystemId];
     const targetSys = state.cluster[state.ui.hyperspaceTarget];
-    const check = this.hyperspace.canJump(currentSys, targetSys, state.player.fuel);
+    const availableFuel = INFINITE_FUEL_DEV ? HYPERSPACE.tankSize : state.player.fuel;
+    const check = this.hyperspace.canJump(currentSys, targetSys, availableFuel);
     if (!check.ok) {
       state.setAlert(check.reason ?? 'Cannot jump');
       setTimeout(() => useGameState.getState().setAlert(null), 2000);
@@ -607,7 +624,11 @@ export class Game {
     const targetSys = state.cluster[targetId];
     const cost = this.hyperspace.jumpCost(currentSys, targetSys);
 
-    state.setFuel(state.player.fuel - cost);
+    if (!INFINITE_FUEL_DEV) {
+      state.setFuel(state.player.fuel - cost);
+    } else if (state.player.fuel < HYPERSPACE.tankSize) {
+      state.setFuel(HYPERSPACE.tankSize);
+    }
 
     // Call Rust engine for the jump — computes years, simulates galaxy, generates system
     const wasmState = buildWasmPlayerState(state);
@@ -671,6 +692,11 @@ export class Game {
     this.sceneRenderer.shipGroup.rotation.set(0, 0, 0);
     this.flightModel.reset(this.sceneRenderer.shipGroup.position);
     this.flightModel.velocity.set(0, 0, -150);
+
+    // Queue system entry dialog (iron star first arrival, etc.) — shown before entry lines
+    if (payload.systemEntryDialog) {
+      state.setPendingSystemEntryDialog(payload.systemEntryDialog);
+    }
 
     // Use entry lines from Rust (includes era transitions, faction info, secret base hints)
     const lines = [...payload.systemEntryLines];
@@ -824,6 +850,17 @@ export class Game {
         state.removeCargo(good, 1);
       }
     }
+  }
+
+  dismissSystemEntryDialog(): void {
+    const state = useGameState.getState();
+    const dialog = state.pendingSystemEntryDialog;
+    if (!dialog) return;
+    if (dialog.showOnce) {
+      state.markSystemDialogSeen(dialog.id);
+      state.saveGame();
+    }
+    state.setPendingSystemEntryDialog(null);
   }
 
   completeComm(): void {

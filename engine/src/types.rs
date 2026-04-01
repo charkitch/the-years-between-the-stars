@@ -94,8 +94,6 @@ pub enum StarType {
     A,
     #[serde(rename = "WD")]
     WD,
-    #[serde(rename = "HE")]
-    HE,
     #[serde(rename = "NS")]
     NS,
     #[serde(rename = "PU")]
@@ -110,18 +108,21 @@ pub enum StarType {
     XBB,
     #[serde(rename = "SGR")]
     SGR,
+    #[serde(rename = "IRON")]
+    Iron,
 }
 
 impl StarType {
     pub const ALL: &'static [StarType] = &[
         StarType::G, StarType::K, StarType::M, StarType::F, StarType::A,
-        StarType::WD, StarType::HE, StarType::NS, StarType::PU, StarType::XB,
+        StarType::WD, StarType::NS, StarType::PU, StarType::XB,
         StarType::MG, StarType::BH, StarType::XBB, StarType::SGR,
+        // StarType::Iron is hand-placed, not randomly generated
     ];
     pub const WEIGHTS: &'static [f64] = &[
-        0.12, 0.10, 0.08, 0.06, 0.04,
+        0.16, 0.13, 0.11, 0.07, 0.05,
         0.08, 0.07, 0.06, 0.05, 0.06,
-        0.05, 0.08, 0.07, 0.08,
+        0.05, 0.08, 0.13,
     ];
 }
 
@@ -147,6 +148,7 @@ pub enum GasGiantType {
     Neptunian,
     Inferno,
     Chromatic,
+    Helium,
 }
 
 impl GasGiantType {
@@ -156,6 +158,7 @@ impl GasGiantType {
         GasGiantType::Neptunian,
         GasGiantType::Inferno,
         GasGiantType::Chromatic,
+        // GasGiantType::Helium is reserved for the Iron star system profile
     ];
 }
 
@@ -360,6 +363,8 @@ pub struct PlayerState {
     pub last_visit_year: HashMap<u32, u32>,
     pub known_factions: Vec<String>,
     pub faction_memory: HashMap<u32, FactionMemoryEntry>,
+    #[serde(default)]
+    pub seen_system_dialog_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -414,6 +419,17 @@ pub struct LandingEvent {
     pub required_faction_tag: Option<String>,
 }
 
+// ─── System Entry Dialog ─────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemEntryDialog {
+    pub id: String,
+    pub title: String,
+    pub body_lines: Vec<String>,
+    pub show_once: bool,
+}
+
 // ─── WASM Boundary Types ────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -442,6 +458,7 @@ pub struct SystemPayload {
     pub market: Vec<MarketEntry>,
     pub landing_event: Option<LandingEvent>,
     pub system_entry_lines: Vec<String>,
+    pub system_entry_dialog: Option<SystemEntryDialog>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

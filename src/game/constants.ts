@@ -23,6 +23,7 @@ export const PALETTE = {
   starBH:           0x220022,
   starXBB:          0xFF4466,
   starSGR:          0xFFAA22,
+  starIron:         0x2A2A2A,
   ambient:          0x112244,
   wireframe:        0x33FF88,
   stationWire:      0x44CCFF,
@@ -89,6 +90,34 @@ export const STAR_COLORS: Record<string, number> = {
   BH: PALETTE.starBH,
   XBB: PALETTE.starXBB,
   SGR: PALETTE.starSGR,
+  IRON: PALETTE.starIron,
+};
+
+export interface StarAttributes {
+  /** Whether this star type renders a glow/halo sprite */
+  glow: boolean;
+  /** Glow sprite size multiplier relative to star radius */
+  glowMul: number;
+  /** Whether proximity allows fuel scooping and causes heat damage */
+  stellarEffects: boolean;
+}
+
+export const STAR_ATTRIBUTES: Record<string, StarAttributes> = {
+  G:    { glow: true,  glowMul: 6,  stellarEffects: true  },
+  K:    { glow: true,  glowMul: 6,  stellarEffects: true  },
+  M:    { glow: true,  glowMul: 6,  stellarEffects: true  },
+  F:    { glow: true,  glowMul: 6,  stellarEffects: true  },
+  A:    { glow: true,  glowMul: 6,  stellarEffects: true  },
+  WD:   { glow: true,  glowMul: 8,  stellarEffects: true  },
+  HE:   { glow: true,  glowMul: 6,  stellarEffects: true  },
+  NS:   { glow: true,  glowMul: 12, stellarEffects: true  },
+  PU:   { glow: true,  glowMul: 12, stellarEffects: true  },
+  XB:   { glow: true,  glowMul: 6,  stellarEffects: true  },
+  MG:   { glow: true,  glowMul: 12, stellarEffects: true  },
+  BH:   { glow: true,  glowMul: 6,  stellarEffects: true  },
+  XBB:  { glow: true,  glowMul: 6,  stellarEffects: true  },
+  SGR:  { glow: true,  glowMul: 6,  stellarEffects: true  },
+  IRON: { glow: false, glowMul: 0,  stellarEffects: false },
 };
 
 export const STAR_TYPE_DISPLAY: Record<string, string> = {
@@ -98,7 +127,6 @@ export const STAR_TYPE_DISPLAY: Record<string, string> = {
   F: 'F-TYPE',
   A: 'A-TYPE',
   WD: 'WHITE DWARF',
-  HE: 'HELIUM PLANET',
   NS: 'NEUTRON STAR',
   PU: 'PULSAR',
   XB: 'X-RAY BINARY',
@@ -106,6 +134,7 @@ export const STAR_TYPE_DISPLAY: Record<string, string> = {
   BH: 'BLACK HOLE',
   XBB: 'X-RAY BURSTER',
   SGR: 'SGR',
+  IRON: 'IRON STAR',
 };
 
 const BUYABLE_GOODS = [

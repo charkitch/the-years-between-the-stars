@@ -79,6 +79,11 @@ pub fn generate_cluster() -> Vec<StarSystemData> {
         systems[0].star_type = StarType::A;
     }
 
+    // Hand-place the iron star — it shouldn't exist, but here it is
+    if systems.len() > 22 {
+        systems[22].star_type = StarType::Iron;
+    }
+
     systems
 }
 

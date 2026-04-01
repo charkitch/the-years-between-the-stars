@@ -217,6 +217,7 @@ mod tests {
             last_visit_year: HashMap::new(),
             known_factions: vec![],
             faction_memory: HashMap::new(),
+            seen_system_dialog_ids: vec![],
         }
     }
 
