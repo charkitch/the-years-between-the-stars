@@ -5,6 +5,8 @@ import { InputSystem } from './input/InputSystem';
 import { DockingSystem } from './mechanics/DockingSystem';
 import { HyperspaceSystem } from './mechanics/HyperspaceSystem';
 import { BATTLE_DANGER_RANGE } from './mechanics/FleetBattleSystem';
+
+const XB_STREAM_HAZARD_RADIUS = 40;
 import { useGameState } from './GameState';
 import type { SystemChoices } from './GameState';
 import {
@@ -321,6 +323,9 @@ export class Game {
     // Battle zone danger
     this.checkBattleZone(pos, dt, state);
 
+    // X-ray binary donor stream hazard
+    this.checkXRayStream(pos, dt, state);
+
     // Hyperspace countdown
     if (state.ui.hyperspaceCountdown > 0) {
       const remaining = state.ui.hyperspaceCountdown - dt;
@@ -354,6 +359,38 @@ export class Game {
 
     if (!this.scoopingFuel && !this.gasGiantScoopingFuel && state.ui.hyperspaceCountdown === 0) {
       state.setAlert(null);
+    }
+  }
+
+  private checkXRayStream(
+    pos: THREE.Vector3,
+    dt: number,
+    state: ReturnType<typeof useGameState.getState>,
+  ): void {
+    const curve = this.sceneRenderer.getXRayStreamCurveBuffer();
+    if (!curve) return;
+
+    const pointCount = curve.length / 3;
+    let minDistSq = Infinity;
+
+    // Find closest approach to any segment of the stream curve
+    for (let i = 0; i < pointCount - 1; i++) {
+      const ax = curve[i * 3], ay = curve[i * 3 + 1], az = curve[i * 3 + 2];
+      const bx = curve[(i + 1) * 3], by = curve[(i + 1) * 3 + 1], bz = curve[(i + 1) * 3 + 2];
+      const abx = bx - ax, aby = by - ay, abz = bz - az;
+      const abLenSq = abx * abx + aby * aby + abz * abz;
+      if (abLenSq < 1e-6) continue;
+      const t = Math.max(0, Math.min(1, ((pos.x - ax) * abx + (pos.y - ay) * aby + (pos.z - az) * abz) / abLenSq));
+      const dx = pos.x - (ax + t * abx);
+      const dy = pos.y - (ay + t * aby);
+      const dz = pos.z - (az + t * abz);
+      const dSq = dx * dx + dy * dy + dz * dz;
+      if (dSq < minDistSq) minDistSq = dSq;
+    }
+
+    if (minDistSq < XB_STREAM_HAZARD_RADIUS * XB_STREAM_HAZARD_RADIUS) {
+      state.setHeat(state.player.heat + 30 * dt);
+      state.setAlert('WARNING: X-RAY TRANSFER STREAM');
     }
   }
 

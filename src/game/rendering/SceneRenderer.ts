@@ -34,6 +34,8 @@ const _streamVecD = new THREE.Vector3();
 const _streamVecE = new THREE.Vector3();
 const _streamVecF = new THREE.Vector3();
 const _streamVecG = new THREE.Vector3();
+const _streamVecH = new THREE.Vector3();
+const _streamVecI = new THREE.Vector3();
 
 interface XRayTransferStream {
   donorId: string;
@@ -42,7 +44,8 @@ interface XRayTransferStream {
   phase: number;
   flowSpeed: number;
   diskImpactRadius: number;
-  spine: THREE.Line;
+  curveBuffer: Float32Array;
+  spine: THREE.Mesh;
   ribbon: THREE.Mesh;
   donorColor: THREE.Color;
   highlightColor: THREE.Color;
@@ -50,7 +53,17 @@ interface XRayTransferStream {
 
 let xRayStreamRibbonTexture: THREE.CanvasTexture | null = null;
 
-function createBlackHoleDiskTexture(): THREE.CanvasTexture {
+interface BlackHoleVisualStyle {
+  diskColor: string;
+  midColor: string;
+  hotColor: string;
+  crescentColor: string;
+  outerGlowColor: number;
+  brightArcColor: number;
+  outerGlowOpacity: number;
+}
+
+function createBlackHoleDiskTexture(style: BlackHoleVisualStyle): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
@@ -64,11 +77,11 @@ function createBlackHoleDiskTexture(): THREE.CanvasTexture {
   const outer = canvas.width * 0.46;
   const inner = canvas.width * 0.2;
   const grad = ctx.createRadialGradient(cx, cy, inner, cx, cy, outer);
-  grad.addColorStop(0.0, 'rgba(255,250,235,0.98)');
-  grad.addColorStop(0.18, 'rgba(255,210,150,0.92)');
-  grad.addColorStop(0.38, 'rgba(255,144,72,0.7)');
-  grad.addColorStop(0.62, 'rgba(255,96,40,0.28)');
-  grad.addColorStop(1.0, 'rgba(255,96,40,0)');
+  grad.addColorStop(0.0, style.hotColor);
+  grad.addColorStop(0.2, style.diskColor);
+  grad.addColorStop(0.4, style.midColor);
+  grad.addColorStop(0.66, style.crescentColor.replace('0.95', '0.24'));
+  grad.addColorStop(1.0, style.crescentColor.replace('0.95', '0'));
   ctx.fillStyle = grad;
   ctx.beginPath();
   ctx.arc(cx, cy, outer, 0, Math.PI * 2);
@@ -76,10 +89,10 @@ function createBlackHoleDiskTexture(): THREE.CanvasTexture {
   ctx.fill();
 
   const crescent = ctx.createRadialGradient(cx + canvas.width * 0.11, cy - canvas.height * 0.06, canvas.width * 0.03, cx, cy, outer);
-  crescent.addColorStop(0.0, 'rgba(255,255,245,0.95)');
-  crescent.addColorStop(0.22, 'rgba(255,232,188,0.7)');
-  crescent.addColorStop(0.55, 'rgba(255,140,62,0.12)');
-  crescent.addColorStop(1.0, 'rgba(255,140,62,0)');
+  crescent.addColorStop(0.0, style.crescentColor);
+  crescent.addColorStop(0.24, style.diskColor.replace('0.92', '0.74'));
+  crescent.addColorStop(0.56, style.midColor.replace('0.72', '0.14'));
+  crescent.addColorStop(1.0, style.midColor.replace('0.72', '0'));
   ctx.globalCompositeOperation = 'lighter';
   ctx.fillStyle = crescent;
   ctx.beginPath();
@@ -92,13 +105,32 @@ function createBlackHoleDiskTexture(): THREE.CanvasTexture {
   return texture;
 }
 
-function createBlackHoleGroup(radius: number): THREE.Group {
+function createBlackHoleGroup(radius: number, xRayMode = false): THREE.Group {
   const group = new THREE.Group();
+  const style: BlackHoleVisualStyle = xRayMode
+    ? {
+      diskColor: 'rgba(255,214,248,0.92)',
+      midColor: 'rgba(154,208,255,0.72)',
+      hotColor: 'rgba(245,248,255,0.98)',
+      crescentColor: 'rgba(255,255,255,0.95)',
+      outerGlowColor: 0x8FD4FF,
+      brightArcColor: 0xFEE0FF,
+      outerGlowOpacity: 0.3,
+    }
+    : {
+      diskColor: 'rgba(255,210,150,0.92)',
+      midColor: 'rgba(255,144,72,0.72)',
+      hotColor: 'rgba(255,250,235,0.98)',
+      crescentColor: 'rgba(255,255,245,0.95)',
+      outerGlowColor: 0xFF7A2E,
+      brightArcColor: 0xFFF1CF,
+      outerGlowOpacity: 0.24,
+    };
 
   const disk = new THREE.Mesh(
-    new THREE.RingGeometry(radius * 1.18, radius * 2.45, 96),
+    new THREE.RingGeometry(radius * 1.6, radius * 2.9, 96),
     new THREE.MeshBasicMaterial({
-      map: createBlackHoleDiskTexture(),
+      map: createBlackHoleDiskTexture(style),
       transparent: true,
       opacity: 0.95,
       side: THREE.DoubleSide,
@@ -108,28 +140,43 @@ function createBlackHoleGroup(radius: number): THREE.Group {
   );
   disk.rotation.x = Math.PI / 2;
   disk.rotation.z = 0.45;
-  disk.scale.set(1.26, 0.76, 1);
+  disk.scale.set(1.2, 0.68, 1);
   group.add(disk);
 
-  const outerGlow = makeGlowSprite(0xFF7A2E, radius * 6.8);
+  const innerRing = new THREE.Mesh(
+    new THREE.TorusGeometry(radius * 1.62, radius * 0.09, 10, 72),
+    new THREE.MeshBasicMaterial({
+      color: style.brightArcColor,
+      transparent: true,
+      opacity: xRayMode ? 0.5 : 0.42,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  innerRing.rotation.x = Math.PI / 2;
+  innerRing.rotation.z = 0.54;
+  innerRing.scale.set(1.08, 0.72, 1);
+  group.add(innerRing);
+
+  const outerGlow = makeGlowSprite(style.outerGlowColor, radius * (xRayMode ? 5.6 : 5.2));
   const outerGlowMat = outerGlow.material as THREE.SpriteMaterial;
-  outerGlowMat.opacity = 0.24;
+  outerGlowMat.opacity = style.outerGlowOpacity;
   group.add(outerGlow);
 
   const brightArc = new THREE.Mesh(
-    new THREE.TorusGeometry(radius * 1.56, radius * 0.18, 10, 96, Math.PI * 1.16),
+    new THREE.TorusGeometry(radius * 1.78, radius * 0.16, 10, 96, Math.PI * 1.12),
     new THREE.MeshBasicMaterial({
-      color: 0xFFF1CF,
+      color: style.brightArcColor,
       transparent: true,
-      opacity: 0.92,
+      opacity: xRayMode ? 0.86 : 0.88,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     }),
   );
   brightArc.rotation.x = Math.PI / 2;
-  brightArc.rotation.z = 0.66;
-  brightArc.position.x = radius * 0.2;
-  brightArc.scale.set(1.08, 0.66, 1);
+  brightArc.rotation.z = 0.62;
+  brightArc.position.x = radius * 0.16;
+  brightArc.scale.set(1.06, 0.64, 1);
   group.add(brightArc);
 
   const shadowCore = new THREE.Mesh(
@@ -210,26 +257,36 @@ function createXRayTransferStream(donorColorValue: number, diskImpactRadius: num
   const highlightColor = donorColor.clone().lerp(new THREE.Color(0xFFF7EE), 0.62);
   const ribbonSegmentCount = 44;
 
-  const linePositions = new Float32Array(36 * 3);
-  const lineColors = new Float32Array(36 * 3);
-  for (let i = 0; i < 36; i++) {
-    const mix = Math.sin((i / 35) * Math.PI) * 0.42 + 0.18;
-    const color = donorColor.clone().lerp(highlightColor, mix);
-    lineColors[i * 3] = color.r;
-    lineColors[i * 3 + 1] = color.g;
-    lineColors[i * 3 + 2] = color.b;
-  }
+  // Curve centerline — written each frame, sampled by both tube and ribbon
+  const curveBuffer = new Float32Array(36 * 3);
 
-  const spine = new THREE.Line(
+  // Pre-allocate tube mesh (cylinder along the stream spine)
+  const tubeSeg = 20;
+  const tubeSides = 6;
+  const tubePositions = new Float32Array(tubeSeg * tubeSides * 3);
+  const tubeIndices = new Uint16Array((tubeSeg - 1) * tubeSides * 6);
+  for (let s = 0; s < tubeSeg - 1; s++) {
+    for (let n = 0; n < tubeSides; n++) {
+      const idx = (s * tubeSides + n) * 6;
+      const a = s * tubeSides + n;
+      const b = s * tubeSides + (n + 1) % tubeSides;
+      const c = (s + 1) * tubeSides + n;
+      const d = (s + 1) * tubeSides + (n + 1) % tubeSides;
+      tubeIndices[idx] = a; tubeIndices[idx + 1] = b; tubeIndices[idx + 2] = c;
+      tubeIndices[idx + 3] = b; tubeIndices[idx + 4] = d; tubeIndices[idx + 5] = c;
+    }
+  }
+  const spine = new THREE.Mesh(
     new THREE.BufferGeometry()
-      .setAttribute('position', new THREE.BufferAttribute(linePositions, 3))
-      .setAttribute('color', new THREE.BufferAttribute(lineColors, 3)),
-    new THREE.LineBasicMaterial({
-      vertexColors: true,
+      .setAttribute('position', new THREE.BufferAttribute(tubePositions, 3))
+      .setIndex(new THREE.BufferAttribute(tubeIndices, 1)),
+    new THREE.MeshBasicMaterial({
+      color: highlightColor,
       transparent: true,
-      opacity: 0.52,
+      opacity: 0.72,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      side: THREE.DoubleSide,
     }),
   );
 
@@ -286,6 +343,7 @@ function createXRayTransferStream(donorColorValue: number, diskImpactRadius: num
     phase: Math.random() * Math.PI * 2,
     flowSpeed: 0.065,
     diskImpactRadius,
+    curveBuffer,
     spine,
     ribbon,
     donorColor,
@@ -419,35 +477,18 @@ export class SceneRenderer {
     } else if (data.starType === 'XB' && data.companion) {
       const companion = data.companion;
 
-      // Compact object (neutron star / X-ray source) — built into starGroup
-      starGroup.add(new THREE.Mesh(
-        new THREE.SphereGeometry(data.starRadius, 8, 8),
-        new THREE.MeshBasicMaterial({ color: starColor }),
-      ));
-      starGroup.add(makeGlowSprite(starColor, data.starRadius * 10));
+      // Compact accretor — same visual language as BH, but brighter in X-ray.
+      starGroup.add(createBlackHoleGroup(data.starRadius, true));
 
-      // Accretion disk around compact object
-      const diskInnerR = data.starRadius * 1.5;
-      const diskOuterR = data.starRadius * 3.5;
-      const diskGeo = new THREE.TorusGeometry((diskInnerR + diskOuterR) / 2, (diskOuterR - diskInnerR) / 2, 8, 48);
-      const diskMat = new THREE.MeshBasicMaterial({
-        color: 0xFF4466,
-        transparent: true,
-        opacity: 0.55,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const disk = new THREE.Mesh(diskGeo, diskMat);
-      disk.rotation.x = Math.PI / 2;
-      disk.rotation.z = 0.35;
-      disk.scale.set(1.18, 0.74, 1);
-      starGroup.add(disk);
-
-      const diskHalo = makeGlowSprite(0xFF9578, data.starRadius * 12);
+      const diskHalo = makeGlowSprite(0xA9DCFF, data.starRadius * 10.5);
       const diskHaloMat = diskHalo.material as THREE.SpriteMaterial;
-      diskHaloMat.opacity = 0.18;
+      diskHaloMat.opacity = 0.24;
       starGroup.add(diskHalo);
+
+      const xRayCorona = makeGlowSprite(starColor, data.starRadius * 12.6);
+      const xRayCoronaMat = xRayCorona.material as THREE.SpriteMaterial;
+      xRayCoronaMat.opacity = 0.24;
+      starGroup.add(xRayCorona);
 
       // Light travels with the compact object group (no static starLight needed)
       if (this.starLight) this.scene.remove(this.starLight);
@@ -1028,7 +1069,10 @@ export class SceneRenderer {
       } else {
         diskTarget.normalize();
       }
+      const diskDirX = diskTarget.x;
       diskTarget.multiplyScalar(stream.diskImpactRadius).add(accretorPos);
+      // Tilt the disk impact point to match the accretion disk's rotation.z = 0.45
+      diskTarget.y = accretorPos.y + diskDirX * stream.diskImpactRadius * Math.tan(0.45);
 
       const flow = _streamVecA.copy(diskTarget).sub(donorPos);
       const dist = flow.length();
@@ -1038,46 +1082,85 @@ export class SceneRenderer {
       const lateral = _streamVecB.set(-flow.z, 0, flow.x).normalize();
       const control = _streamVecC.copy(donorPos).lerp(diskTarget, 0.58);
       control.addScaledVector(lateral, Math.max(dist * stream.curveBias, 65));
-      control.y += Math.sin(time * 0.32 + stream.phase) * Math.max(dist * 0.045, 12);
+      control.y += Math.sin(time * 0.32 + stream.phase) * Math.max(dist * 0.015, 4);
 
-      const lineAttr = stream.spine.geometry.attributes.position as THREE.BufferAttribute;
-      const lineArr = lineAttr.array as Float32Array;
-      const linePointCount = lineArr.length / 3;
-      for (let i = 0; i < linePointCount; i++) {
-        const t = i / (linePointCount - 1);
-        writeQuadraticPoint(lineArr, i * 3, donorPos, control, diskTarget, t);
+      // Write bezier centerline into curveBuffer
+      const curveBuffer = stream.curveBuffer;
+      const curvePointCount = curveBuffer.length / 3;
+      for (let i = 0; i < curvePointCount; i++) {
+        const t = i / (curvePointCount - 1);
+        writeQuadraticPoint(curveBuffer, i * 3, donorPos, control, diskTarget, t);
       }
-      lineAttr.needsUpdate = true;
 
-      const spineMat = stream.spine.material as THREE.LineBasicMaterial;
+      // Build tube mesh from curveBuffer using a stable perpendicular frame
+      const tubeAttr = stream.spine.geometry.attributes.position as THREE.BufferAttribute;
+      const tubeArr = tubeAttr.array as Float32Array;
+      const tubeSeg = 20;
+      const tubeSides = 6;
+      const ribbonHalfWidth = Math.max(dist * 0.026, 20);
+      for (let s = 0; s < tubeSeg; s++) {
+        const t = s / (tubeSeg - 1);
+        const ci = Math.min(Math.floor(t * (curvePointCount - 1)), curvePointCount - 2);
+        const ct = t * (curvePointCount - 1) - ci;
+        const cOff = ci * 3;
+        const nOff = (ci + 1) * 3;
+        const cx = curveBuffer[cOff] + (curveBuffer[nOff] - curveBuffer[cOff]) * ct;
+        const cy = curveBuffer[cOff + 1] + (curveBuffer[nOff + 1] - curveBuffer[cOff + 1]) * ct;
+        const cz = curveBuffer[cOff + 2] + (curveBuffer[nOff + 2] - curveBuffer[cOff + 2]) * ct;
+        const pIdx = Math.max(0, ci - 1) * 3;
+        const fIdx = Math.min(curvePointCount - 1, ci + 2) * 3;
+        const tubeTangent = _streamVecF.set(
+          curveBuffer[fIdx] - curveBuffer[pIdx],
+          curveBuffer[fIdx + 1] - curveBuffer[pIdx + 1],
+          curveBuffer[fIdx + 2] - curveBuffer[pIdx + 2],
+        ).normalize();
+        // Stable frame: cross with world-up, fallback to world-X if near-parallel
+        const tubeN1 = _streamVecH.set(0, 1, 0).cross(tubeTangent);
+        if (tubeN1.lengthSq() < 0.01) tubeN1.set(1, 0, 0);
+        tubeN1.normalize();
+        const tubeN2 = _streamVecI.crossVectors(tubeTangent, tubeN1).normalize();
+        const endTaper = Math.cos(t * Math.PI / 2);
+        const midBulge = Math.pow(Math.sin(t * Math.PI), 0.7);
+        const tubeRadius = ribbonHalfWidth * (0.38 * endTaper + 0.62 * midBulge) * 0.28;
+        for (let n = 0; n < tubeSides; n++) {
+          const angle = (n / tubeSides) * Math.PI * 2;
+          const ca = Math.cos(angle);
+          const sa = Math.sin(angle);
+          const vi = (s * tubeSides + n) * 3;
+          tubeArr[vi] = cx + (tubeN1.x * ca + tubeN2.x * sa) * tubeRadius;
+          tubeArr[vi + 1] = cy + (tubeN1.y * ca + tubeN2.y * sa) * tubeRadius;
+          tubeArr[vi + 2] = cz + (tubeN1.z * ca + tubeN2.z * sa) * tubeRadius;
+        }
+      }
+      tubeAttr.needsUpdate = true;
+
+      const spineMat = stream.spine.material as THREE.MeshBasicMaterial;
       spineMat.color.copy(stream.highlightColor);
 
       const cameraPos = this.camera.getWorldPosition(_streamVecG);
       const ribbonAttr = stream.ribbon.geometry.attributes.position as THREE.BufferAttribute;
       const ribbonArr = ribbonAttr.array as Float32Array;
       const ribbonSegments = ribbonArr.length / 6;
-      const ribbonHalfWidth = Math.max(dist * 0.018, 16);
-      const ribbonSamplePointCount = lineArr.length / 3;
       for (let i = 0; i < ribbonSegments; i++) {
         const t = i / (ribbonSegments - 1);
-        const sample = t * (ribbonSamplePointCount - 1);
+        const sample = t * (curvePointCount - 1);
         const basePoint = Math.floor(sample);
-        const nextPoint = Math.min(ribbonSamplePointCount - 1, basePoint + 1);
+        const nextPoint = Math.min(curvePointCount - 1, basePoint + 1);
         const blend = sample - basePoint;
         const baseOffset = basePoint * 3;
         const nextOffset = nextPoint * 3;
-        const px = lineArr[baseOffset] + (lineArr[nextOffset] - lineArr[baseOffset]) * blend;
-        const py = lineArr[baseOffset + 1] + (lineArr[nextOffset + 1] - lineArr[baseOffset + 1]) * blend;
-        const pz = lineArr[baseOffset + 2] + (lineArr[nextOffset + 2] - lineArr[baseOffset + 2]) * blend;
+        const px = curveBuffer[baseOffset] + (curveBuffer[nextOffset] - curveBuffer[baseOffset]) * blend;
+        const py = curveBuffer[baseOffset + 1] + (curveBuffer[nextOffset + 1] - curveBuffer[baseOffset + 1]) * blend;
+        const pz = curveBuffer[baseOffset + 2] + (curveBuffer[nextOffset + 2] - curveBuffer[baseOffset + 2]) * blend;
 
         const prevPoint = Math.max(0, basePoint - 1);
-        const futurePoint = Math.min(ribbonSamplePointCount - 1, nextPoint + 1);
+        const futurePoint = Math.min(curvePointCount - 1, nextPoint + 1);
         const prevOffset = prevPoint * 3;
         const futureOffset = futurePoint * 3;
         const tangent = _streamVecF.set(
-          lineArr[futureOffset] - lineArr[prevOffset],
-          lineArr[futureOffset + 1] - lineArr[prevOffset + 1],
-          lineArr[futureOffset + 2] - lineArr[prevOffset + 2],
+          curveBuffer[futureOffset] - curveBuffer[prevOffset],
+          curveBuffer[futureOffset + 1] - curveBuffer[prevOffset + 1],
+          curveBuffer[futureOffset + 2] - curveBuffer[prevOffset + 2],
         ).normalize();
         const toCamera = _streamVecE.set(cameraPos.x - px, cameraPos.y - py, cameraPos.z - pz).normalize();
         const side = _streamVecD.crossVectors(toCamera, tangent);
@@ -1087,9 +1170,12 @@ export class SceneRenderer {
           side.normalize();
         }
 
-        const envelope = Math.pow(Math.sin(t * Math.PI), 0.85);
-        const pulse = 0.78 + 0.22 * Math.sin(time * stream.flowSpeed * 18 - t * 9 + stream.phase);
-        const width = ribbonHalfWidth * (0.4 + envelope) * pulse;
+        // Taper to near-zero at disk end (t=1), moderate width at donor end (t=0)
+        const endTaper = Math.cos(t * Math.PI / 2);        // 1 at t=0, 0 at t=1
+        const midBulge = Math.pow(Math.sin(t * Math.PI), 0.7); // peaks in middle
+        const envelope = 0.38 * endTaper + 0.62 * midBulge;
+        const pulse = 0.94 + 0.06 * Math.sin(time * stream.flowSpeed * 18 - t * 9 + stream.phase);
+        const width = ribbonHalfWidth * envelope * pulse;
 
         const leftIndex = i * 6;
         ribbonArr[leftIndex] = px + side.x * width;
@@ -1127,6 +1213,10 @@ export class SceneRenderer {
 
   getFleetBattle(): FleetBattle | null {
     return this.fleetBattleData;
+  }
+
+  getXRayStreamCurveBuffer(): Float32Array | null {
+    return this.xRayTransferStreams.length > 0 ? this.xRayTransferStreams[0].curveBuffer : null;
   }
 
   startHyperspace(): void {
