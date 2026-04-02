@@ -1,0 +1,4 @@
+interface:
+  display_name: "Modify Events"
+  short_description: "Edit landing events and narrative encounter flow"
+  default_prompt: "Use this skill to locate and modify event content and logic in The Years Between the Stars, including landing encounters, choices, outcomes, and system entry narration."

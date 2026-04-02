@@ -1,0 +1,4 @@
+interface:
+  display_name: "Modify Trading"
+  short_description: "Adjust economy, cargo, and market behavior"
+  default_prompt: "Use this skill to locate and modify trading and economy systems in The Years Between the Stars, including goods, prices, station markets, and NPC trade routes."

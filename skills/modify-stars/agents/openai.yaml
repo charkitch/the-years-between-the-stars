@@ -1,0 +1,4 @@
+interface:
+  display_name: "Modify Stars"
+  short_description: "Change star data, colors, and rendering"
+  default_prompt: "Use this skill to locate and modify star systems in The Years Between the Stars, including star types, star colors/sizes, star glow, and starfield rendering."

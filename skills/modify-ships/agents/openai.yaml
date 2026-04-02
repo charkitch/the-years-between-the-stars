@@ -1,0 +1,4 @@
+interface:
+  display_name: "Modify Ships"
+  short_description: "Edit ship physics, stats, and behaviors"
+  default_prompt: "Use this skill to locate and modify ship systems in The Years Between the Stars, including player ship physics, NPC ship behavior, fleet ships, and ship visuals/stats."

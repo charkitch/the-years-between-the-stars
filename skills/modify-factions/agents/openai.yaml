@@ -1,0 +1,4 @@
+interface:
+  display_name: "Modify Factions"
+  short_description: "Change factions, politics, and galaxy simulation"
+  default_prompt: "Use this skill to locate and modify faction data and simulation behavior in The Years Between the Stars, including faction identities, political types, and system control dynamics."

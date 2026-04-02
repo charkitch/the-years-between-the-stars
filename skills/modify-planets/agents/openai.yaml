@@ -1,0 +1,4 @@
+interface:
+  display_name: "Modify Planets"
+  short_description: "Adjust planet generation and rendering"
+  default_prompt: "Use this skill to locate and modify planet systems in The Years Between the Stars, including rocky/gas giant types, procedural generation, and planet visual rendering."

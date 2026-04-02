@@ -1,0 +1,4 @@
+interface:
+  display_name: "Modify Combat"
+  short_description: "Tune fleet battle systems, weapons, and AI"
+  default_prompt: "Use this skill to locate and modify combat systems in The Years Between the Stars, including fleet battle logic, weapon behavior, projectile/explosion effects, and battle AI."
