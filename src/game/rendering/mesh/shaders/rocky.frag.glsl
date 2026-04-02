@@ -14,7 +14,7 @@ void main() {
 
   vec3 surfaceColor;
 
-  if (surfType == 0) {
+  if (surfType == SURF_TYPE_CONTINENTAL) {
     // -- Continental: balanced land/ocean --
     float landMask = smoothstep(-0.05, 0.1, n);
     vec3 ocean = vec3(0.05, 0.12, 0.25);
@@ -27,7 +27,7 @@ void main() {
     vec3 oceanC = mix(ocean, shallow, depth);
     surfaceColor = mix(oceanC, land, landMask);
 
-  } else if (surfType == 1) {
+  } else if (surfType == SURF_TYPE_OCEAN) {
     // -- Ocean world: mostly water, tiny island chains --
     float landMask = smoothstep(0.25, 0.35, n);
     vec3 deepOcean = vec3(0.02, 0.06, 0.2);
@@ -38,7 +38,7 @@ void main() {
     vec3 island = mix(vec3(0.6, 0.55, 0.35), vec3(0.2, 0.4, 0.15), smoothstep(0.35, 0.5, n));
     surfaceColor = mix(oceanC, island, landMask);
 
-  } else if (surfType == 2) {
+  } else if (surfType == SURF_TYPE_MARSH) {
     // -- Marsh world: murky, swampy, green-brown --
     float landMask = smoothstep(-0.15, 0.05, n);
     vec3 swampWater = vec3(0.05, 0.1, 0.08);
@@ -51,7 +51,7 @@ void main() {
     vec3 land = mix(wetland, dryLand, h);
     surfaceColor = mix(waterC, land, landMask);
 
-  } else if (surfType == 3) {
+  } else if (surfType == SURF_TYPE_VENUS) {
     // -- Venus: thick atmosphere, no visible ocean, hazy yellow-orange --
     vec3 hazeLight = vec3(0.85, 0.7, 0.35);
     vec3 hazeDark = vec3(0.55, 0.35, 0.15);
@@ -65,7 +65,7 @@ void main() {
     float crack = smoothstep(0.3, 0.5, n);
     surfaceColor = mix(surfaceColor, hotSurface, crack * 0.3);
 
-  } else if (surfType == 4) {
+  } else if (surfType == SURF_TYPE_BARREN) {
     // -- Barren world: dusty, rocky, nearly airless --
     float ridge = smoothstep(-0.15, 0.45, n);
     vec3 dust = vec3(0.42, 0.36, 0.30);
@@ -74,7 +74,7 @@ void main() {
     surfaceColor = mix(dust, stone, ridge);
     surfaceColor = mix(surfaceColor, pale, smoothstep(0.35, 0.7, n));
 
-  } else if (surfType == 5) {
+  } else if (surfType == SURF_TYPE_DESERT) {
     // -- Desert world: sand seas with dark rock uplands --
     float dune = sin(normalize(vLocalPos).x * 18.0 + n * 4.0 + seed) * 0.5 + 0.5;
     float highland = smoothstep(0.12, 0.55, n);
@@ -84,7 +84,7 @@ void main() {
     surfaceColor = mix(sand, duneGold, dune * 0.35);
     surfaceColor = mix(surfaceColor, rock, highland * 0.55);
 
-  } else if (surfType == 6) {
+  } else if (surfType == SURF_TYPE_ICE) {
     // -- Ice world: frozen seas, blue shadows, bright caps --
     float crack = smoothstep(0.15, 0.6, abs(snoise(noisePos * 2.4)));
     float ridge = smoothstep(-0.05, 0.45, n);
@@ -95,7 +95,7 @@ void main() {
     surfaceColor = mix(surfaceColor, snow, smoothstep(0.25, 0.65, n));
     surfaceColor = mix(surfaceColor, deepIce * 0.75, crack * 0.25);
 
-  } else if (surfType == 7) {
+  } else if (surfType == SURF_TYPE_VOLCANIC) {
     // -- Volcanic world: basalt plains with hot fissures --
     float lava = smoothstep(0.35, 0.62, abs(snoise(noisePos * 3.2)));
     float ash = smoothstep(-0.25, 0.35, n);
@@ -107,7 +107,7 @@ void main() {
     surfaceColor = mix(surfaceColor, lavaCore, lava);
     surfaceColor = mix(surfaceColor, lavaGlow, lava * smoothstep(0.0, 0.6, sunDot + 0.2) * 0.35);
 
-  } else if (surfType == 8) {
+  } else if (surfType == SURF_TYPE_FOREST_MOON) {
     // -- Forest moon: dense green canopy, muted seas, Endor-like and rare --
     float landMask = smoothstep(-0.18, 0.02, n);
     vec3 deepWater = vec3(0.03, 0.09, 0.13);
@@ -121,7 +121,7 @@ void main() {
     surfaceColor = mix(waterC, forest, landMask);
 
   } else {
-    // -- Mountain world (surfType == 9): ridged peaks, elevation-based coloring --
+    // -- Mountain world: ridged peaks, elevation-based coloring --
     float ridge = 1.0 - abs(snoise(noisePos * 2.2));
     ridge = pow(ridge, 2.5);
     float elevation = smoothstep(0.0, 1.0, n * 0.5 + ridge * 0.5);

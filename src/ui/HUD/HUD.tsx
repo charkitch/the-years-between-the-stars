@@ -1,11 +1,12 @@
 import { useGameState } from '../../game/GameState';
+import { useState, useRef, useEffect } from 'react';
 import { StatusBars } from './StatusBars';
 import { Scanner } from './Scanner';
 import { TargetIndicator } from './TargetIndicator';
 import type { SceneEntity } from '../../game/rendering/SceneRenderer';
 import { getFaction } from '../../game/data/factions';
 import type { SecretBaseData } from '../../game/engine';
-import { STAR_TYPE_DISPLAY } from '../../game/constants';
+import { STAR_TYPE_DISPLAY, STAR_DESCRIPTIONS } from '../../game/constants';
 import styles from './HUD.module.css';
 import * as THREE from 'three';
 
@@ -16,6 +17,9 @@ interface HUDProps {
 }
 
 export function HUD({ getEntities, getShipPos, getCamera }: HUDProps) {
+  const [isStarTooltipOpen, setIsStarTooltipOpen] = useState(false);
+  const tooltipRef = useRef<HTMLSpanElement>(null);
+
   const player = useGameState(s => s.player);
   const cluster = useGameState(s => s.cluster);
   const currentSystemId = useGameState(s => s.currentSystemId);
@@ -24,6 +28,29 @@ export function HUD({ getEntities, getShipPos, getCamera }: HUDProps) {
   const galaxyYear = useGameState(s => s.galaxyYear);
   const knownFactions = useGameState(s => s.knownFactions);
   const currentSystemPayload = useGameState(s => s.currentSystemPayload);
+
+  useEffect(() => {
+    if (!isStarTooltipOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
+        setIsStarTooltipOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsStarTooltipOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isStarTooltipOpen]);
 
   const currentStar = cluster[currentSystemId];
   const targetStar = hyperspaceTarget !== null ? cluster[hyperspaceTarget] : null;
@@ -70,7 +97,37 @@ export function HUD({ getEntities, getShipPos, getCamera }: HUDProps) {
           YEAR {galaxyYear.toLocaleString()}
         </div>
         <div className={styles.systemInfo}>
-          {currentStar?.name} · {STAR_TYPE_DISPLAY[currentStar?.starType] ?? `${currentStar?.starType}-TYPE`} · {currentSystemPayload?.civState.economy ?? currentStar?.economy}
+          <span className={styles.systemInfoText}>
+            {currentStar?.name} · </span><span
+            ref={tooltipRef}
+            className={`${styles.starType} ${isStarTooltipOpen ? styles.active : ''}`}
+            onClick={() => setIsStarTooltipOpen(!isStarTooltipOpen)}
+          >
+            {STAR_TYPE_DISPLAY[currentStar?.starType] ?? `${currentStar?.starType}-TYPE`}
+            {currentStar && STAR_DESCRIPTIONS[currentStar.starType] && (
+              <div className={`${styles.tooltip} ${isStarTooltipOpen ? styles.tooltipOpen : ''}`}>
+                <button
+                  className={styles.closeButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsStarTooltipOpen(false);
+                  }}
+                >
+                  ×
+                </button>
+                {STAR_DESCRIPTIONS[currentStar.starType].desc}
+                <a
+                  href={STAR_DESCRIPTIONS[currentStar.starType].wiki}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.wikiLink}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  LEARN MORE ON WIKIPEDIA
+                </a>
+              </div>
+            )}
+          </span><span className={styles.systemInfoText}> · {currentSystemPayload?.civState.economy ?? currentStar?.economy}
           {currentSystemPayload && (
             <span
               style={{
@@ -83,6 +140,7 @@ export function HUD({ getEntities, getShipPos, getCamera }: HUDProps) {
               · {currentFactionKnown && currentFaction ? currentFaction.name.toUpperCase() : 'UNKNOWN'}
             </span>
           )}
+          </span>
         </div>
         {targetStar && (
           <div style={{ color: 'var(--color-hyperspace-bright)', fontSize: '11px', marginTop: '4px' }}>

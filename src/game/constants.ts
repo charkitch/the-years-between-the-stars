@@ -137,6 +137,65 @@ export const STAR_TYPE_DISPLAY: Record<string, string> = {
   IRON: 'IRON STAR',
 };
 
+export const STAR_DESCRIPTIONS: Record<string, { desc: string; wiki: string }> = {
+  G: {
+    desc: "A G-type main-sequence star (Yellow Dwarf), similar to Earth's Sun. Stable and long-lived.",
+    wiki: "https://en.wikipedia.org/wiki/G-type_main-sequence_star"
+  },
+  K: {
+    desc: "A K-type main-sequence star (Orange Dwarf). Cooler than G-type stars but more stable and long-lived.",
+    wiki: "https://en.wikipedia.org/wiki/K-type_main-sequence_star"
+  },
+  M: {
+    desc: "An M-type main-sequence star (Red Dwarf). The most common type of star, small and relatively cool.",
+    wiki: "https://en.wikipedia.org/wiki/M-type_main-sequence_star"
+  },
+  F: {
+    desc: "An F-type main-sequence star (Yellow-White Dwarf). Larger and hotter than the Sun.",
+    wiki: "https://en.wikipedia.org/wiki/F-type_main-sequence_star"
+  },
+  A: {
+    desc: "An A-type main-sequence star. Hot, bright, and often white or bluish-white.",
+    wiki: "https://en.wikipedia.org/wiki/A-type_main-sequence_star"
+  },
+  WD: {
+    desc: "A White Dwarf. The dense, hot remnant of a low-to-medium mass star after it has exhausted its nuclear fuel.",
+    wiki: "https://en.wikipedia.org/wiki/White_dwarf"
+  },
+  NS: {
+    desc: "A Neutron Star. An incredibly dense stellar remnant composed almost entirely of neutrons.",
+    wiki: "https://en.wikipedia.org/wiki/Neutron_star"
+  },
+  PU: {
+    desc: "A Pulsar. A highly magnetized rotating neutron star that emits beams of electromagnetic radiation.",
+    wiki: "https://en.wikipedia.org/wiki/Pulsar"
+  },
+  XB: {
+    desc: "An X-ray Binary. A system of two stars where one is a compact object accreting matter from its companion, emitting X-rays.",
+    wiki: "https://en.wikipedia.org/wiki/X-ray_binary"
+  },
+  MG: {
+    desc: "A Magnetar. A type of neutron star with an extremely powerful magnetic field.",
+    wiki: "https://en.wikipedia.org/wiki/Magnetar"
+  },
+  BH: {
+    desc: "A Black Hole. A region of spacetime where gravity is so strong that nothing, not even light, can escape.",
+    wiki: "https://en.wikipedia.org/wiki/Black_hole"
+  },
+  XBB: {
+    desc: "An X-ray Burster. A class of X-ray binaries that show sudden, intense increases in X-ray luminosity.",
+    wiki: "https://en.wikipedia.org/wiki/X-ray_burster"
+  },
+  SGR: {
+    desc: "A Soft Gamma Repeater. A magnetar that emits large bursts of gamma rays and X-rays at irregular intervals.",
+    wiki: "https://en.wikipedia.org/wiki/Soft_gamma_repeater"
+  },
+  IRON: {
+    desc: "An Iron Star. A hypothetical type of compact star that could form in the extremely distant future via quantum tunneling.",
+    wiki: "https://en.wikipedia.org/wiki/Iron_star"
+  },
+};
+
 const BUYABLE_GOODS = [
   'Food',
   'Textiles',

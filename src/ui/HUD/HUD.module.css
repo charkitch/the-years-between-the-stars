@@ -107,8 +107,76 @@
 
 .systemInfo {
   font-size: var(--font-size-sm);
-  opacity: 0.8;
   margin-top: 4px;
+}
+
+.systemInfoText {
+  opacity: 0.8;
+}
+
+.starType {
+  position: relative;
+  cursor: pointer;
+  pointer-events: auto;
+  text-decoration: underline dotted var(--color-hud-dim);
+}
+
+.starType .tooltipOpen {
+  display: block;
+}
+
+.starType.active {
+  color: var(--color-hud);
+  text-decoration: underline solid var(--color-hud);
+}
+
+.tooltip {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 300px;
+  background: #000;
+  border: 1px solid var(--color-hud);
+  padding: 20px;
+  margin-top: 12px;
+  z-index: 1000;
+  pointer-events: auto;
+  font-family: var(--font-hud);
+  color: var(--color-hud);
+  line-height: 1.6;
+  font-size: 13px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 1);
+}
+
+.closeButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--color-hud-dim);
+  font-family: var(--font-hud);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.closeButton:hover {
+  color: var(--color-hud);
+}
+
+.wikiLink {
+  display: block;
+  margin-top: 8px;
+  color: var(--color-station);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.wikiLink:hover {
+  text-decoration: underline;
 }
 
 .controls {

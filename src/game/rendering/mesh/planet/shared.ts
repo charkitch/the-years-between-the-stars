@@ -39,3 +39,20 @@ export const SURFACE_TYPE_INDEX: Record<SurfaceType, number> = {
   forest_moon: 8,
   mountain: 9,
 };
+
+export const SURFACE_TYPE_SHADER_DEFINES = `
+#define SURF_TYPE_CONTINENTAL ${SURFACE_TYPE_INDEX.continental}
+#define SURF_TYPE_OCEAN ${SURFACE_TYPE_INDEX.ocean}
+#define SURF_TYPE_MARSH ${SURFACE_TYPE_INDEX.marsh}
+#define SURF_TYPE_VENUS ${SURFACE_TYPE_INDEX.venus}
+#define SURF_TYPE_BARREN ${SURFACE_TYPE_INDEX.barren}
+#define SURF_TYPE_DESERT ${SURFACE_TYPE_INDEX.desert}
+#define SURF_TYPE_ICE ${SURFACE_TYPE_INDEX.ice}
+#define SURF_TYPE_VOLCANIC ${SURFACE_TYPE_INDEX.volcanic}
+#define SURF_TYPE_FOREST_MOON ${SURFACE_TYPE_INDEX.forest_moon}
+#define SURF_TYPE_MOUNTAIN ${SURFACE_TYPE_INDEX.mountain}
+`.trim();
+
+export function withSurfaceTypeShaderDefines(fragmentShader: string): string {
+  return `${SURFACE_TYPE_SHADER_DEFINES}\n\n${fragmentShader}`;
+}

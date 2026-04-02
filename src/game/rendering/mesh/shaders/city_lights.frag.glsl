@@ -16,16 +16,16 @@ void main() {
 
   // Land mask matches planet surface type thresholds
   float landMask;
-  if (surfType == 1) {
+  if (surfType == SURF_TYPE_OCEAN) {
     // Ocean world — only tiny islands
     landMask = smoothstep(0.25, 0.4, n);
-  } else if (surfType == 2) {
+  } else if (surfType == SURF_TYPE_MARSH) {
     // Marsh — most land is soggy but buildable
     landMask = smoothstep(-0.15, 0.1, n);
-  } else if (surfType == 5) {
+  } else if (surfType == SURF_TYPE_DESERT) {
     // Desert — sparser buildable pockets
     landMask = smoothstep(-0.05, 0.2, n) * 0.45;
-  } else if (surfType == 8) {
+  } else if (surfType == SURF_TYPE_FOREST_MOON) {
     // Forest moon — sparse settlements beneath dense canopy
     landMask = smoothstep(-0.1, 0.12, n) * 0.35;
   } else {

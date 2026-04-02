@@ -3,7 +3,7 @@ import { PALETTE } from '../../../constants';
 import { loadTexture } from '../../textureCache';
 import type { PlanetSkin } from '../../planetSkins';
 import type { SurfaceType } from '../../../engine';
-import { SURFACE_TYPE_INDEX } from './shared';
+import { SURFACE_TYPE_INDEX, withSurfaceTypeShaderDefines } from './shared';
 import planetVertex from '../shaders/includes/planet_vertex.glsl';
 import rockyFrag from '../shaders/rocky.frag.glsl';
 
@@ -23,7 +23,7 @@ export function makePlanet(
       surfType: { value: SURFACE_TYPE_INDEX[surfaceType] },
     },
     vertexShader: planetVertex,
-    fragmentShader: rockyFrag,
+    fragmentShader: withSurfaceTypeShaderDefines(rockyFrag),
   });
 
   group.add(new THREE.Mesh(geo, mat));
