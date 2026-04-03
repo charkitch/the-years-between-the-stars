@@ -21,6 +21,8 @@ export function App() {
 
   const uiMode = useGameState(s => s.ui.mode);
   const hyperspaceCountdown = useGameState(s => s.ui.hyperspaceCountdown);
+  const invertControls = useGameState(s => s.invertControls);
+  const setInvertControls = useGameState(s => s.setInvertControls);
   const setUIMode = useGameState(s => s.setUIMode);
   const pendingSystemEntryDialog = useGameState(s => s.pendingSystemEntryDialog);
 
@@ -100,6 +102,10 @@ export function App() {
     setUIMode('flight');
   };
 
+  const handleToggleInvertControls = () => {
+    setInvertControls(!invertControls);
+  };
+
   return (
     <>
       <canvas
@@ -167,7 +173,14 @@ export function App() {
       {uiMode === 'landing' && <LandingDialog onChoice={handleLandingChoice} />}
       {uiMode === 'docked' && <StationUI onUndock={handleUndock} />}
 
-      {uiMode === 'menu' && <MainMenu onNewGame={handleNewGame} onResume={handleResume} />}
+      {uiMode === 'menu' && (
+        <MainMenu
+          onNewGame={handleNewGame}
+          onResume={handleResume}
+          invertControls={invertControls}
+          onToggleInvertControls={handleToggleInvertControls}
+        />
+      )}
 
       {uiMode === 'dead' && <DeathScreen onRespawn={handleRespawn} onNewGame={handleNewGame} />}
     </>

@@ -48,14 +48,15 @@ export class InputSystem {
     KEYS.delete(e.code);
   };
 
-  read(): InputState {
+  read(invertControls = false): InputState {
     const down = isDown('KeyS') || isDown('ArrowDown');
     const up = isDown('KeyW') || isDown('ArrowUp');
     const left = isDown('KeyA') || isDown('ArrowLeft');
     const right = isDown('KeyD') || isDown('ArrowRight');
+    const pitch = (down ? 1 : 0) - (up ? 1 : 0);
 
     return {
-      pitch:       (down ? 1 : 0) - (up ? 1 : 0),
+      pitch:       invertControls ? -pitch : pitch,
       yaw:         (isDown('KeyE') ? 1 : 0) - (isDown('KeyQ') ? 1 : 0),
       roll:        (right ? 1 : 0) - (left ? 1 : 0),
       thrust:      isDown('Space') ? 1 : 0,

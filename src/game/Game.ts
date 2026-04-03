@@ -152,7 +152,7 @@ export class Game {
   };
 
   private updateFlight(dt: number, state: ReturnType<typeof useGameState.getState>): void {
-    const inp = this.input.read();
+    const inp = this.input.read(state.invertControls);
     const { speed } = this.flightModel.update(
       dt,
       inp,

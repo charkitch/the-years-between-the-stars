@@ -4,9 +4,11 @@ import styles from './MainMenu.module.css';
 interface MainMenuProps {
   onNewGame: () => void;
   onResume: () => void;
+  invertControls: boolean;
+  onToggleInvertControls: () => void;
 }
 
-export function MainMenu({ onNewGame, onResume }: MainMenuProps) {
+export function MainMenu({ onNewGame, onResume, invertControls, onToggleInvertControls }: MainMenuProps) {
   const [view, setView] = useState<'main' | 'controls'>('main');
 
   if (view === 'controls') {
@@ -66,6 +68,9 @@ export function MainMenu({ onNewGame, onResume }: MainMenuProps) {
               <span className={styles.action}>MENU / BACK</span>
             </div>
           </div>
+          <button className={styles.menuBtn} onClick={onToggleInvertControls}>
+            INVERT CONTROLS: {invertControls ? 'ON' : 'OFF'}
+          </button>
           <button className={styles.menuBtn} onClick={() => setView('main')}>
             BACK
           </button>

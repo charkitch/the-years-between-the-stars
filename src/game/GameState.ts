@@ -67,6 +67,7 @@ export interface FactionMemoryEntry {
 }
 
 export interface GameStateData {
+  invertControls: boolean;
   player: PlayerState;
   currentSystemId: number;
   currentSystem: SolarSystemData | null;
@@ -103,6 +104,7 @@ export interface GameStateData {
 }
 
 export interface GameActions {
+  setInvertControls: (invert: boolean) => void;
   setPlayerPosition: (pos: { x: number; y: number; z: number }) => void;
   setPlayerVelocity: (vel: { x: number; y: number; z: number }) => void;
   setPlayerSpeed: (speed: number) => void;
@@ -164,6 +166,7 @@ const DEFAULT_PLAYER: PlayerState = {
 };
 
 interface SaveData {
+  invertControls?: boolean;
   credits: number;
   cargo: Partial<Record<GoodName, number>>;
   cargoCostBasis: Partial<Record<GoodName, number>>;
@@ -197,6 +200,7 @@ function loadFromStorage(): Partial<SaveData> {
 }
 
 export const useGameState = create<GameStateData & GameActions>((set, get) => ({
+  invertControls: false,
   player: { ...DEFAULT_PLAYER },
   currentSystemId: 0,
   currentSystem: null,
@@ -231,6 +235,10 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
   // Galaxy simulation state
   galaxySimState: null,
 
+  setInvertControls: (invert) => {
+    set({ invertControls: invert });
+    get().saveGame();
+  },
   setPlayerPosition: (pos) => set(s => ({ player: { ...s.player, position: pos } })),
   setPlayerVelocity: (vel) => set(s => ({ player: { ...s.player, velocity: vel } })),
   setPlayerSpeed: (speed) => set(s => ({ player: { ...s.player, speed } })),
@@ -337,6 +345,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
     localStorage.removeItem('space-game-save');
     set({
       player: { ...DEFAULT_PLAYER },
+      invertControls: false,
       currentSystemId: 0,
       currentSystem: null,
       currentSystemPayload: null,
@@ -371,6 +380,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
         fuel: saved.fuel ?? s.player.fuel,
         shields: saved.shields ?? s.player.shields,
       },
+      invertControls: saved.invertControls ?? false,
       currentSystemId: saved.currentSystemId ?? 0,
       visitedSystems: new Set(saved.visitedSystems ?? []),
       galaxyYear: saved.galaxyYear ?? GALAXY_YEAR_START,
@@ -386,6 +396,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
   saveGame: () => {
     const s = get();
     const data: SaveData = {
+      invertControls: s.invertControls,
       credits: s.player.credits,
       cargo: s.player.cargo,
       cargoCostBasis: s.player.cargoCostBasis,
