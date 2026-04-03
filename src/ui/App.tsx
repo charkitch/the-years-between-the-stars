@@ -148,7 +148,7 @@ export function App() {
     }
   }, [uiMode, isLandscapePlayable]);
 
-  const handleTouchFlightInput = useCallback((input: { pitch: number; yaw: number; thrust: number; boost: boolean }) => {
+  const handleTouchFlightInput = useCallback((input: { pitch: number; yaw: number; roll: number; thrust: number; boost: boolean }) => {
     if (uiMode !== 'flight' || !isLandscapePlayable) {
       gameRef.current?.clearTouchFlightInput();
       return;

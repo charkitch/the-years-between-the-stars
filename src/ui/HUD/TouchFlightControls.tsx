@@ -4,12 +4,14 @@ import styles from './TouchFlightControls.module.css';
 interface TouchFlightInput {
   pitch: number;
   yaw: number;
+  roll: number;
   thrust: number;
   boost: boolean;
 }
 
 interface TouchFlightControlsProps {
   enabled: boolean;
+  canDockNow: boolean;
   onInputChange: (input: TouchFlightInput) => void;
   onDock: () => void;
   onHail: () => void;
@@ -21,9 +23,11 @@ interface TouchFlightControlsProps {
 
 const STICK_RADIUS = 48;
 const STICK_DEADZONE = 0.14;
+const BOOST_THRESHOLD = 0.75;
 
 export function TouchFlightControls({
   enabled,
+  canDockNow,
   onInputChange,
   onDock,
   onHail,
@@ -32,37 +36,58 @@ export function TouchFlightControls({
   onSystemMap,
   onJump,
 }: TouchFlightControlsProps) {
-  const stickRef = useRef<HTMLDivElement>(null);
-  const [stickActive, setStickActive] = useState(false);
-  const [stickPointerId, setStickPointerId] = useState<number | null>(null);
-  const [stickX, setStickX] = useState(0);
-  const [stickY, setStickY] = useState(0);
-  const [thrustHeld, setThrustHeld] = useState(false);
-  const [boostHeld, setBoostHeld] = useState(false);
+  const leftStickRef = useRef<HTMLDivElement>(null);
+  const rightStickRef = useRef<HTMLDivElement>(null);
+
+  const [leftActive, setLeftActive] = useState(false);
+  const [leftPointerId, setLeftPointerId] = useState<number | null>(null);
+  const [leftX, setLeftX] = useState(0);
+  const [leftY, setLeftY] = useState(0);
+
+  const [rightActive, setRightActive] = useState(false);
+  const [rightPointerId, setRightPointerId] = useState<number | null>(null);
+  const [rightX, setRightX] = useState(0);
+  const [rightY, setRightY] = useState(0);
+
+  const [actionsOpen, setActionsOpen] = useState(false);
+
+  const thrust = Math.max(0, Math.min(1, (-rightY - STICK_DEADZONE) / (1 - STICK_DEADZONE)));
+  const boostActive = thrust >= BOOST_THRESHOLD;
 
   useEffect(() => {
     if (!enabled) {
-      setStickActive(false);
-      setStickPointerId(null);
-      setStickX(0);
-      setStickY(0);
-      setThrustHeld(false);
-      setBoostHeld(false);
-      onInputChange({ pitch: 0, yaw: 0, thrust: 0, boost: false });
+      setLeftActive(false);
+      setLeftPointerId(null);
+      setLeftX(0);
+      setLeftY(0);
+      setRightActive(false);
+      setRightPointerId(null);
+      setRightX(0);
+      setRightY(0);
+      setActionsOpen(false);
+      onInputChange({ pitch: 0, yaw: 0, roll: 0, thrust: 0, boost: false });
       return;
     }
 
     onInputChange({
-      pitch: stickY,
-      yaw: stickX,
-      thrust: thrustHeld ? 1 : 0,
-      boost: boostHeld,
+      pitch: leftY,
+      yaw: leftX,
+      roll: rightX,
+      thrust,
+      boost: boostActive,
     });
-  }, [enabled, stickX, stickY, thrustHeld, boostHeld, onInputChange]);
+  }, [enabled, leftX, leftY, rightX, thrust, boostActive, onInputChange]);
 
-  const updateStickFromPointer = (clientX: number, clientY: number) => {
+  const updateStickFromPointer = (
+    stickRef: React.RefObject<HTMLDivElement>,
+    clientX: number,
+    clientY: number,
+    setX: (x: number) => void,
+    setY: (y: number) => void,
+  ) => {
     const root = stickRef.current;
     if (!root) return;
+
     const rect = root.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
@@ -72,106 +97,137 @@ export function TouchFlightControls({
     const clamped = Math.min(dist, STICK_RADIUS);
     const nx = dist > 0 ? (dx / dist) * (clamped / STICK_RADIUS) : 0;
     const ny = dist > 0 ? (dy / dist) * (clamped / STICK_RADIUS) : 0;
+
     const finalX = Math.abs(nx) < STICK_DEADZONE ? 0 : nx;
     const finalY = Math.abs(ny) < STICK_DEADZONE ? 0 : ny;
-    setStickX(finalX);
-    setStickY(finalY);
+    setX(finalX);
+    setY(finalY);
   };
 
-  const handleStickDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleLeftDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!enabled) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
-    setStickActive(true);
-    setStickPointerId(e.pointerId);
-    updateStickFromPointer(e.clientX, e.clientY);
+    setLeftActive(true);
+    setLeftPointerId(e.pointerId);
+    updateStickFromPointer(leftStickRef, e.clientX, e.clientY, setLeftX, setLeftY);
   };
 
-  const handleStickMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!enabled || !stickActive || e.pointerId !== stickPointerId) return;
+  const handleLeftMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!enabled || !leftActive || e.pointerId !== leftPointerId) return;
     e.preventDefault();
-    updateStickFromPointer(e.clientX, e.clientY);
+    updateStickFromPointer(leftStickRef, e.clientX, e.clientY, setLeftX, setLeftY);
   };
 
-  const resetStick = () => {
-    setStickActive(false);
-    setStickPointerId(null);
-    setStickX(0);
-    setStickY(0);
-  };
-
-  const handleStickUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerId !== stickPointerId) return;
+  const handleLeftUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerId !== leftPointerId) return;
     e.preventDefault();
-    resetStick();
+    setLeftActive(false);
+    setLeftPointerId(null);
+    setLeftX(0);
+    setLeftY(0);
   };
 
-  const makeHoldHandlers = (setValue: (held: boolean) => void) => ({
-    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
-      if (!enabled) return;
-      e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
-      setValue(true);
-    },
-    onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
-      e.preventDefault();
-      setValue(false);
-    },
-    onPointerCancel: (e: React.PointerEvent<HTMLButtonElement>) => {
-      e.preventDefault();
-      setValue(false);
-    },
-    onPointerLeave: () => {
-      setValue(false);
-    },
-  });
+  const handleRightDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!enabled) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setRightActive(true);
+    setRightPointerId(e.pointerId);
+    updateStickFromPointer(rightStickRef, e.clientX, e.clientY, setRightX, setRightY);
+  };
 
-  const thrustHandlers = makeHoldHandlers(setThrustHeld);
-  const boostHandlers = makeHoldHandlers(setBoostHeld);
+  const handleRightMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!enabled || !rightActive || e.pointerId !== rightPointerId) return;
+    e.preventDefault();
+    updateStickFromPointer(rightStickRef, e.clientX, e.clientY, setRightX, setRightY);
+  };
+
+  const handleRightUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerId !== rightPointerId) return;
+    e.preventDefault();
+    setRightActive(false);
+    setRightPointerId(null);
+    setRightX(0);
+    setRightY(0);
+  };
+
+  const runAction = (action: () => void) => {
+    if (!enabled) return;
+    action();
+    setActionsOpen(false);
+  };
 
   return (
     <div className={styles.root}>
       <div
-        ref={stickRef}
+        ref={leftStickRef}
         className={styles.stickZone}
-        onPointerDown={handleStickDown}
-        onPointerMove={handleStickMove}
-        onPointerUp={handleStickUp}
-        onPointerCancel={handleStickUp}
+        onPointerDown={handleLeftDown}
+        onPointerMove={handleLeftMove}
+        onPointerUp={handleLeftUp}
+        onPointerCancel={handleLeftUp}
       >
         <div className={styles.stickRing} />
         <div
           className={styles.stickKnob}
           style={{
-            transform: `translate(${stickX * STICK_RADIUS}px, ${stickY * STICK_RADIUS}px)`,
+            transform: `translate(${leftX * STICK_RADIUS}px, ${leftY * STICK_RADIUS}px)`,
           }}
         />
       </div>
 
-      <div className={styles.rightControls}>
-        <button
-          type="button"
-          className={`${styles.holdButton} ${thrustHeld ? styles.pressed : ''}`}
-          {...thrustHandlers}
-        >
-          THRUST
-        </button>
-        <button
-          type="button"
-          className={`${styles.holdButton} ${boostHeld ? styles.pressed : ''}`}
-          {...boostHandlers}
-        >
-          BOOST
-        </button>
+      <div
+        ref={rightStickRef}
+        className={styles.rightStickZone}
+        onPointerDown={handleRightDown}
+        onPointerMove={handleRightMove}
+        onPointerUp={handleRightUp}
+        onPointerCancel={handleRightUp}
+      >
+        <div className={styles.stickRing} />
+        <div
+          className={styles.stickKnob}
+          style={{
+            transform: `translate(${rightX * STICK_RADIUS}px, ${rightY * STICK_RADIUS}px)`,
+          }}
+        />
+        <div className={styles.rightLegend}>
+          <span>ROLL</span>
+          <span>THRUST {Math.round(thrust * 100)}%</span>
+          <span className={boostActive ? styles.boostHot : ''}>BOOST</span>
+        </div>
       </div>
 
-      <div className={styles.actionRail}>
-        <button type="button" className={styles.actionButton} onClick={onDock}>DOCK</button>
-        <button type="button" className={styles.actionButton} onClick={onHail}>HAIL</button>
-        <button type="button" className={styles.actionButton} onClick={onTargetCycle}>TARGET</button>
-        <button type="button" className={styles.actionButton} onClick={onClusterMap}>CLUSTER</button>
-        <button type="button" className={styles.actionButton} onClick={onSystemMap}>SYSTEM</button>
-        <button type="button" className={styles.actionButton} onClick={onJump}>JUMP</button>
+      {enabled && canDockNow && (
+        <button
+          type="button"
+          className={styles.quickDockButton}
+          onClick={onDock}
+        >
+          DOCK
+        </button>
+      )}
+
+      <div className={styles.menuWrap}>
+        <button
+          type="button"
+          className={`${styles.menuButton} ${actionsOpen ? styles.menuButtonOpen : ''}`}
+          onClick={() => enabled && setActionsOpen(v => !v)}
+          disabled={!enabled}
+        >
+          ACTIONS
+        </button>
+        {actionsOpen && enabled && (
+          <div className={styles.actionMenu}>
+            <button type="button" className={styles.actionButton} onClick={() => runAction(onDock)}>DOCK</button>
+            <button type="button" className={styles.actionButton} onClick={() => runAction(onHail)}>HAIL</button>
+            <button type="button" className={styles.actionButton} onClick={() => runAction(onTargetCycle)}>TARGET</button>
+            <button type="button" className={styles.actionButton} onClick={() => runAction(onClusterMap)}>CLUSTER</button>
+            <button type="button" className={styles.actionButton} onClick={() => runAction(onSystemMap)}>SYSTEM</button>
+            <button type="button" className={styles.actionButton} onClick={() => runAction(onJump)}>JUMP</button>
+          </div>
+        )}
       </div>
     </div>
   );

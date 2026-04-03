@@ -21,6 +21,7 @@ function isDown(key: string): boolean {
 export class InputSystem {
   private touchPitch = 0;
   private touchYaw = 0;
+  private touchRoll = 0;
   private touchThrust = 0;
   private touchBoost = false;
   private onDock?: () => void;
@@ -72,7 +73,7 @@ export class InputSystem {
     return {
       pitch:       invertControls ? -pitch : pitch,
       yaw,
-      roll:        (right ? 1 : 0) - (left ? 1 : 0),
+      roll:        Math.max(-1, Math.min(1, ((right ? 1 : 0) - (left ? 1 : 0)) + this.touchRoll)),
       thrust:      Math.max(isDown('Space') ? 1 : 0, this.touchThrust),
       boost:       isDown('ShiftLeft') || isDown('ShiftRight') || this.touchBoost,
       dockRequest: false,
@@ -84,9 +85,10 @@ export class InputSystem {
     };
   }
 
-  setTouchFlightInput(input: { pitch: number; yaw: number; thrust: number; boost: boolean }) {
+  setTouchFlightInput(input: { pitch: number; yaw: number; roll: number; thrust: number; boost: boolean }) {
     this.touchPitch = Math.max(-1, Math.min(1, input.pitch));
     this.touchYaw = Math.max(-1, Math.min(1, input.yaw));
+    this.touchRoll = Math.max(-1, Math.min(1, input.roll));
     this.touchThrust = Math.max(0, Math.min(1, input.thrust));
     this.touchBoost = input.boost;
   }
@@ -94,6 +96,7 @@ export class InputSystem {
   resetTouchFlightInput() {
     this.touchPitch = 0;
     this.touchYaw = 0;
+    this.touchRoll = 0;
     this.touchThrust = 0;
     this.touchBoost = false;
   }

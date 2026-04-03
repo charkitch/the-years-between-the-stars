@@ -138,7 +138,7 @@ export class Game {
     this.tryJump();
   }
 
-  setTouchFlightInput(input: { pitch: number; yaw: number; thrust: number; boost: boolean }): void {
+  setTouchFlightInput(input: { pitch: number; yaw: number; roll: number; thrust: number; boost: boolean }): void {
     this.input.setTouchFlightInput(input);
   }
 
@@ -185,6 +185,9 @@ export class Game {
     } else if (uiMode === 'hyperspace') {
       this.updateHyperspace(dt, state);
     }
+    if (uiMode !== 'flight') {
+      state.setCanDockNow(false);
+    }
 
     // Always update orbits
     const time = state.time;
@@ -222,6 +225,7 @@ export class Game {
     const pos = this.sceneRenderer.shipGroup.position;
     state.setPlayerPosition({ x: pos.x, y: pos.y, z: pos.z });
     state.setPlayerSpeed(speed);
+    state.setCanDockNow(this.canDockNow(speed));
 
     // Fuel scooping near star
     const starEntity = this.sceneRenderer.getAllEntities().get('star');
@@ -365,6 +369,14 @@ export class Game {
         state.setAlert(`JUMP IN ${Math.ceil(remaining)}s`);
       }
     }
+  }
+
+  private canDockNow(speed: number): boolean {
+    const pos = this.sceneRenderer.shipGroup.position;
+    const entities = this.sceneRenderer.getAllEntities();
+    const nearest = this.docking.findNearestStation(pos, entities);
+    if (!nearest) return false;
+    return this.docking.canDock(pos, nearest.pos, speed);
   }
 
   private tryDock(): void {

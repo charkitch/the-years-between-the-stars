@@ -81,6 +81,7 @@ export interface GameStateData {
     hyperspaceTarget: number | null;
     hyperspaceCountdown: number;
     deathMessage: string[] | null;
+    canDockNow: boolean;
   };
   time: number; // game time in seconds
 
@@ -119,6 +120,7 @@ export interface GameActions {
   setHyperspaceTarget: (id: number | null) => void;
   setHyperspaceCountdown: (n: number) => void;
   setDeathMessage: (lines: string[] | null) => void;
+  setCanDockNow: (canDockNow: boolean) => void;
   addCredits: (delta: number) => void;
   addCargo: (good: GoodName, qty: number, purchasePrice?: number) => void;
   removeCargo: (good: GoodName, qty: number) => void;
@@ -214,6 +216,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
     hyperspaceTarget: null,
     hyperspaceCountdown: 0,
     deathMessage: null,
+    canDockNow: false,
   },
   time: 0,
 
@@ -261,6 +264,9 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
   setHyperspaceTarget: (id) => set(s => ({ ui: { ...s.ui, hyperspaceTarget: id } })),
   setHyperspaceCountdown: (n) => set(s => ({ ui: { ...s.ui, hyperspaceCountdown: n } })),
   setDeathMessage: (lines) => set(s => ({ ui: { ...s.ui, deathMessage: lines } })),
+  setCanDockNow: (canDockNow) => set((s) => (
+    s.ui.canDockNow === canDockNow ? {} : { ui: { ...s.ui, canDockNow } }
+  )),
   addCredits: (delta) => set(s => ({ player: { ...s.player, credits: s.player.credits + delta } })),
   addCargo: (good, qty, purchasePrice) => set(s => {
     const cargo = { ...s.player.cargo };
@@ -364,7 +370,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
       pendingSystemEntryDialog: null,
       seenSystemDialogIds: [],
       galaxySimState: null,
-      ui: { mode: 'flight', alertMessage: null, hyperspaceTarget: null, hyperspaceCountdown: 0, deathMessage: null },
+      ui: { mode: 'flight', alertMessage: null, hyperspaceTarget: null, hyperspaceCountdown: 0, deathMessage: null, canDockNow: false },
     });
   },
 

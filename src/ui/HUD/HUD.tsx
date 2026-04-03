@@ -18,7 +18,7 @@ interface HUDProps {
   getCamera: () => THREE.PerspectiveCamera | null;
   runtimeProfile: RuntimeProfile | null;
   isLandscapePlayable: boolean;
-  onTouchFlightInput: (input: { pitch: number; yaw: number; thrust: number; boost: boolean }) => void;
+  onTouchFlightInput: (input: { pitch: number; yaw: number; roll: number; thrust: number; boost: boolean }) => void;
   onDock: () => void;
   onHail: () => void;
   onTargetCycle: () => void;
@@ -50,6 +50,7 @@ export function HUD({
   const alert = useGameState(s => s.ui.alertMessage);
   const hyperspaceTarget = useGameState(s => s.ui.hyperspaceTarget);
   const uiMode = useGameState(s => s.ui.mode);
+  const canDockNow = useGameState(s => s.ui.canDockNow);
   const galaxyYear = useGameState(s => s.galaxyYear);
   const knownFactions = useGameState(s => s.knownFactions);
   const currentSystemPayload = useGameState(s => s.currentSystemPayload);
@@ -233,7 +234,9 @@ export function HUD({
         ) : (
           <div className={styles.targetInfo}>
             <div className={styles.targetLabel}>NO TARGET</div>
-            <div style={{ fontSize: '10px', opacity: 0.5 }}>TAB to cycle</div>
+            <div style={{ fontSize: '10px', opacity: 0.5 }}>
+              {isMobileHUD ? 'ACTIONS > TARGET' : 'TAB to cycle'}
+            </div>
           </div>
         )}
       </div>
@@ -251,6 +254,7 @@ export function HUD({
       {isMobileHUD && (
         <TouchFlightControls
           enabled={touchFlightEnabled}
+          canDockNow={canDockNow}
           onInputChange={onTouchFlightInput}
           onDock={onDock}
           onHail={onHail}

@@ -10,9 +10,53 @@ import styles from './ClusterMap.module.css';
 const hyperspace = new HyperspaceSystem();
 const MAP_W = 520;
 const MAP_H = 420;
+const MOBILE_BREAKPOINT = 820;
+const MOBILE_CLUSTER_ZOOM = 2.2;
 
-function toCanvas(x: number, y: number): [number, number] {
-  return [x * MAP_W / 100, y * MAP_H / 100];
+interface MapViewport {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  zoom: number;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getViewport(currentX: number, currentY: number, isMobile: boolean): MapViewport {
+  if (!isMobile) {
+    return { minX: 0, maxX: 100, minY: 0, maxY: 100, zoom: 1 };
+  }
+
+  const spanX = 100 / MOBILE_CLUSTER_ZOOM;
+  const spanY = 100 / MOBILE_CLUSTER_ZOOM;
+  const halfX = spanX / 2;
+  const halfY = spanY / 2;
+  const centerX = clamp(currentX, halfX, 100 - halfX);
+  const centerY = clamp(currentY, halfY, 100 - halfY);
+
+  return {
+    minX: centerX - halfX,
+    maxX: centerX + halfX,
+    minY: centerY - halfY,
+    maxY: centerY + halfY,
+    zoom: MOBILE_CLUSTER_ZOOM,
+  };
+}
+
+function toCanvas(x: number, y: number, viewport: MapViewport): [number, number] {
+  const nx = (x - viewport.minX) / (viewport.maxX - viewport.minX);
+  const ny = (y - viewport.minY) / (viewport.maxY - viewport.minY);
+  return [nx * MAP_W, ny * MAP_H];
+}
+
+function toWorld(px: number, py: number, viewport: MapViewport): [number, number] {
+  return [
+    viewport.minX + px * (viewport.maxX - viewport.minX),
+    viewport.minY + py * (viewport.maxY - viewport.minY),
+  ];
 }
 
 const STAR_TYPE_COLOR: Record<string, string> = {
@@ -33,6 +77,7 @@ interface ClusterMapProps {
 
 export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const cluster = useGameState(s => s.cluster);
   const currentSystemId = useGameState(s => s.currentSystemId);
   const visitedSystems = useGameState(s => s.visitedSystems);
@@ -55,6 +100,14 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
 
   const [hovered, setHovered] = useState<StarSystemData | null>(null);
 
+  useEffect(() => {
+    const media = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
   // Compute years-elapsed preview for hovered/targeted system
   const previewSys = hovered ?? (hyperspaceTarget !== null ? cluster[hyperspaceTarget] : null);
   const previewYears = previewSys && previewSys.id !== currentSystemId
@@ -71,13 +124,15 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const viewport = getViewport(currentSys.x, currentSys.y, isMobile);
+
     ctx.clearRect(0, 0, MAP_W, MAP_H);
     ctx.fillStyle = '#010206';
     ctx.fillRect(0, 0, MAP_W, MAP_H);
 
     // Range ring
-    const [cx, cy] = toCanvas(currentSys.x, currentSys.y);
-    const rangePixels = (HYPERSPACE.maxRange / 100) * MAP_W;
+    const [cx, cy] = toCanvas(currentSys.x, currentSys.y, viewport);
+    const rangePixels = (HYPERSPACE.maxRange / (viewport.maxX - viewport.minX)) * MAP_W;
 
     // Soft outer glow pass so the range ring stays readable against dense stars/lines.
     ctx.strokeStyle = 'rgba(68, 220, 255, 0.22)';
@@ -98,7 +153,8 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
 
     // Systems
     for (const sys of cluster) {
-      const [sx, sy] = toCanvas(sys.x, sys.y);
+      const [sx, sy] = toCanvas(sys.x, sys.y, viewport);
+      if (sx < -30 || sx > MAP_W + 30 || sy < -30 || sy > MAP_H + 30) continue;
       const isReachable = reachableIds.has(sys.id);
       const isCurrent = sys.id === currentSystemId;
       const isTarget = sys.id === hyperspaceTarget;
@@ -257,26 +313,33 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
         ctx.fillText(sys.name.toUpperCase(), sx + 8, sy + 4);
       }
     }
-  }, [cluster, currentSystemId, visitedSystems, hyperspaceTarget, reachableIds, hovered, currentSys, knownFactions, lastVisitYear, galaxyYear, galaxySimState, clusterSummaryById]);
+  }, [cluster, currentSystemId, visitedSystems, hyperspaceTarget, reachableIds, hovered, currentSys, knownFactions, lastVisitYear, galaxyYear, galaxySimState, clusterSummaryById, isMobile]);
 
   useEffect(() => { draw(); }, [draw]);
 
   const getMapPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current!.getBoundingClientRect();
+    const viewport = getViewport(currentSys.x, currentSys.y, isMobile);
+    const px = (e.clientX - rect.left) / rect.width;
+    const py = (e.clientY - rect.top) / rect.height;
+    const [mx, my] = toWorld(px, py, viewport);
+    const pickRadius = (isMobile ? 28 : 18) * (viewport.maxX - viewport.minX) / MAP_W;
+
     return {
-      mx: ((e.clientX - rect.left) / rect.width) * 100,
-      my: ((e.clientY - rect.top) / rect.height) * 100,
+      mx,
+      my,
+      pickRadius,
     };
   };
 
   const handleCanvasClick = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const { mx, my } = getMapPointer(e);
+    const { mx, my, pickRadius } = getMapPointer(e);
 
     let nearest: StarSystemData | null = null;
     let nearestDist = Infinity;
     for (const sys of cluster) {
       const d = Math.hypot(sys.x - mx, sys.y - my);
-      if (d < nearestDist && d < 6) { nearest = sys; nearestDist = d; }
+      if (d < nearestDist && d < pickRadius) { nearest = sys; nearestDist = d; }
     }
 
     if (nearest && nearest.id !== currentSystemId && reachableIds.has(nearest.id)) {
@@ -285,13 +348,13 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
   };
 
   const handleCanvasMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const { mx, my } = getMapPointer(e);
+    const { mx, my, pickRadius } = getMapPointer(e);
 
     let nearest: StarSystemData | null = null;
     let nearestDist = Infinity;
     for (const sys of cluster) {
       const d = Math.hypot(sys.x - mx, sys.y - my);
-      if (d < nearestDist && d < 6) { nearest = sys; nearestDist = d; }
+      if (d < nearestDist && d < pickRadius) { nearest = sys; nearestDist = d; }
     }
     setHovered(nearest);
   };

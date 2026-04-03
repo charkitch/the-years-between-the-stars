@@ -40,43 +40,87 @@
   box-shadow: 0 0 10px rgba(110, 255, 190, 0.55);
 }
 
-.rightControls {
+.rightStickZone {
   position: absolute;
-  right: calc(20px + env(safe-area-inset-right));
-  bottom: calc(42px + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  right: calc(24px + env(safe-area-inset-right));
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  width: 112px;
+  height: 112px;
   pointer-events: auto;
 }
 
-.holdButton {
-  min-width: 110px;
-  min-height: 48px;
-  padding: 10px 14px;
-  font-size: 12px;
+.rightLegend {
+  position: absolute;
+  left: 50%;
+  top: calc(-56px - env(safe-area-inset-bottom) * 0.1);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 140px;
+  font-size: 9px;
   letter-spacing: 1px;
-  border: 1px solid rgba(100, 255, 180, 0.6);
-  background: rgba(8, 18, 14, 0.76);
-  color: rgba(180, 255, 220, 0.95);
+  color: rgba(170, 255, 220, 0.85);
+  text-shadow: 0 0 10px rgba(65, 230, 160, 0.35);
 }
 
-.pressed {
-  background: rgba(40, 130, 90, 0.72);
-  color: #fff;
-  box-shadow: 0 0 14px rgba(90, 255, 185, 0.45);
+.boostHot {
+  color: rgba(255, 214, 102, 0.95);
+  text-shadow: 0 0 12px rgba(255, 170, 0, 0.45);
 }
 
-.actionRail {
+.quickDockButton {
+  position: absolute;
+  left: calc(50% - 56px);
+  bottom: calc(118px + env(safe-area-inset-bottom));
+  min-width: 112px;
+  min-height: 42px;
+  border: 1px solid rgba(96, 223, 255, 0.72);
+  background: rgba(8, 34, 44, 0.84);
+  color: rgba(170, 235, 255, 0.96);
+  letter-spacing: 1.6px;
+  font-size: 12px;
+  box-shadow: 0 0 16px rgba(85, 196, 255, 0.22);
+  pointer-events: auto;
+}
+
+.menuWrap {
   position: absolute;
   left: 50%;
   bottom: calc(20px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  display: grid;
-  grid-template-columns: repeat(3, minmax(86px, 1fr));
-  gap: 8px;
-  width: min(92vw, 350px);
   pointer-events: auto;
+}
+
+.menuButton {
+  min-width: 120px;
+  min-height: 42px;
+  border: 1px solid rgba(100, 255, 180, 0.58);
+  background: rgba(10, 20, 15, 0.88);
+  color: rgba(180, 255, 220, 0.95);
+  font-size: 11px;
+  letter-spacing: 1.4px;
+}
+
+.menuButtonOpen {
+  background: rgba(34, 84, 62, 0.92);
+  box-shadow: 0 0 14px rgba(90, 255, 185, 0.32);
+}
+
+.actionMenu {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: min(90vw, 330px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(80px, 1fr));
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(100, 255, 180, 0.48);
+  background: rgba(4, 12, 9, 0.92);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.48);
 }
 
 .actionButton {
