@@ -1,6 +1,7 @@
 {
   "name": "time-in-transit",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "wasm:build": "cd engine && wasm-pack build --target web --out-dir pkg",
