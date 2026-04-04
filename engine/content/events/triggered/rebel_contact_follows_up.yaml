@@ -1,0 +1,22 @@
+id: REBEL_CONTACT_FOLLOWS_UP
+title: THE COURIER'S RECEIPT
+triggeredOnly: true
+triggeredBy: rebel-contact-ready
+narrativeLines:
+  - >-
+    A dock worker catches your eye and taps two fingers to their collar - old resistance sign.
+  - >-
+    They slide a crate into your cargo hold without a word. Inside: medical supplies and a sealed data core.
+  - >-
+    A note reads: "The cell on Korathi Prime got your package. They want you to know it mattered."
+choices:
+  - id: keep_going
+    label: Ask how you can help again
+    description: "+Reputation, fuel resupply"
+    effect:
+      tradingReputation: 1
+      fuelReward: 0.3
+  - id: done
+    label: Nod and walk away
+    description: You've done enough for now
+    effect: {}

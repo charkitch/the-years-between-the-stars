@@ -1,0 +1,26 @@
+id: THE_LISTENER
+title: THE LISTENER
+narrativeLines:
+  - >-
+    The station is a single habitat module bolted to a frozen comet. One occupant. She has been here for thirty years.
+  - >-
+    She monitors deep-space transmissions from beyond the Oort cloud. Most of it is noise. Some of it is not.
+  - >-
+    "I heard something last week," she whispers. "Something that heard me back."
+choices:
+  - id: listen_recording
+    label: Listen to the recording
+    description: "+Reputation x2 (you are now a witness)"
+    effect:
+      tradingReputation: 2
+  - id: buy_data
+    label: Buy a copy of all her data (CR 300)
+    description: "CR 300 cost, +1 fuel (she refuels you as thanks)"
+    effect:
+      creditsReward: -300
+      fuelReward: 1.0
+    requiresCredits: 300
+  - id: leave_listener
+    label: Leave her to her vigil
+    description: No effect
+    effect: {}

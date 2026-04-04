@@ -1,0 +1,24 @@
+id: THE_LAST_BROADCAST
+title: THE LAST BROADCAST
+narrativeLines:
+  - >-
+    The station's antenna array is aimed at nothing - at the gap between galaxies where no stars shine.
+  - >-
+    A recording loops endlessly: a voice reading coordinates in a language that predates your civilization by millennia.
+  - >-
+    The attendant is long dead. The station runs on automatic. It has been broadcasting for longer than human history.
+choices:
+  - id: record_coordinates
+    label: Record the coordinates
+    description: "+Reputation x2 (this changes everything)"
+    effect:
+      tradingReputation: 2
+  - id: shut_it_down
+    label: Shut down the broadcast
+    description: "CR 800 (salvage the power cells)"
+    effect:
+      creditsReward: 800
+  - id: leave_broadcasting
+    label: Leave it broadcasting
+    description: No effect
+    effect: {}

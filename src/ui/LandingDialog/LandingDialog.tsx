@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameState } from '../../game/GameState';
 import styles from './LandingDialog.module.css';
 
@@ -7,7 +7,7 @@ interface LandingDialogProps {
 }
 
 export function LandingDialog({ onChoice }: LandingDialogProps) {
-  const pendingLandingEvent = useGameState(s => s.pendingLandingEvent);
+  const pendingGameEvent = useGameState(s => s.pendingGameEvent);
   const galaxyYear = useGameState(s => s.galaxyYear);
   const player = useGameState(s => s.player);
   const cluster = useGameState(s => s.cluster);
@@ -15,9 +15,16 @@ export function LandingDialog({ onChoice }: LandingDialogProps) {
 
   const [confirmed, setConfirmed] = useState(false);
 
-  if (!pendingLandingEvent) return null;
+  useEffect(() => {
+    setConfirmed(false);
+  }, [
+    pendingGameEvent?.event?.id,
+    pendingGameEvent?.event?.narrativeLines.join('|'),
+  ]);
 
-  const { civState, event, yearsSinceLastVisit } = pendingLandingEvent;
+  if (!pendingGameEvent) return null;
+
+  const { civState, event, yearsSinceLastVisit } = pendingGameEvent;
   const currentSystemTechLevel = cluster[currentSystemId]?.techLevel ?? 0;
 
   const handleChoice = (choiceId: string) => {

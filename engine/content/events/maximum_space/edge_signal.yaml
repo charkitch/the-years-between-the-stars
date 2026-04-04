@@ -1,0 +1,25 @@
+id: EDGE_SIGNAL
+title: EDGE SIGNAL
+narrativeLines:
+  - >-
+    The station is broadcasting on a frequency that hasn't been used in three thousand years. Your frequency.
+  - >-
+    Inside, the walls are covered in star charts - but the constellations are wrong. Shifted. As seen from somewhere else.
+  - >-
+    A message is etched into the airlock: "FOR THE ONE WHO TRAVELS BETWEEN." It is addressed to you.
+choices:
+  - id: take_the_charts
+    label: Take the star charts
+    description: "CR 2000 (priceless to the right buyer)"
+    effect:
+      creditsReward: 2000
+  - id: leave_a_reply
+    label: Leave a reply message
+    description: "+Reputation x2, +3 fuel (the station refuels you)"
+    effect:
+      tradingReputation: 2
+      fuelReward: 3.0
+  - id: seal_it_shut
+    label: Seal the station and leave
+    description: No effect
+    effect: {}

@@ -1,0 +1,26 @@
+id: SMUGGLER_HAVEN
+title: SMUGGLER HAVEN
+narrativeLines:
+  - >-
+    The hollowed-out asteroid hums with illicit commerce. Crates with scratched-off manifests line every corridor.
+  - >-
+    A one-eyed dockmaster eyes your ancient ship with open admiration. "Pre-war hull. Beautiful. Nobody scans for those."
+  - >-
+    She leans in: "I have a job, if you have nerve. No questions. Cash up front."
+choices:
+  - id: take_job
+    label: Take the smuggling job
+    description: "CR 900, prices -20% here"
+    effect:
+      creditsReward: 900
+      priceModifier: 0.80
+  - id: trade_info
+    label: Trade information instead
+    description: "+Reputation, CR 300"
+    effect:
+      tradingReputation: 1
+      creditsReward: 300
+  - id: decline_smuggler
+    label: Shake your head and walk away
+    description: No effect
+    effect: {}

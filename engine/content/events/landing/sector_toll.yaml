@@ -1,0 +1,30 @@
+id: SECTOR_TOLL
+title: SECTOR TOLL
+requires:
+  - !PoliticsIs [Feudal, MilitaryDictatorship, StagnantMilitancy]
+narrativeLines:
+  - >-
+    A gunship flags you down inside the docking envelope. The insignia is unfamiliar - local warlord, recent vintage.
+  - >-
+    "Toll is five hundred credits. Historical vessels, double rate." The pilot seems to be reading from a card.
+  - >-
+    You have been paying tolls since before this warlord's species existed.
+choices:
+  - id: pay_toll
+    label: Pay the CR 500 toll
+    description: Smooth passage
+    effect:
+      creditsReward: -500
+    requiresCredits: 500
+  - id: negotiate
+    label: Negotiate down to CR 200
+    description: Half-price toll
+    effect:
+      creditsReward: -200
+    requiresCredits: 200
+  - id: invoke_immunity
+    label: Invoke historical transit immunity (Article 7)
+    description: "-Reputation, prices +40% (they remember)"
+    effect:
+      tradingReputation: -1
+      priceModifier: 1.40

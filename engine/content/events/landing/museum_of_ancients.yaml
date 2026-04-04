@@ -1,0 +1,28 @@
+id: MUSEUM_OF_ANCIENTS
+title: MUSEUM OF THE ANCIENTS
+requires:
+  - !PoliticsIs [Technocracy, Democracy]
+narrativeLines:
+  - >-
+    The curator of the System Heritage Museum has been waiting at your berth since 0400.
+  - >-
+    The museum's centrepiece exhibit covers your home era. They want to add a living artefact.
+  - >-
+    "We will display your ship's original components - with your permission, and proper compensation."
+choices:
+  - id: sell_components
+    label: Sell old components to the museum
+    description: CR 1000, +1 fuel unit (new parts fitted)
+    effect:
+      creditsReward: 1000
+      fuelReward: 1.0
+  - id: donate_components
+    label: Donate the components
+    description: "+Reputation x2, prices -20%"
+    effect:
+      tradingReputation: 2
+      priceModifier: 0.80
+  - id: decline_museum
+    label: Decline politely
+    description: No effect
+    effect: {}

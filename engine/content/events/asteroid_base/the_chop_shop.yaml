@@ -1,0 +1,26 @@
+id: THE_CHOP_SHOP
+title: THE CHOP SHOP
+narrativeLines:
+  - >-
+    Deep in the rock, someone has built a shipyard out of salvaged parts and sheer audacity.
+  - >-
+    The mechanic whistles when she sees your drive core. "That's fifth-generation. I thought they were all scrapped."
+  - >-
+    "I can tune it - make her faster. Or I can buy it off you for more money than you've seen in a century."
+choices:
+  - id: tune_drive
+    label: Let her tune the drive (CR 400)
+    description: "+2 fuel capacity worth of efficiency"
+    effect:
+      creditsReward: -400
+      fuelReward: 2.0
+    requiresCredits: 400
+  - id: sell_spare
+    label: Sell her your spare components
+    description: CR 1200
+    effect:
+      creditsReward: 1200
+  - id: leave_shop
+    label: Leave the drive alone
+    description: No effect
+    effect: {}

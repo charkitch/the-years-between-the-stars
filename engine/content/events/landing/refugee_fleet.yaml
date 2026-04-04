@@ -1,0 +1,26 @@
+id: REFUGEE_FLEET
+title: REFUGEE FLEET
+narrativeLines:
+  - >-
+    A convoy of generation ships from a system you visited centuries ago drifts into the docking queue.
+  - >-
+    The survivors carry cultural archives they believe you can authenticate - you were there, after all.
+  - >-
+    A dignitary with hollow eyes approaches the ramp: "You remember what it was like. Please - tell them what we had."
+choices:
+  - id: share_freely
+    label: Share your testimony freely
+    description: "+Reputation, CR 200 humanitarian stipend"
+    effect:
+      tradingReputation: 2
+      creditsReward: 200
+  - id: sell_it
+    label: Sell the testimony to media brokers
+    description: "-Reputation, CR 800"
+    effect:
+      tradingReputation: -2
+      creditsReward: 800
+  - id: decline
+    label: Plead ignorance and move on
+    description: No effect
+    effect: {}

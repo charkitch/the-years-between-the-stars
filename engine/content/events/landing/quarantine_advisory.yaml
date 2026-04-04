@@ -1,0 +1,26 @@
+id: QUARANTINE_ADVISORY
+title: QUARANTINE ADVISORY
+narrativeLines:
+  - >-
+    Station med-control broadcasts a tier-2 quarantine: a fast-mutating pathogen, origin unknown.
+  - >-
+    Your ancient immune profile - pre-dating the standard inoculation series - could map the pathogen's lineage.
+  - >-
+    The chief medical officer is requesting your bioscan data. Voluntarily. For now.
+choices:
+  - id: release_freely
+    label: Release the bioscan data publicly
+    description: "+Reputation x2, +2 fuel units (medical priority)"
+    effect:
+      tradingReputation: 2
+      fuelReward: 2.0
+  - id: sell_data
+    label: Sell the data to a pharmaceutical corp
+    description: "-Reputation x2, CR 1200"
+    effect:
+      tradingReputation: -2
+      creditsReward: 1200
+  - id: deny_records
+    label: Claim your records were lost in transit
+    description: No effect
+    effect: {}

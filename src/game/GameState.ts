@@ -3,7 +3,7 @@ import type {
   StarSystemData,
   SolarSystemData,
   CivilizationState,
-  LandingEvent,
+  GameEvent,
   SystemSimState,
   ClusterSystemSummary,
   SystemPayload,
@@ -51,13 +51,17 @@ export interface SystemChoices {
   priceModifier: number;        // accumulated multiplier
   factionTag: string | null;
   completedEventIds: string[];
+  flags: string[];
+  firedTriggers: string[];
 }
 
-export interface PendingLandingContext {
+export interface PendingGameEventContext {
   systemId: number;
   civState: CivilizationState;
-  event: LandingEvent | null;
+  event: GameEvent | null;
+  rootEventId: string | null;
   yearsSinceLastVisit: number | null;
+  returnMode: UIMode;
 }
 
 export interface FactionMemoryEntry {
@@ -90,7 +94,7 @@ export interface GameStateData {
   jumpLog: JumpLogEntry[];                            // last 20
   playerChoices: Record<number, SystemChoices>;       // keyed by systemId
   lastVisitYear: Record<number, number>;              // systemId → galaxyYear
-  pendingLandingEvent: PendingLandingContext | null;
+  pendingGameEvent: PendingGameEventContext | null;
   pendingCommContext: PendingCommContext | null;
 
   // ── Faction tracking ──────────────────────────────────────────────────────
@@ -134,7 +138,7 @@ export interface GameActions {
   advanceGalaxyYear: (years: number) => void;
   addJumpLogEntry: (entry: JumpLogEntry) => void;
   recordPlayerChoice: (systemId: number, eventId: string, effect: Partial<SystemChoices>) => void;
-  setPendingLandingEvent: (ctx: PendingLandingContext | null) => void;
+  setPendingGameEvent: (ctx: PendingGameEventContext | null) => void;
   setPendingCommContext: (ctx: PendingCommContext | null) => void;
   recordVisitYear: (systemId: number, year: number) => void;
 
@@ -193,6 +197,25 @@ function migrateLegacyGoodKeys<T>(record: Partial<Record<GoodName, T>> | undefin
   return migrated;
 }
 
+function normalizeSystemChoicesMap(
+  map: Record<number, SystemChoices> | undefined,
+): Record<number, SystemChoices> {
+  if (!map) return {};
+  const out: Record<number, SystemChoices> = {};
+  for (const [k, v] of Object.entries(map)) {
+    out[Number(k)] = {
+      tradingReputation: v.tradingReputation ?? 0,
+      bannedGoods: v.bannedGoods ?? [],
+      priceModifier: v.priceModifier ?? 1.0,
+      factionTag: v.factionTag ?? null,
+      completedEventIds: v.completedEventIds ?? [],
+      flags: v.flags ?? [],
+      firedTriggers: v.firedTriggers ?? [],
+    };
+  }
+  return out;
+}
+
 function loadFromStorage(): Partial<SaveData> {
   try {
     const raw = localStorage.getItem('space-game-save');
@@ -225,7 +248,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
   jumpLog: [],
   playerChoices: {},
   lastVisitYear: {},
-  pendingLandingEvent: null,
+  pendingGameEvent: null,
   pendingCommContext: null,
 
   // Faction tracking state
@@ -309,17 +332,23 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
       priceModifier: 1.0,
       factionTag: null,
       completedEventIds: [],
+      flags: [],
+      firedTriggers: [],
     };
     const updated: SystemChoices = {
       tradingReputation: existing.tradingReputation + (effect.tradingReputation ?? 0),
       bannedGoods: [...new Set([...existing.bannedGoods, ...(effect.bannedGoods ?? [])])],
       priceModifier: existing.priceModifier * (effect.priceModifier ?? 1.0),
       factionTag: effect.factionTag ?? existing.factionTag,
-      completedEventIds: [...existing.completedEventIds, eventId],
+      completedEventIds: existing.completedEventIds.includes(eventId)
+        ? existing.completedEventIds
+        : [...existing.completedEventIds, eventId],
+      flags: [...new Set([...existing.flags, ...(effect.flags ?? [])])],
+      firedTriggers: [...new Set([...existing.firedTriggers, ...(effect.firedTriggers ?? [])])],
     };
     return { playerChoices: { ...s.playerChoices, [systemId]: updated } };
   }),
-  setPendingLandingEvent: (ctx) => set({ pendingLandingEvent: ctx }),
+  setPendingGameEvent: (ctx) => set({ pendingGameEvent: ctx }),
   setPendingCommContext: (ctx) => set({ pendingCommContext: ctx }),
   recordVisitYear: (systemId, year) => set(s => ({
     lastVisitYear: { ...s.lastVisitYear, [systemId]: year },
@@ -362,7 +391,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
       jumpLog: [],
       playerChoices: {},
       lastVisitYear: {},
-      pendingLandingEvent: null,
+      pendingGameEvent: null,
       pendingCommContext: null,
       knownFactions: new Set(),
       factionMemory: {},
@@ -391,7 +420,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
       visitedSystems: new Set(saved.visitedSystems ?? []),
       galaxyYear: saved.galaxyYear ?? GALAXY_YEAR_START,
       jumpLog: saved.jumpLog ?? [],
-      playerChoices: saved.playerChoices ?? {},
+      playerChoices: normalizeSystemChoicesMap(saved.playerChoices),
       lastVisitYear: saved.lastVisitYear ?? {},
       knownFactions: new Set(saved.knownFactions ?? []),
       factionMemory: saved.factionMemory ?? {},

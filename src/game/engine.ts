@@ -10,6 +10,7 @@ import initWasm, {
   init_game,
   jump_to_system,
   get_system_market,
+  get_game_event,
   get_landing_event,
   get_cluster_summary,
 } from '../../engine/pkg/time_in_transit_engine';
@@ -184,6 +185,13 @@ export interface ChoiceEffect {
   factionTag: string | null;
   creditsReward: number;
   fuelReward: number;
+  setsFlags: string[];
+  fires: string[];
+}
+
+export interface EventMoment {
+  narrativeLines: string[];
+  choices: EventChoice[];
 }
 
 export interface EventChoice {
@@ -193,16 +201,16 @@ export interface EventChoice {
   effect: ChoiceEffect;
   requiresMinTech: number | null;
   requiresCredits: number | null;
+  nextMoment: EventMoment | null;
 }
 
-export interface LandingEvent {
+export interface GameEvent {
   id: string;
   title: string;
-  narrativeLines: [string, string, string];
+  narrativeLines: string[];
   choices: EventChoice[];
-  applicablePolitics: PoliticalType[] | null;
-  minGalaxyYear: number | null;
-  requiredFactionTag: string | null;
+  triggeredBy: string | null;
+  triggeredOnly: boolean;
 }
 
 export interface ClusterSystemSummary {
@@ -232,7 +240,7 @@ export interface SystemPayload {
   civState: CivilizationState;
   factionState: SystemFactionState;
   market: MarketEntry[];
-  landingEvent: LandingEvent | null;
+  gameEvent: GameEvent | null;
   systemEntryLines: string[];
   systemEntryDialog: SystemEntryDialog | null;
 }
@@ -279,6 +287,8 @@ export interface WasmPlayerState {
     priceModifier: number;
     factionTag: string | null;
     completedEventIds: string[];
+    flags: string[];
+    firedTriggers: string[];
   }>;
   lastVisitYear: Record<number, number>;
   knownFactions: string[];
@@ -322,11 +332,30 @@ export function engineGetMarket(
   return JSON.parse(result);
 }
 
+export function engineGetGameEvent(
+  systemId: number,
+  playerState: WasmPlayerState,
+  options?: {
+    context?: 'landing' | 'system_entry' | 'proximity_star' | 'proximity_base' | 'planet_landing' | 'triggered';
+    secretBaseId?: string;
+    surface?: string;
+  },
+): GameEvent | null {
+  const result = get_game_event(
+    systemId,
+    JSON.stringify(playerState),
+    options?.context ?? 'landing',
+    options?.secretBaseId ?? '',
+    options?.surface ?? '',
+  );
+  return JSON.parse(result);
+}
+
 export function engineGetLandingEvent(
   systemId: number,
   playerState: WasmPlayerState,
   secretBaseId?: string,
-): LandingEvent | null {
+): GameEvent | null {
   const result = get_landing_event(
     systemId,
     JSON.stringify(playerState),

@@ -1,0 +1,27 @@
+id: THE_LINEAGE
+title: THE LINEAGE
+requires:
+  - !MinGalaxyYear 5000
+narrativeLines:
+  - >-
+    A dockworker stops you cold: she is holding a lumigraph - old, printed, degraded at the edges.
+  - >-
+    The person in the lumigraph is you. The date stamp is 4,200 years ago. She found it in her grandmother's estate.
+  - >-
+    "Are you... related to them?" she whispers. The dock is very quiet.
+choices:
+  - id: reveal_truth
+    label: Tell her the truth
+    description: "+Reputation x2 (she will tell everyone)"
+    effect:
+      tradingReputation: 2
+  - id: claim_descent
+    label: Claim to be a distant descendant
+    description: "+Reputation, CR 100 (she insists on buying you a drink)"
+    effect:
+      tradingReputation: 1
+      creditsReward: 100
+  - id: deny_lineage
+    label: Deny any connection
+    description: No effect
+    effect: {}

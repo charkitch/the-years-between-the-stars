@@ -1,0 +1,42 @@
+id: THE_ARCHIVIST
+title: THE ARCHIVIST
+narrativeLines:
+  - >-
+    A white-haired historian intercepts you at the dock cafe, recorder already running.
+  - >-
+    She has spent forty years reconstructing the era you lived through from fragments.
+  - >-
+    "You are the fragment," she says quietly. "Would you sit with me for an hour?"
+choices:
+  - id: full_interview
+    label: Give a full interview, free of charge
+    description: "+Reputation x2"
+    effect:
+      tradingReputation: 2
+    nextMoment:
+      narrativeLines:
+        - >-
+          An hour becomes three. She asks about the sky over a world that no longer exists.
+        - >-
+          When you describe the color of the oceans, her hands shake. She was born there - three generations removed.
+      choices:
+        - id: give_nav_data
+          label: Give her your original nav logs from that system
+          description: "+Reputation, she publishes your name in the archive"
+          effect:
+            tradingReputation: 1
+        - id: keep_private
+          label: Some memories are yours alone
+          description: She understands
+          effect: {}
+  - id: leave_nav_logs
+    label: Leave a copy of your navigation logs
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1
+  - id: charge_time
+    label: Charge your standard rate for your time
+    description: "-Reputation, CR 500"
+    effect:
+      tradingReputation: -1
+      creditsReward: 500

@@ -19,9 +19,11 @@ export function SystemEntryDialog({ onDismiss }: SystemEntryDialogProps) {
             <p key={i} className={styles.line}>{line}</p>
           ))}
         </div>
-        <button className={styles.dismissBtn} onClick={onDismiss}>
-          ACKNOWLEDGE
-        </button>
+        <div className={styles.actions}>
+          <button className={styles.dismissBtn} onClick={onDismiss}>
+            ACKNOWLEDGE
+          </button>
+        </div>
       </div>
     </div>
   );

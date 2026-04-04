@@ -1,0 +1,4 @@
+triggers:
+  - id: rebel-contact-ready
+    conditions:
+      - !FlagSet dead_drop_accepted

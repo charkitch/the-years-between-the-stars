@@ -1,0 +1,22 @@
+id: ACQUISITION_PROPOSAL
+title: ACQUISITION PROPOSAL
+requires:
+  - !PoliticsIs [CorporateState, Technocracy]
+narrativeLines:
+  - >-
+    A sleek representative from a megacorporation intercepts you at the airlock.
+  - >-
+    They want to retain you as a historical courier - your longevity makes you an unrivalled chain of custody.
+  - >-
+    "We can make it worth your while," she says, sliding a contract across the scanner.
+choices:
+  - id: sign_contract
+    label: Sign the courier contract
+    description: "+CR 1500, aligned with corporate interests"
+    effect:
+      creditsReward: 1500
+      factionTag: corp_ally
+  - id: remain_independent
+    label: Remain independent
+    description: No effect
+    effect: {}

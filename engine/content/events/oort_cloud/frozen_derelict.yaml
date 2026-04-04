@@ -1,0 +1,26 @@
+id: FROZEN_DERELICT
+title: FROZEN DERELICT
+narrativeLines:
+  - >-
+    The station is grafted onto the hull of a ship older than yours. Much older. The markings are unrecognizable.
+  - >-
+    Someone has been studying it for decades. The interior is a museum of impossible engineering.
+  - >-
+    "We think it came from outside," says the researcher. "Outside the galaxy. We need help translating the drive logs."
+choices:
+  - id: help_translate
+    label: Help translate the drive logs
+    description: "+Reputation x2, CR 500"
+    effect:
+      tradingReputation: 2
+      creditsReward: 500
+  - id: salvage_tech
+    label: Quietly pocket a component
+    description: "CR 1500, -Reputation x2"
+    effect:
+      tradingReputation: -2
+      creditsReward: 1500
+  - id: leave_derelict
+    label: Leave it to the researchers
+    description: No effect
+    effect: {}

@@ -1,0 +1,24 @@
+id: BUOY_TAPPER
+title: BUOY TAPPER
+narrativeLines:
+  - >-
+    A maintenance skiff paces you near the station perimeter and taps your hull with coded laser pulses.
+  - >-
+    The pilot offers route telemetry in exchange for your ancient drift logs.
+  - >-
+    The data could shave risk off your next jump, or sell for credits.
+choices:
+  - id: trade_logs
+    label: Trade logs for telemetry
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1
+  - id: sell_logs
+    label: Sell logs for CR 250
+    description: "CR 250"
+    effect:
+      creditsReward: 250
+  - id: refuse_logs
+    label: Refuse the exchange
+    description: No effect
+    effect: {}

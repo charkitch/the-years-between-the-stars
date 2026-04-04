@@ -1,0 +1,21 @@
+id: DUST_CHOIR
+title: DUST CHOIR
+requires:
+  - !SurfaceIs [desert]
+narrativeLines:
+  - >-
+    Your boots sink into singing dunes that resonate with every step.
+  - >-
+    Local pilgrims say the wind records memory in the sand and replays it at dusk.
+  - >-
+    A guide asks if you'll leave a story for those who come after.
+choices:
+  - id: leave_story
+    label: Leave a story in the dunes
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1
+  - id: keep_silence
+    label: Keep your memories private
+    description: No effect
+    effect: {}

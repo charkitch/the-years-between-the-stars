@@ -1,0 +1,32 @@
+id: DOCKING_INSPECTION
+title: DOCKING INSPECTION
+requires:
+  - !PoliticsIs [Theocracy]
+narrativeLines:
+  - >-
+    Priests in full ceremonial hazmat suits board before you can cycle the airlock.
+  - >-
+    They cite the Purification Mandate - all vessels from "heathen epochs" must be spiritually cleansed.
+  - >-
+    The levy is CR 400. You sense enforcement is entirely negotiable.
+choices:
+  - id: pay_levy
+    label: Pay the CR 400 levy
+    description: "+Reputation with local clergy"
+    effect:
+      tradingReputation: 1
+      creditsReward: -400
+    requiresCredits: 400
+  - id: invoke_transit
+    label: Invoke ancient transit rights
+    description: "-Reputation, local prices +25%"
+    effect:
+      tradingReputation: -1
+      priceModifier: 1.25
+  - id: bribe_quietly
+    label: Slide CR 200 into a collection plate
+    description: "+Reputation, cheaper than the levy"
+    effect:
+      tradingReputation: 1
+      creditsReward: -200
+    requiresCredits: 200

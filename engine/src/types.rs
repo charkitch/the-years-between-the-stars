@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -384,6 +384,10 @@ pub struct SystemChoices {
     pub price_modifier: f64,
     pub faction_tag: Option<String>,
     pub completed_event_ids: Vec<String>,
+    #[serde(default)]
+    pub flags: HashSet<String>,
+    #[serde(default)]
+    pub fired_triggers: HashSet<String>,
 }
 
 impl Default for SystemChoices {
@@ -394,6 +398,8 @@ impl Default for SystemChoices {
             price_modifier: 1.0,
             faction_tag: None,
             completed_event_ids: vec![],
+            flags: HashSet::new(),
+            fired_triggers: HashSet::new(),
         }
     }
 }
@@ -442,6 +448,10 @@ pub struct ChoiceEffect {
     pub credits_reward: i32,
     #[serde(default)]
     pub fuel_reward: f64,
+    #[serde(default)]
+    pub sets_flags: Vec<String>,
+    #[serde(default)]
+    pub fires: Vec<String>,
 }
 
 fn default_price_mod() -> f64 { 1.0 }
@@ -453,20 +463,61 @@ pub struct EventChoice {
     pub label: String,
     pub description: String,
     pub effect: ChoiceEffect,
+    #[serde(default)]
     pub requires_min_tech: Option<i32>,
+    #[serde(default)]
     pub requires_credits: Option<i32>,
+    #[serde(default)]
+    pub next_moment: Option<Box<EventMoment>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct LandingEvent {
+pub struct EventMoment {
+    pub narrative_lines: Vec<String>,
+    pub choices: Vec<EventChoice>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum EventCondition {
+    PoliticsIs(Vec<PoliticalType>),
+    MinGalaxyYear(u32),
+    HasFactionTag(String),
+    HasCargo(String),
+    VisitedSystem(String),
+    MinCluster(u32),
+    MinReputation(i32),
+    FlagSet(String),
+    SurfaceIs(Vec<SurfaceType>),
+    TriggerFired(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameEvent {
     pub id: String,
     pub title: String,
-    pub narrative_lines: [String; 3],
+    pub narrative_lines: Vec<String>,
     pub choices: Vec<EventChoice>,
-    pub applicable_politics: Option<Vec<PoliticalType>>,
-    pub min_galaxy_year: Option<u32>,
-    pub required_faction_tag: Option<String>,
+    #[serde(default)]
+    pub requires: Vec<EventCondition>,
+    #[serde(default)]
+    pub triggered_by: Option<String>,
+    #[serde(default)]
+    pub triggered_only: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Trigger {
+    pub id: String,
+    pub conditions: Vec<EventCondition>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TriggerFile {
+    pub triggers: Vec<Trigger>,
 }
 
 // ─── System Entry Dialog ─────────────────────────────────────────────────────
@@ -506,7 +557,7 @@ pub struct SystemPayload {
     pub civ_state: CivilizationState,
     pub faction_state: SystemFactionState,
     pub market: Vec<MarketEntry>,
-    pub landing_event: Option<LandingEvent>,
+    pub game_event: Option<GameEvent>,
     pub system_entry_lines: Vec<String>,
     pub system_entry_dialog: Option<SystemEntryDialog>,
 }

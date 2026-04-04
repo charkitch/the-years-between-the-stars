@@ -19,8 +19,8 @@ import {
 import type { GoodName } from './constants';
 import { MAX_CARGO } from './constants';
 import {
-  initEngine, engineInitGame, engineJumpToSystem, engineGetLandingEvent, engineGetMarket,
-  type ChoiceEffect, type SecretBaseType, type SystemPayload,
+  initEngine, engineInitGame, engineJumpToSystem, engineGetGameEvent, engineGetMarket,
+  type ChoiceEffect, type GameEvent, type SecretBaseType, type SystemPayload,
 } from './engine';
 import {
   buildWasmPlayerState,
@@ -40,6 +40,11 @@ import type { RuntimeProfile } from '../runtime/runtimeProfile';
 
 const COMBAT_INTEL_INTERVAL = 8;
 const INFINITE_FUEL_DEV = import.meta.env.DEV;
+const FIRST_SYSTEM_ID = 0;
+const SYSTEM_ENTRY_EVENT_CHANCE = 0.3;
+const PROXIMITY_EVENT_CHANCE = 0.08;
+const PROXIMITY_EVENT_COOLDOWN_HIT = 20;
+const PROXIMITY_EVENT_COOLDOWN_MISS = 8;
 
 export class Game {
   private sceneRenderer: SceneRenderer;
@@ -59,6 +64,11 @@ export class Game {
   private hasUndocked = false;
   private pendingSystemPayload: SystemPayload | null = null;
   private engineReady = false;
+  private proximityEventCooldown = 0;
+
+  private shouldTriggerEvent(chance: number): boolean {
+    return Math.random() < chance;
+  }
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -199,6 +209,10 @@ export class Game {
   };
 
   private updateFlight(dt: number, state: ReturnType<typeof useGameState.getState>): void {
+    if (this.proximityEventCooldown > 0) {
+      this.proximityEventCooldown = Math.max(0, this.proximityEventCooldown - dt);
+    }
+
     const inp = this.input.read(state.invertControls);
     const { speed } = this.flightModel.update(
       dt,
@@ -358,6 +372,8 @@ export class Game {
       hazardRadius: XB_STREAM_HAZARD_RADIUS,
     });
 
+    this.tryProximityGameEvent(state, pos);
+
     // Hyperspace countdown
     if (state.ui.hyperspaceCountdown > 0) {
       const remaining = state.ui.hyperspaceCountdown - dt;
@@ -417,28 +433,40 @@ export class Game {
     // Get landing event from Rust engine
     const wasmState = buildWasmPlayerState(state);
     const secretBase = state.currentSystem?.secretBases.find(b => b.id === stationId);
-    const event = engineGetLandingEvent(
-      systemId,
-      wasmState,
-      secretBase ? stationId : undefined,
-    );
+    const event = systemId === FIRST_SYSTEM_ID
+      ? null
+      : engineGetGameEvent(
+        systemId,
+        wasmState,
+        {
+          context: 'landing',
+          secretBaseId: secretBase ? stationId : undefined,
+        },
+      );
 
     // Get civ state from the pending payload or request from engine
     // For simplicity, build a minimal civState from what we have
     const civState = state.currentSystemPayload?.civState;
     if (!civState) return;
 
-    state.setPendingLandingEvent({ systemId, civState, event, yearsSinceLastVisit });
+    state.setPendingGameEvent({
+      systemId,
+      civState,
+      event,
+      rootEventId: event?.id ?? null,
+      yearsSinceLastVisit,
+      returnMode: 'docked',
+    });
     state.setUIMode('landing');
   }
 
   /** Called from UI when the player picks a landing event choice. */
   completeLanding(choiceId: string): void {
     const state = useGameState.getState();
-    const ctx = state.pendingLandingEvent;
+    const ctx = state.pendingGameEvent;
     if (!ctx) return;
 
-    const { systemId, event } = ctx;
+    const { systemId, event, rootEventId, returnMode } = ctx;
 
     // Apply choice effect
     if (event) {
@@ -451,11 +479,31 @@ export class Game {
           priceModifier: fx.priceModifier ?? 1.0,
           factionTag: fx.factionTag ?? null,
           completedEventIds: [],
+          flags: fx.setsFlags ?? [],
+          firedTriggers: fx.fires ?? [],
         };
-        state.recordPlayerChoice(systemId, event.id, partial);
+        state.recordPlayerChoice(systemId, rootEventId ?? event.id, partial);
 
         if (fx.creditsReward) state.addCredits(fx.creditsReward);
         if (fx.fuelReward) state.setFuel(state.player.fuel + fx.fuelReward);
+
+        if (choice.nextMoment) {
+          const followUp: GameEvent = {
+            id: event.id,
+            title: event.title,
+            narrativeLines: choice.nextMoment.narrativeLines,
+            choices: choice.nextMoment.choices,
+            triggeredBy: null,
+            triggeredOnly: false,
+          };
+          state.setPendingGameEvent({
+            ...ctx,
+            event: followUp,
+            rootEventId: rootEventId ?? event.id,
+          });
+          state.saveGame();
+          return;
+        }
       }
     }
 
@@ -465,9 +513,9 @@ export class Game {
     refreshedState.setCurrentSystemMarket(
       engineGetMarket(systemId, buildWasmPlayerState(refreshedState)),
     );
-    state.setPendingLandingEvent(null);
+    state.setPendingGameEvent(null);
     state.saveGame();
-    state.setUIMode('docked');
+    state.setUIMode(returnMode);
   }
 
   private toggleClusterMap(): void {
@@ -577,7 +625,81 @@ export class Game {
       flightModel: this.flightModel,
       discoverFactions: discoverFactionsFromSystem,
     });
+    this.tryProximityGameEvent(state, this.sceneRenderer.shipGroup.position);
+    const refreshed = useGameState.getState();
+    if (
+      targetId !== FIRST_SYSTEM_ID
+      && !refreshed.pendingGameEvent
+      && payload.gameEvent
+      && this.shouldTriggerEvent(SYSTEM_ENTRY_EVENT_CHANCE)
+    ) {
+      state.setPendingGameEvent({
+        systemId: targetId,
+        civState: payload.civState,
+        event: payload.gameEvent,
+        rootEventId: payload.gameEvent.id,
+        yearsSinceLastVisit: null,
+        returnMode: 'flight',
+      });
+      state.setUIMode('landing');
+    }
     state.saveGame();
+  }
+
+  private tryProximityGameEvent(
+    state: ReturnType<typeof useGameState.getState>,
+    pos: THREE.Vector3,
+  ): void {
+    if (state.ui.mode !== 'flight' || this.proximityEventCooldown > 0) return;
+    if (state.currentSystemId === FIRST_SYSTEM_ID) return;
+    if (!state.currentSystemPayload) return;
+    if (!this.shouldTriggerEvent(PROXIMITY_EVENT_CHANCE)) {
+      this.proximityEventCooldown = PROXIMITY_EVENT_COOLDOWN_MISS;
+      return;
+    }
+
+    const wasmState = buildWasmPlayerState(state);
+    let event: GameEvent | null = null;
+
+    const star = this.sceneRenderer.getAllEntities().get('star');
+    if (star) {
+      const distanceToStar = pos.distanceTo(star.worldPos);
+      if (distanceToStar <= star.collisionRadius + 140) {
+        event = engineGetGameEvent(state.currentSystemId, wasmState, {
+          context: 'proximity_star',
+        });
+      }
+    }
+
+    if (!event) {
+      for (const base of state.currentSystemPayload.system.secretBases) {
+        const entity = this.sceneRenderer.getAllEntities().get(base.id);
+        if (!entity) continue;
+        const dist = pos.distanceTo(entity.worldPos);
+        if (dist <= entity.collisionRadius + 180) {
+          event = engineGetGameEvent(state.currentSystemId, wasmState, {
+            context: 'proximity_base',
+          });
+          if (event) break;
+        }
+      }
+    }
+
+    if (!event) {
+      this.proximityEventCooldown = PROXIMITY_EVENT_COOLDOWN_MISS;
+      return;
+    }
+
+    state.setPendingGameEvent({
+      systemId: state.currentSystemId,
+      civState: state.currentSystemPayload.civState,
+      event,
+      rootEventId: event.id,
+      yearsSinceLastVisit: null,
+      returnMode: 'flight',
+    });
+    state.setUIMode('landing');
+    this.proximityEventCooldown = PROXIMITY_EVENT_COOLDOWN_HIT;
   }
 
   private triggerDeath(deathMessage: string[] | null = null): void {

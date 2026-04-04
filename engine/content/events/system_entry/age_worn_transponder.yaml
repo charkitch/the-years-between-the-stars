@@ -1,0 +1,19 @@
+id: AGE_WORN_TRANSPONDER
+title: AGE-WORN TRANSPONDER
+narrativeLines:
+  - >-
+    As you enter the system, a forgotten transponder handshake pings your comms - a protocol dead for millennia.
+  - >-
+    The station AI flags it as invalid. You recognize it immediately: your era's emergency corridor code.
+  - >-
+    Someone out there still remembers the old lanes.
+choices:
+  - id: answer_ping
+    label: Answer the handshake
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1
+  - id: ignore_ping
+    label: Ignore and continue approach
+    description: No effect
+    effect: {}

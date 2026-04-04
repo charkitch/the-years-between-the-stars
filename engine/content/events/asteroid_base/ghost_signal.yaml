@@ -1,0 +1,24 @@
+id: GHOST_SIGNAL
+title: GHOST SIGNAL
+narrativeLines:
+  - >-
+    The base is half-abandoned. Lights flicker in corridors that lead nowhere. Someone left in a hurry.
+  - >-
+    Your comms pick up a looping distress call - old encoding, maybe decades stale. Maybe not.
+  - >-
+    A data terminal near the airlock still works. The last log entry reads: "They found us. Tell no one."
+choices:
+  - id: download_logs
+    label: Download the station logs
+    description: "+Reputation (someone may pay for this)"
+    effect:
+      tradingReputation: 2
+  - id: salvage_parts
+    label: Salvage what you can carry
+    description: CR 600
+    effect:
+      creditsReward: 600
+  - id: leave_undisturbed
+    label: Leave it undisturbed
+    description: No effect
+    effect: {}

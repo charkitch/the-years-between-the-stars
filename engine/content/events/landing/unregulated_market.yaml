@@ -1,0 +1,28 @@
+id: UNREGULATED_MARKET
+title: UNREGULATED MARKET
+requires:
+  - !PoliticsIs [Anarchist]
+narrativeLines:
+  - >-
+    Someone has set up shop in the maintenance ring - no permits, no inspectors, no questions.
+  - >-
+    They're selling everything in bulk, dirt-cheap, but want immediate payment for the whole lot.
+  - >-
+    The goods are unmanifested. This is either a great deal or evidence in a future trial.
+choices:
+  - id: buy_the_lot
+    label: Buy the entire lot (CR 600)
+    description: Prices -30% this port
+    effect:
+      creditsReward: -600
+      priceModifier: 0.70
+    requiresCredits: 600
+  - id: browse_carefully
+    label: Browse selectively
+    description: Prices -15% this port
+    effect:
+      priceModifier: 0.85
+  - id: skip_market
+    label: Walk past without stopping
+    description: No effect
+    effect: {}

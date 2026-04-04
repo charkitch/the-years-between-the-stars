@@ -7,6 +7,7 @@ mod factions;
 mod trading;
 mod events;
 mod simulation;
+mod content;
 
 use wasm_bindgen::prelude::*;
 use std::sync::Mutex;
@@ -17,7 +18,7 @@ use system_generator::generate_solar_system;
 use civilization::get_civ_state;
 use factions::{get_faction, get_system_faction_state};
 use trading::get_market;
-use events::{select_event, select_secret_base_event};
+use events::{select_game_event, EventContext, EventPool};
 use simulation::{init_galaxy_state, simulate_galaxy};
 
 // ─── Persistent state across WASM calls ─────────────────────────────────────
@@ -67,15 +68,31 @@ fn build_system_payload(
     let system_choices = player_state.player_choices.get(&star.id);
     let market = get_market(star.id, civ_state.economy, Some(&civ_state), system_choices);
 
-    // Select landing event
+    let triggers = content::all_triggers();
+
+    // Select event for this payload context
     let event_seed = galaxy_year.wrapping_mul(31337).wrapping_add(star.id.wrapping_mul(1009));
-    let landing_event = if let Some(base_id) = secret_base_id {
+    let ctx = EventContext {
+        civ_state: &civ_state,
+        player_state,
+        system_choices,
+        triggers: &triggers,
+        surface: None,
+        current_cluster: 0,
+    };
+    let game_event = if let Some(base_id) = secret_base_id {
         let base_type = system.secret_bases.iter()
             .find(|b| b.id == base_id)
             .map(|b| b.base_type);
-        base_type.and_then(|bt| select_secret_base_event(bt, system_choices, event_seed))
+        let pool = match base_type {
+            Some(SecretBaseType::Asteroid) => EventPool::AsteroidBase,
+            Some(SecretBaseType::OortCloud) => EventPool::OortCloudBase,
+            Some(SecretBaseType::MaximumSpace) => EventPool::MaximumSpace,
+            None => EventPool::Landing,
+        };
+        select_game_event(pool, &ctx, event_seed)
     } else {
-        select_event(&civ_state, system_choices, event_seed)
+        select_game_event(EventPool::SystemEntry, &ctx, event_seed)
     };
 
     // Build system entry lines
@@ -137,18 +154,7 @@ fn build_system_payload(
     let system_entry_dialog = if star.star_type == StarType::Iron
         && !player_state.seen_system_dialog_ids.iter().any(|id| id == "iron_star_arrival")
     {
-        Some(SystemEntryDialog {
-            id: "iron_star_arrival".to_string(),
-            title: "IRON STAR".to_string(),
-            body_lines: vec![
-                "A long time ago, when you were a child, you learned Iron Stars would not exist for trillions upon trillions of years, until after the white dwarfs had gone black and quantum chance had done its patient work".to_string(),
-                "Slightly less long ago, you learned that Iron Stars would never exist, as the life expectancy of this universe was hastily shortened by changes in the predicted collapse of expansion.".to_string(),
-                "Today, you learned, yet again, that things that cannot be sometimes are, and that the universe continues to suprise.".to_string(),
-                "The system around the Iron Star has a Dyson Shell in the habitable zone. Iron Stars don't have habitable zones.".to_string(),
-                "Today will be a good day. You might not think of the past even once.".to_string(),
-            ],
-            show_once: true,
-        })
+        Some(content::iron_star_arrival_dialog())
     } else {
         None
     };
@@ -158,7 +164,7 @@ fn build_system_payload(
         civ_state,
         faction_state,
         market,
-        landing_event,
+        game_event,
         system_entry_lines: lines,
         system_entry_dialog,
     }
@@ -310,14 +316,16 @@ pub fn get_system_market(system_id: u32, player_state_json: &str) -> Result<Stri
         .map_err(|e| JsValue::from_str(&format!("Failed to serialize: {}", e)))
 }
 
-/// Select a landing event for a station dock.
+/// Select a game event for a specific context.
 ///
-/// Returns: JSON-serialized Option<LandingEvent>
+/// Returns: JSON-serialized Option<GameEvent>
 #[wasm_bindgen]
-pub fn get_landing_event(
+pub fn get_game_event(
     system_id: u32,
     player_state_json: &str,
+    context: &str,
     secret_base_id: &str,
+    surface: &str,
 ) -> Result<String, JsValue> {
     let player_state: PlayerState = serde_json::from_str(player_state_json)
         .map_err(|e| JsValue::from_str(&format!("Failed to parse player state: {}", e)))?;
@@ -330,19 +338,63 @@ pub fn get_landing_event(
     let civ_state = get_civ_state(system_id, player_state.galaxy_year, star.economy);
     let system_choices = player_state.player_choices.get(&system_id);
     let event_seed = player_state.galaxy_year.wrapping_mul(31337).wrapping_add(system_id.wrapping_mul(1009));
+    let triggers = content::all_triggers();
 
-    let event = if secret_base_id.is_empty() {
-        select_event(&civ_state, system_choices, event_seed)
-    } else {
-        let system = generate_solar_system(star);
-        let base_type = system.secret_bases.iter()
-            .find(|b| b.id == secret_base_id)
-            .map(|b| b.base_type);
-        base_type.and_then(|bt| select_secret_base_event(bt, system_choices, event_seed))
+    let pool = match context {
+        "landing" => {
+            if secret_base_id.is_empty() {
+                EventPool::Landing
+            } else {
+                let system = generate_solar_system(star);
+                match system
+                    .secret_bases
+                    .iter()
+                    .find(|b| b.id == secret_base_id)
+                    .map(|b| b.base_type)
+                {
+                    Some(SecretBaseType::Asteroid) => EventPool::AsteroidBase,
+                    Some(SecretBaseType::OortCloud) => EventPool::OortCloudBase,
+                    Some(SecretBaseType::MaximumSpace) => EventPool::MaximumSpace,
+                    None => EventPool::Landing,
+                }
+            }
+        }
+        "system_entry" => EventPool::SystemEntry,
+        "proximity_star" => EventPool::ProximityStar,
+        "proximity_base" => EventPool::ProximityBase,
+        "planet_landing" => EventPool::PlanetLanding,
+        "triggered" => EventPool::Triggered,
+        _ => EventPool::Landing,
     };
+
+    let surface = if surface.is_empty() {
+        None
+    } else {
+        serde_json::from_str::<SurfaceType>(&format!("\"{}\"", surface)).ok()
+    };
+
+    let ctx = EventContext {
+        civ_state: &civ_state,
+        player_state: &player_state,
+        system_choices,
+        triggers: &triggers,
+        surface,
+        current_cluster: 0,
+    };
+
+    let event = select_game_event(pool, &ctx, event_seed);
 
     serde_json::to_string(&event)
         .map_err(|e| JsValue::from_str(&format!("Failed to serialize: {}", e)))
+}
+
+#[wasm_bindgen]
+pub fn get_landing_event(
+    system_id: u32,
+    player_state_json: &str,
+    secret_base_id: &str,
+) -> Result<String, JsValue> {
+    get_game_event(system_id, player_state_json, "landing", secret_base_id, "")
 }
 
 /// Get the current cluster summary (all 30 systems' state).

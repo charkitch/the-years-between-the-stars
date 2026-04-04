@@ -1,0 +1,25 @@
+id: MINERS_DISPUTE
+title: MINERS' DISPUTE
+narrativeLines:
+  - >-
+    Two mining crews have the base in a standoff. Both claim the same vein of rare earth minerals.
+  - >-
+    Neither side trusts station authority - what authority there is. But you, the ancient outsider, might arbitrate.
+  - >-
+    "You've been around longer than any of us," growls the crew chief. "What do you say is fair?"
+choices:
+  - id: split_evenly
+    label: Rule for an even split
+    description: "+Reputation x2, both crews grateful"
+    effect:
+      tradingReputation: 2
+  - id: side_with_stronger
+    label: Side with the larger crew (for a cut)
+    description: "CR 800, -Reputation"
+    effect:
+      tradingReputation: -1
+      creditsReward: 800
+  - id: refuse_dispute
+    label: Refuse to get involved
+    description: No effect
+    effect: {}

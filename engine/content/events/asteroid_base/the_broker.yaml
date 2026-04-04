@@ -1,0 +1,27 @@
+id: THE_BROKER
+title: THE BROKER
+narrativeLines:
+  - >-
+    A figure in a sealed environment suit meets you at the dock. No name. No station ID. Just business.
+  - >-
+    "I deal in futures," they say. "Cargo that doesn't exist yet, from systems that haven't been surveyed."
+  - >-
+    "Your ship is old enough to carry pre-regulation manifests. That makes you... useful."
+choices:
+  - id: invest
+    label: Invest CR 500 in speculative cargo futures
+    description: "CR 500 cost, prices -30% at this base"
+    effect:
+      creditsReward: -500
+      priceModifier: 0.70
+    requiresCredits: 500
+  - id: sell_route_data
+    label: Sell your jump route data
+    description: "CR 700, -Reputation (someone will be watching)"
+    effect:
+      tradingReputation: -1
+      creditsReward: 700
+  - id: walk_away_broker
+    label: Walk away from the deal
+    description: No effect
+    effect: {}

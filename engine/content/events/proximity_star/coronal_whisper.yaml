@@ -1,0 +1,20 @@
+id: CORONAL_WHISPER
+title: CORONAL WHISPER
+narrativeLines:
+  - >-
+    At the edge of the corona, your sensors decode a narrow-band signal braided into stellar noise.
+  - >-
+    It is not language, exactly - more like navigation intent rendered as song.
+  - >-
+    Your ship can cache the stream, but you'll run hotter if you stay this close.
+choices:
+  - id: cache_stream
+    label: Cache the stellar stream
+    description: "+Reputation, slight fuel loss"
+    effect:
+      tradingReputation: 1
+      fuelReward: -0.1
+  - id: peel_away
+    label: Pull away and cool the hull
+    description: No effect
+    effect: {}

@@ -23,6 +23,8 @@ export function buildWasmPlayerState(
       priceModifier: v.priceModifier,
       factionTag: v.factionTag,
       completedEventIds: v.completedEventIds,
+      flags: v.flags,
+      firedTriggers: v.firedTriggers,
     };
   }
 

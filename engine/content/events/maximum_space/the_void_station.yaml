@@ -1,0 +1,24 @@
+id: THE_VOID_STATION
+title: THE VOID
+narrativeLines:
+  - >-
+    There is nothing here. That is the point.
+  - >-
+    The station exists at the mathematical edge of the system's gravitational influence. Beyond this, you drift between stars forever.
+  - >-
+    A single attendant maintains the beacon. She looks at you as though she has been waiting.
+choices:
+  - id: stay_awhile
+    label: Stay and watch the void
+    description: "+Reputation x2 (you understand something now)"
+    effect:
+      tradingReputation: 2
+  - id: sign_the_log
+    label: Sign the visitor log
+    description: "+Reputation (you are only the 12th entry)"
+    effect:
+      tradingReputation: 1
+  - id: leave_void
+    label: Turn back toward the light
+    description: No effect
+    effect: {}

@@ -1,0 +1,27 @@
+id: ICE_MONKS
+title: ICE MONKS
+narrativeLines:
+  - >-
+    A small religious order has built a monastery in the ice. They believe the cold preserves truth.
+  - >-
+    They know who you are - the one who outlives eras. To them, you are a kind of proof.
+  - >-
+    "Stay with us," says the abbot. "Even a day in the deep cold would teach you what stillness means."
+choices:
+  - id: stay_and_meditate
+    label: Stay for a day of contemplation
+    description: "+Reputation x2, +2 fuel (they insist)"
+    effect:
+      tradingReputation: 2
+      fuelReward: 2.0
+  - id: donate_supplies
+    label: Donate supplies (CR 200)
+    description: "+Reputation, their blessing"
+    effect:
+      tradingReputation: 1
+      creditsReward: -200
+    requiresCredits: 200
+  - id: decline_monks
+    label: Decline gracefully
+    description: No effect
+    effect: {}

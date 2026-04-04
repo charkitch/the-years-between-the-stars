@@ -1,0 +1,31 @@
+id: DEAD_DROP_MESSAGE
+title: DEAD DROP MESSAGE
+requires:
+  - !PoliticsIs [MilitaryDictatorship, StagnantMilitancy]
+narrativeLines:
+  - >-
+    A maintenance bot delivers a data chip with no manifest number.
+  - >-
+    It contains a resistance cell's plea: they need a courier who won't appear on modern databases.
+  - >-
+    You are, in every formal sense, a ghost. They are counting on it.
+choices:
+  - id: help_rebels
+    label: Accept the dead drop run
+    description: "+Reputation, local prices -15%"
+    effect:
+      tradingReputation: 1
+      priceModifier: 0.85
+      factionTag: rebel_ally
+      setsFlags: [dead_drop_accepted]
+      fires: [rebel-contact-ready]
+  - id: report_authorities
+    label: Report the cell to station security
+    description: CR 300 bounty, government aligned
+    effect:
+      creditsReward: 300
+      factionTag: gov_ally
+  - id: delete_message
+    label: Wipe the chip and forget it
+    description: No effect
+    effect: {}
