@@ -23,7 +23,8 @@ interface TouchFlightControlsProps {
 
 const STICK_RADIUS = 48;
 const STICK_DEADZONE = 0.14;
-const BOOST_THRESHOLD = 0.75;
+const CENTER_THRUST_RADIUS = 0.28;
+const BOOST_TOP_Y = -0.78;
 
 export function TouchFlightControls({
   enabled,
@@ -48,11 +49,14 @@ export function TouchFlightControls({
   const [rightPointerId, setRightPointerId] = useState<number | null>(null);
   const [rightX, setRightX] = useState(0);
   const [rightY, setRightY] = useState(0);
+  const [rightRawX, setRightRawX] = useState(0);
+  const [rightRawY, setRightRawY] = useState(0);
 
   const [actionsOpen, setActionsOpen] = useState(false);
 
-  const thrust = Math.max(0, Math.min(1, (-rightY - STICK_DEADZONE) / (1 - STICK_DEADZONE)));
-  const boostActive = thrust >= BOOST_THRESHOLD;
+  const centerThrustActive = Math.hypot(rightRawX, rightRawY) <= CENTER_THRUST_RADIUS;
+  const boostActive = rightRawY <= BOOST_TOP_Y;
+  const thrust = boostActive || centerThrustActive ? 1 : 0;
 
   useEffect(() => {
     if (!enabled) {
@@ -64,6 +68,8 @@ export function TouchFlightControls({
       setRightPointerId(null);
       setRightX(0);
       setRightY(0);
+      setRightRawX(0);
+      setRightRawY(0);
       setActionsOpen(false);
       onInputChange({ pitch: 0, yaw: 0, roll: 0, thrust: 0, boost: false });
       return;
@@ -84,6 +90,8 @@ export function TouchFlightControls({
     clientY: number,
     setX: (x: number) => void,
     setY: (y: number) => void,
+    setRawX?: (x: number) => void,
+    setRawY?: (y: number) => void,
   ) => {
     const root = stickRef.current;
     if (!root) return;
@@ -97,6 +105,8 @@ export function TouchFlightControls({
     const clamped = Math.min(dist, STICK_RADIUS);
     const nx = dist > 0 ? (dx / dist) * (clamped / STICK_RADIUS) : 0;
     const ny = dist > 0 ? (dy / dist) * (clamped / STICK_RADIUS) : 0;
+    setRawX?.(nx);
+    setRawY?.(ny);
 
     const finalX = Math.abs(nx) < STICK_DEADZONE ? 0 : nx;
     const finalY = Math.abs(ny) < STICK_DEADZONE ? 0 : ny;
@@ -134,13 +144,13 @@ export function TouchFlightControls({
     e.currentTarget.setPointerCapture(e.pointerId);
     setRightActive(true);
     setRightPointerId(e.pointerId);
-    updateStickFromPointer(rightStickRef, e.clientX, e.clientY, setRightX, setRightY);
+    updateStickFromPointer(rightStickRef, e.clientX, e.clientY, setRightX, setRightY, setRightRawX, setRightRawY);
   };
 
   const handleRightMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!enabled || !rightActive || e.pointerId !== rightPointerId) return;
     e.preventDefault();
-    updateStickFromPointer(rightStickRef, e.clientX, e.clientY, setRightX, setRightY);
+    updateStickFromPointer(rightStickRef, e.clientX, e.clientY, setRightX, setRightY, setRightRawX, setRightRawY);
   };
 
   const handleRightUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -150,6 +160,8 @@ export function TouchFlightControls({
     setRightPointerId(null);
     setRightX(0);
     setRightY(0);
+    setRightRawX(0);
+    setRightRawY(0);
   };
 
   const runAction = (action: () => void) => {
@@ -194,8 +206,8 @@ export function TouchFlightControls({
         />
         <div className={styles.rightLegend}>
           <span>ROLL</span>
-          <span>THRUST {Math.round(thrust * 100)}%</span>
-          <span className={boostActive ? styles.boostHot : ''}>BOOST</span>
+          <span className={centerThrustActive ? styles.boostHot : ''}>THRUST CENTER</span>
+          <span className={boostActive ? styles.boostHot : ''}>BOOST TOP</span>
         </div>
       </div>
 

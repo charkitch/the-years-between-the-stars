@@ -299,10 +299,20 @@ export class SceneRenderer {
         collisionRadius: companion.radius,
       });
     } else {
-      // Normal/exotic star sphere
-      const starGeo = new THREE.SphereGeometry(data.starRadius, 8, 8);
-      const starMat = new THREE.MeshBasicMaterial({ color: starColor });
+      // Normal/exotic star sphere — additive + transparent so glow shows through uniformly
+      const starGeo = new THREE.SphereGeometry(data.starRadius, 32, 32);
+      const starMat = new THREE.MeshBasicMaterial({
+        color: starColor,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
       starGroup.add(new THREE.Mesh(starGeo, starMat));
+
+      // Inner glow to fill the center so the star looks uniformly luminous
+      const innerGlow = makeGlowSprite(0xFFFFFF, data.starRadius * 2.5);
+      starGroup.add(innerGlow);
 
       // Glow sprite — size and presence driven by star attributes
       const starAttrs = STAR_ATTRIBUTES[data.starType];
