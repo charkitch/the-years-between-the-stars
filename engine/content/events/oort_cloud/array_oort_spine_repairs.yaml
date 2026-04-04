@@ -1,0 +1,48 @@
+id: ARRAY_OORT_SPINE_REPAIRS
+title: "REPAIR RUN: SPINE NODE"
+requires:
+  - !AnyFlagSet quasar_array_stage2_done
+  - !AnyFlagNotSet quasar_array_stage3_done
+  - !FlagNotSet quasar_array_stage1_done
+  - !FlagNotSet quasar_array_stage2_done
+narrativeLines:
+  - >-
+    This node is older than the others, wrapped around a split comet like a bracelet repaired too many times to count.
+  - >-
+    A foreman in a magnetic harness greets you at the lock. "You brought the actuator rings? Bless every star you've passed through."
+  - >-
+    The replacement parts are for a tracking gimbal that has to keep a distant quasar pinned for weeks without drift.
+  - >-
+    Nobody asks you to touch a tool. They just want the right hardware delivered intact, and maybe a second pair of eyes on what they've been seeing.
+choices:
+  - id: deliver_actuator_rings
+    label: Deliver the actuator rings and stay for debrief
+    description: "Complete repair delivery and hear the latest findings"
+    effect:
+      tradingReputation: 0
+    nextMoment:
+      narrativeLines:
+        - >-
+          During the debrief, an analyst overlays their fresh track against pre-war archival baselines.
+        - >-
+          "The war-affected sources don't just brighten and dim," she says. "Some of them precess off-axis as if the central engines were physically reconfigured."
+        - >-
+          The foreman folds his arms. "Whatever happened out there, it wasn't a clean kill-shot. It left machinery of reality bent out of true."
+      choices:
+        - id: back_comparative_study
+          label: Back a broader comparative study
+          description: "CR 650 contract payment, +Reputation, stage complete"
+          effect:
+            creditsReward: 650
+            tradingReputation: 1
+            setsFlags: [quasar_array_stage3_done]
+        - id: back_targeted_monitoring
+          label: Back tighter monitoring of known scar sites
+          description: "CR 700 priority payment, stage complete"
+          effect:
+            creditsReward: 700
+            setsFlags: [quasar_array_stage3_done]
+  - id: defer_repair_delivery
+    label: Defer the delivery
+    description: No effect
+    effect: {}

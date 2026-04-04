@@ -60,7 +60,7 @@ export function CommDialog({ onTrade, onDismiss }: CommDialogProps) {
                 <span className={styles.tradeButtons}>
                   <button
                     className={styles.tradeBtn}
-                    disabled={player.credits < entry.buyPrice}
+                    disabled={entry.qty <= 0 || player.credits < entry.buyPrice}
                     onClick={() => onTrade('buy', entry.good)}
                   >
                     BUY

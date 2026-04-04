@@ -24,7 +24,9 @@ interface TouchFlightControlsProps {
 const STICK_RADIUS = 48;
 const STICK_DEADZONE = 0.14;
 const ROLL_EDGE_THRESHOLD = 0.5;
-const CENTER_THRUST_RADIUS = 0.28;
+// Keep forward thrust engaged while the thumb is near center so moving toward boost
+// does not pass through a deceleration "dead band".
+const CENTER_THRUST_RADIUS = 0.55;
 const BOOST_TOP_Y = -0.78;
 
 export function TouchFlightControls({

@@ -66,7 +66,13 @@ fn build_system_payload(
     let faction_state = get_system_faction_state(star.id, galaxy_year, civ_state.politics);
 
     let system_choices = player_state.player_choices.get(&star.id);
-    let market = get_market(star.id, civ_state.economy, Some(&civ_state), system_choices);
+    let market = get_market(
+        star.id,
+        civ_state.economy,
+        Some(&civ_state),
+        system_choices,
+        Some(&player_state.cargo),
+    );
 
     let triggers = content::all_triggers();
 
@@ -310,7 +316,13 @@ pub fn get_system_market(system_id: u32, player_state_json: &str) -> Result<Stri
     let star = &engine.cluster[system_id as usize];
     let civ_state = get_civ_state(system_id, player_state.galaxy_year, star.economy);
     let system_choices = player_state.player_choices.get(&system_id);
-    let market = get_market(system_id, civ_state.economy, Some(&civ_state), system_choices);
+    let market = get_market(
+        system_id,
+        civ_state.economy,
+        Some(&civ_state),
+        system_choices,
+        Some(&player_state.cargo),
+    );
 
     serde_json::to_string(&market)
         .map_err(|e| JsValue::from_str(&format!("Failed to serialize: {}", e)))

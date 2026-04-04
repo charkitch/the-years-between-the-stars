@@ -191,7 +191,32 @@ interface SaveData {
 
 function migrateLegacyGoodKeys<T>(record: Partial<Record<GoodName, T>> | undefined): Partial<Record<GoodName, T>> | undefined {
   if (!record) return record;
-  const migrated = { ...record } as Partial<Record<GoodName, T>> & { Slaves?: T; 'Enslaved People'?: T };
+  const migrated = { ...record } as Partial<Record<GoodName, T>> & {
+    Slaves?: T;
+    'Enslaved People'?: T;
+    Food?: T;
+    Textiles?: T;
+    Radioactives?: T;
+    Liquor?: T;
+    Luxuries?: T;
+    Narcotics?: T;
+    Computers?: T;
+  };
+  const legacyMap: Array<[keyof typeof migrated, GoodName]> = [
+    ['Food', 'Starwind Rations'],
+    ['Textiles', 'Hullskin Lace'],
+    ['Radioactives', 'Reactor Salt'],
+    ['Liquor', 'Dream Resin'],
+    ['Luxuries', 'Embassy Masks'],
+    ['Narcotics', 'Silence Vials'],
+    ['Computers', 'Ancestral Backups'],
+  ];
+  for (const [oldKey, newKey] of legacyMap) {
+    if (migrated[oldKey] !== undefined && migrated[newKey] === undefined) {
+      migrated[newKey] = migrated[oldKey];
+    }
+    delete migrated[oldKey];
+  }
   delete migrated.Slaves;
   delete migrated['Enslaved People'];
   return migrated;

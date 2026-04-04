@@ -1,4 +1,5 @@
 use crate::prng::PRNG;
+use crate::trading::{is_luxury_good, legality_for_good, strategic_goods};
 use crate::types::*;
 
 // ─── Political clusters (70% chance to stay within cluster across eras) ─────
@@ -27,12 +28,11 @@ fn cluster_of(p: PoliticalType) -> &'static [PoliticalType] {
 // ─── Banned goods per politics ──────────────────────────────────────────────
 
 fn banned_goods(politics: PoliticalType) -> Vec<GoodName> {
-    match politics {
-        PoliticalType::Theocracy => vec![GoodName::Narcotics, GoodName::Liquor],
-        PoliticalType::MilitaryDictatorship => vec![GoodName::Narcotics, GoodName::Luxuries],
-        PoliticalType::Feudal => vec![GoodName::Computers, GoodName::Narcotics],
-        _ => vec![],
-    }
+    GoodName::ALL
+        .iter()
+        .copied()
+        .filter(|good| legality_for_good(politics, *good) == MarketLegality::Prohibited)
+        .collect()
 }
 
 fn price_modifier(politics: PoliticalType) -> f64 {
@@ -110,10 +110,16 @@ pub fn get_civ_state(system_id: u32, galaxy_year: u32, base_economy: EconomyType
 
     let banned = banned_goods(politics);
     let price_mod = price_modifier(politics);
-    let luxury_mod = if politics == PoliticalType::StagnantMilitancy { 1.30 } else { 1.0 };
+    let luxury_mod = if politics == PoliticalType::StagnantMilitancy
+        && GoodName::ALL.iter().any(|good| is_luxury_good(*good))
+    {
+        1.30
+    } else {
+        1.0
+    };
     let anarchy_variance = politics == PoliticalType::Anarchist;
     let tech_bonus = if politics == PoliticalType::Technocracy {
-        vec![GoodName::Computers, GoodName::Radioactives]
+        strategic_goods()
     } else {
         vec![]
     };
@@ -155,7 +161,7 @@ mod tests {
 
     #[test]
     fn banned_goods_populated() {
-        // Theocracy should ban Narcotics and Liquor
+        // Theocracy should ban at least one vice/juridical good.
         let state = CivilizationState {
             system_id: 0, galaxy_year: 3200, era: 12,
             politics: PoliticalType::Theocracy,
@@ -164,7 +170,7 @@ mod tests {
             price_modifier: 1.15, luxury_mod: 1.0,
             anarchy_variance: false, tech_bonus: vec![],
         };
-        assert!(state.banned_goods.contains(&GoodName::Narcotics));
-        assert!(state.banned_goods.contains(&GoodName::Liquor));
+        assert!(state.banned_goods.contains(&GoodName::DreamResin));
+        assert!(state.banned_goods.contains(&GoodName::JurisdictionSeals));
     }
 }

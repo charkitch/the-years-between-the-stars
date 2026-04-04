@@ -14,24 +14,70 @@ pub const STARTING_FUEL: f64 = 7.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum GoodName {
-    Food,
-    Textiles,
-    Radioactives,
-    Liquor,
-    Luxuries,
-    Narcotics,
-    Computers,
+    #[serde(rename = "Starwind Rations")]
+    StarwindRations,
+    #[serde(rename = "Hullskin Lace")]
+    HullskinLace,
+    #[serde(rename = "Burial Sunstone")]
+    BurialSunstone,
+    #[serde(rename = "Rain Choir Spools")]
+    RainChoirSpools,
+    #[serde(rename = "Reactor Salt")]
+    ReactorSalt,
+    #[serde(rename = "Pilgrim Maps")]
+    PilgrimMaps,
+    #[serde(rename = "Witness Ink")]
+    WitnessInk,
+    #[serde(rename = "Gravitic Bone")]
+    GraviticBone,
+    #[serde(rename = "Embassy Masks")]
+    EmbassyMasks,
+    #[serde(rename = "Dream Resin")]
+    DreamResin,
+    #[serde(rename = "Silence Vials")]
+    SilenceVials,
+    #[serde(rename = "Jurisdiction Seals")]
+    JurisdictionSeals,
+    #[serde(rename = "Debt Petals")]
+    DebtPetals,
+    #[serde(rename = "Memory Caskets")]
+    MemoryCaskets,
+    #[serde(rename = "Oath Filaments")]
+    OathFilaments,
+    #[serde(rename = "Quasar Glass")]
+    QuasarGlass,
+    #[serde(rename = "Weather Keys")]
+    WeatherKeys,
+    #[serde(rename = "Ancestral Backups")]
+    AncestralBackups,
+    #[serde(rename = "Surrender Codes")]
+    SurrenderCodes,
+    #[serde(rename = "Impossible Seeds")]
+    ImpossibleSeeds,
 }
 
 impl GoodName {
     pub const ALL: &'static [GoodName] = &[
-        GoodName::Food,
-        GoodName::Textiles,
-        GoodName::Radioactives,
-        GoodName::Liquor,
-        GoodName::Luxuries,
-        GoodName::Narcotics,
-        GoodName::Computers,
+        GoodName::StarwindRations,
+        GoodName::HullskinLace,
+        GoodName::BurialSunstone,
+        GoodName::RainChoirSpools,
+        GoodName::ReactorSalt,
+        GoodName::PilgrimMaps,
+        GoodName::WitnessInk,
+        GoodName::GraviticBone,
+        GoodName::EmbassyMasks,
+        GoodName::DreamResin,
+        GoodName::SilenceVials,
+        GoodName::JurisdictionSeals,
+        GoodName::DebtPetals,
+        GoodName::MemoryCaskets,
+        GoodName::OathFilaments,
+        GoodName::QuasarGlass,
+        GoodName::WeatherKeys,
+        GoodName::AncestralBackups,
+        GoodName::SurrenderCodes,
+        GoodName::ImpossibleSeeds,
     ];
 }
 
@@ -364,6 +410,21 @@ pub struct SystemFactionState {
 
 // ─── Trading ────────────────────────────────────────────────────────────────
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MarketListingMode {
+    ListedBuySell,
+    SellOnly,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MarketLegality {
+    Legal,
+    Licensed,
+    Prohibited,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MarketEntry {
@@ -372,6 +433,8 @@ pub struct MarketEntry {
     pub sell_price: i32,
     pub stock: i32,
     pub banned: bool,
+    pub listing_mode: MarketListingMode,
+    pub legality: MarketLegality,
 }
 
 // ─── Player / Choices ───────────────────────────────────────────────────────
@@ -488,6 +551,9 @@ pub enum EventCondition {
     MinCluster(u32),
     MinReputation(i32),
     FlagSet(String),
+    FlagNotSet(String),
+    AnyFlagSet(String),
+    AnyFlagNotSet(String),
     SurfaceIs(Vec<SurfaceType>),
     TriggerFired(String),
 }

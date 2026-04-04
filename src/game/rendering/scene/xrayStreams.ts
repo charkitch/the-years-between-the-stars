@@ -11,6 +11,10 @@ const _streamVecG = new THREE.Vector3();
 const _streamVecH = new THREE.Vector3();
 const _streamVecI = new THREE.Vector3();
 const _streamVecJ = new THREE.Vector3();
+const _streamVecK = new THREE.Vector3();
+const _streamVecL = new THREE.Vector3();
+const _streamVecM = new THREE.Vector3();
+const _streamQuatA = new THREE.Quaternion();
 
 let xRayStreamRibbonTexture: THREE.CanvasTexture | null = null;
 
@@ -66,26 +70,28 @@ function getXRayStreamRibbonTexture(): THREE.CanvasTexture {
   return xRayStreamRibbonTexture;
 }
 
-function writeQuadraticPoint(
+function writeCubicPoint(
   target: Float32Array,
   offset: number,
   start: THREE.Vector3,
-  control: THREE.Vector3,
+  controlA: THREE.Vector3,
+  controlB: THREE.Vector3,
   end: THREE.Vector3,
   t: number,
 ): void {
   const omt = 1 - t;
-  const a = omt * omt;
-  const b = 2 * omt * t;
-  const c = t * t;
-  target[offset] = start.x * a + control.x * b + end.x * c;
-  target[offset + 1] = start.y * a + control.y * b + end.y * c;
-  target[offset + 2] = start.z * a + control.z * b + end.z * c;
+  const a = omt * omt * omt;
+  const b = 3 * omt * omt * t;
+  const c = 3 * omt * t * t;
+  const d = t * t * t;
+  target[offset] = start.x * a + controlA.x * b + controlB.x * c + end.x * d;
+  target[offset + 1] = start.y * a + controlA.y * b + controlB.y * c + end.y * d;
+  target[offset + 2] = start.z * a + controlA.z * b + controlB.z * c + end.z * d;
 }
 
 export function createXRayTransferStream(donorColorValue: number, diskImpactRadius: number): XRayTransferStream {
   const donorColor = new THREE.Color(donorColorValue);
-  const highlightColor = donorColor.clone().lerp(new THREE.Color(0xFFF7EE), 0.62);
+  const highlightColor = donorColor.clone().lerp(new THREE.Color(0xFFF7EE), 0.2);
   const ribbonSegmentCount = 44;
 
   const curveBuffer = new Float32Array(36 * 3);
@@ -114,7 +120,7 @@ export function createXRayTransferStream(donorColorValue: number, diskImpactRadi
       .setAttribute('position', new THREE.BufferAttribute(tubePositions, 3))
       .setIndex(new THREE.BufferAttribute(tubeIndices, 1)),
     new THREE.MeshBasicMaterial({
-      color: highlightColor,
+      color: donorColor,
       transparent: true,
       opacity: 0.72,
       blending: THREE.AdditiveBlending,
@@ -129,7 +135,9 @@ export function createXRayTransferStream(donorColorValue: number, diskImpactRadi
   const ribbonIndices = new Uint16Array((ribbonSegmentCount - 1) * 6);
   for (let i = 0; i < ribbonSegmentCount; i++) {
     const t = i / (ribbonSegmentCount - 1);
-    const color = donorColor.clone().lerp(highlightColor, 0.18 + Math.sin(t * Math.PI) * 0.4);
+    // Keep donor tint across most of the stream; brighten near disk impact.
+    const impactRamp = THREE.MathUtils.smoothstep(t, 0.76, 1.0);
+    const color = donorColor.clone().lerp(highlightColor, impactRamp * 0.7);
     for (let side = 0; side < 2; side++) {
       const vertexIndex = i * 2 + side;
       ribbonColors[vertexIndex * 3] = color.r;
@@ -157,7 +165,7 @@ export function createXRayTransferStream(donorColorValue: number, diskImpactRadi
       .setAttribute('uv', new THREE.BufferAttribute(ribbonUvs, 2))
       .setIndex(new THREE.BufferAttribute(ribbonIndices, 1)),
     new THREE.MeshBasicMaterial({
-      color: highlightColor,
+      color: 0xffffff,
       map: getXRayStreamRibbonTexture(),
       alphaMap: getXRayStreamRibbonTexture(),
       vertexColors: true,
@@ -172,7 +180,7 @@ export function createXRayTransferStream(donorColorValue: number, diskImpactRadi
   return {
     donorId: 'companion-star',
     accretorId: 'star',
-    curveBias: 0.22,
+    curveBias: 0.30,
     phase: Math.random() * Math.PI * 2,
     flowSpeed: 0.065,
     diskImpactRadius,
@@ -207,16 +215,33 @@ export function updateXRayTransferStreams(params: {
     toAccretor.normalize();
     const donorPos = _streamVecJ.copy(donorCenter).addScaledVector(toAccretor, donor.collisionRadius);
 
-    const diskTarget = _streamVecE.copy(donorCenter).sub(accretorPos);
-    diskTarget.y = 0;
-    if (diskTarget.lengthSq() < 1e-6) {
-      diskTarget.set(1, 0, 0);
-    } else {
-      diskTarget.normalize();
+    const diskNormal = _streamVecK.set(0, 1, 0);
+    if (xbDiskGroup) {
+      xbDiskGroup.getWorldQuaternion(_streamQuatA);
+      diskNormal.applyQuaternion(_streamQuatA).normalize();
     }
-    const diskDirX = diskTarget.x;
-    diskTarget.multiplyScalar(stream.diskImpactRadius).add(accretorPos);
-    diskTarget.y = accretorPos.y + diskDirX * stream.diskImpactRadius * Math.tan(0.45);
+
+    const diskRadial = _streamVecE.copy(donorCenter).sub(accretorPos);
+    // Project donor direction into the disk plane to find a natural impact azimuth.
+    diskRadial.addScaledVector(diskNormal, -diskRadial.dot(diskNormal));
+    if (diskRadial.lengthSq() < 1e-6) {
+      diskRadial.set(1, 0, 0);
+    } else {
+      diskRadial.normalize();
+    }
+    const diskTangent = _streamVecM.crossVectors(diskNormal, diskRadial);
+    if (diskTangent.lengthSq() < 1e-6) {
+      diskTangent.set(0, 0, 1);
+    } else {
+      diskTangent.normalize();
+    }
+
+    // Impact point sits just inside disk rim, then leads tangentially for a smoother capture.
+    const diskTarget = _streamVecL.copy(diskRadial)
+      .multiplyScalar(stream.diskImpactRadius * 0.82)
+      .add(accretorPos);
+    diskTarget.addScaledVector(diskTangent, stream.diskImpactRadius * -0.48);
+    diskTarget.addScaledVector(diskNormal, Math.sin(time * 0.75 + stream.phase) * Math.max(stream.diskImpactRadius * 0.012, 1.5));
 
     const flow = _streamVecA.copy(diskTarget).sub(donorPos);
     const dist = flow.length();
@@ -224,15 +249,22 @@ export function updateXRayTransferStreams(params: {
 
     flow.normalize();
     const lateral = _streamVecB.set(-flow.z, 0, flow.x).normalize();
-    const control = _streamVecC.copy(donorPos).lerp(diskTarget, 0.58);
-    control.addScaledVector(lateral, Math.max(dist * stream.curveBias, 65));
-    control.y += Math.sin(time * 0.32 + stream.phase) * Math.max(dist * 0.015, 4);
+
+    const controlA = _streamVecC.copy(donorPos).lerp(diskTarget, 0.34);
+    controlA.addScaledVector(lateral, Math.max(dist * stream.curveBias, 65));
+    controlA.addScaledVector(diskNormal, Math.sin(time * 0.32 + stream.phase) * Math.max(dist * 0.012, 3));
+
+    // Lock terminal tangent to disk direction of travel near impact.
+    const endTangentLen = Math.max(stream.diskImpactRadius * 1.1, 62);
+    const controlB = _streamVecB.copy(diskTarget)
+      .addScaledVector(diskTangent, endTangentLen)
+      .addScaledVector(diskNormal, -Math.max(stream.diskImpactRadius * 0.03, 2));
 
     const curveBuffer = stream.curveBuffer;
     const curvePointCount = curveBuffer.length / 3;
     for (let i = 0; i < curvePointCount; i++) {
       const t = i / (curvePointCount - 1);
-      writeQuadraticPoint(curveBuffer, i * 3, donorPos, control, diskTarget, t);
+      writeCubicPoint(curveBuffer, i * 3, donorPos, controlA, controlB, diskTarget, t);
     }
 
     const tubeAttr = stream.spine.geometry.attributes.position as THREE.BufferAttribute;
@@ -277,7 +309,7 @@ export function updateXRayTransferStreams(params: {
     tubeAttr.needsUpdate = true;
 
     const spineMat = stream.spine.material as THREE.MeshBasicMaterial;
-    spineMat.color.copy(stream.highlightColor);
+    spineMat.color.copy(stream.donorColor).lerp(stream.highlightColor, 0.3);
 
     const cameraPos = camera.getWorldPosition(_streamVecG);
     const ribbonAttr = stream.ribbon.geometry.attributes.position as THREE.BufferAttribute;
@@ -329,7 +361,7 @@ export function updateXRayTransferStreams(params: {
     ribbonAttr.needsUpdate = true;
 
     const ribbonMat = stream.ribbon.material as THREE.MeshBasicMaterial;
-    ribbonMat.color.copy(stream.highlightColor);
+    ribbonMat.color.set(0xffffff);
     ribbonMat.opacity = 0.34 + Math.sin(time * 0.22 + stream.phase) * 0.04;
     if (ribbonMat.map) {
       ribbonMat.map.offset.x = -time * stream.flowSpeed;
@@ -340,9 +372,10 @@ export function updateXRayTransferStreams(params: {
   }
 
   if (xbDiskGroup) {
-    const disk = xbDiskGroup.children[0] as THREE.Mesh;
-    const innerRing = xbDiskGroup.children[1] as THREE.Mesh;
-    const brightArc = xbDiskGroup.children[3] as THREE.Mesh;
+    const disk = (xbDiskGroup.userData.disk as THREE.Object3D | undefined) ?? xbDiskGroup.children[0];
+    const innerRing = (xbDiskGroup.userData.innerRing as THREE.Object3D | undefined) ?? xbDiskGroup.children[1];
+    const brightArc = (xbDiskGroup.userData.brightArc as THREE.Object3D | undefined) ?? xbDiskGroup.children[3];
+    if (!disk || !innerRing || !brightArc) return;
     disk.rotation.z = 0.45 + time * 0.06;
     innerRing.rotation.z = 0.54 + time * 0.10;
     brightArc.rotation.z = 0.62 + time * 0.08;

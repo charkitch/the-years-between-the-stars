@@ -63,7 +63,7 @@ const COMM_PAIRS: [string, string][] = [
   ],
   [
     "Manifest's light this run. Economy.",
-    "If you need Food or Textiles, we're your best offer this side of the ring.",
+    "If you need Starwind Rations or Hullskin Lace, we're your best offer this side of the ring.",
   ],
   [
     "Sector patrol's been heavy. Keep your transponder clean.",

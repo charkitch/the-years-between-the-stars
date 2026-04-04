@@ -176,6 +176,8 @@ export interface MarketEntry {
   sellPrice: number;
   stock: number;
   banned: boolean;
+  listingMode: 'listed_buy_sell' | 'sell_only';
+  legality: 'legal' | 'licensed' | 'prohibited';
 }
 
 export interface ChoiceEffect {

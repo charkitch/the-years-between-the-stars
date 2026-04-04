@@ -48,6 +48,10 @@ pub fn asteroid_base_events() -> Vec<GameEvent> {
 
 pub fn oort_cloud_base_events() -> Vec<GameEvent> {
     load_events(&[
+        ("oort_cloud/array_oort_briefing.yaml", include_str!("../content/events/oort_cloud/array_oort_briefing.yaml")),
+        ("oort_cloud/array_ice_node.yaml", include_str!("../content/events/oort_cloud/array_ice_node.yaml")),
+        ("oort_cloud/array_oort_spine_repairs.yaml", include_str!("../content/events/oort_cloud/array_oort_spine_repairs.yaml")),
+        ("oort_cloud/array_oort_final_manifest.yaml", include_str!("../content/events/oort_cloud/array_oort_final_manifest.yaml")),
         ("oort_cloud/the_listener.yaml", include_str!("../content/events/oort_cloud/the_listener.yaml")),
         ("oort_cloud/ice_monks.yaml", include_str!("../content/events/oort_cloud/ice_monks.yaml")),
         ("oort_cloud/frozen_derelict.yaml", include_str!("../content/events/oort_cloud/frozen_derelict.yaml")),

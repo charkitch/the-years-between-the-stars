@@ -12,6 +12,9 @@ const _shellBasis = new THREE.Matrix4();
 const _dysonSampleWorld = new THREE.Vector3();
 const _dysonNpcLocalPos = new THREE.Vector3();
 const _dysonNpcTargetWorld = new THREE.Vector3();
+const _tidalForward = new THREE.Vector3(1, 0, 0);
+const _tidalToTarget = new THREE.Vector3();
+const _tidalQuat = new THREE.Quaternion();
 
 function angleDelta(a: number, b: number): number {
   return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -84,6 +87,18 @@ export function updateOrbitalEntities(entities: Map<string, SceneEntity>, time: 
     if (entity.type === 'dyson_shell') {
       orientDysonShell(entity);
     }
+  }
+
+  // Second pass so all world positions are current before tidal orientation.
+  for (const [, entity] of entities) {
+    if (!entity.tidalTargetId) continue;
+    const target = entities.get(entity.tidalTargetId);
+    if (!target) continue;
+    _tidalToTarget.copy(target.worldPos).sub(entity.worldPos);
+    if (_tidalToTarget.lengthSq() < 1e-8) continue;
+    _tidalToTarget.normalize();
+    _tidalQuat.setFromUnitVectors(_tidalForward, _tidalToTarget);
+    entity.group.quaternion.copy(_tidalQuat);
   }
 }
 

@@ -18,6 +18,7 @@ export interface SceneEntity {
   collisionSampleRadius?: number;
   collisionSamplesLocal?: THREE.Vector3[];
   collisionSamplesWorld?: THREE.Vector3[];
+  tidalTargetId?: string;
 }
 
 export interface XRayTransferStream {

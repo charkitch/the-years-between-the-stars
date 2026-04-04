@@ -32,6 +32,12 @@ fn system_choices_or_default<'a>(ctx: &'a EventContext<'a>) -> SystemChoices {
 
 fn check_condition(cond: &EventCondition, ctx: &EventContext) -> bool {
     let choices = system_choices_or_default(ctx);
+    let any_system_has_flag = |flag: &str| {
+        ctx.player_state
+            .player_choices
+            .values()
+            .any(|c| c.flags.contains(flag))
+    };
     match cond {
         EventCondition::PoliticsIs(pols) => pols.contains(&ctx.civ_state.politics),
         EventCondition::MinGalaxyYear(y) => ctx.civ_state.galaxy_year >= *y,
@@ -51,6 +57,9 @@ fn check_condition(cond: &EventCondition, ctx: &EventContext) -> bool {
         EventCondition::MinCluster(n) => ctx.current_cluster >= *n,
         EventCondition::MinReputation(r) => choices.trading_reputation >= *r,
         EventCondition::FlagSet(flag) => choices.flags.contains(flag),
+        EventCondition::FlagNotSet(flag) => !choices.flags.contains(flag),
+        EventCondition::AnyFlagSet(flag) => any_system_has_flag(flag),
+        EventCondition::AnyFlagNotSet(flag) => !any_system_has_flag(flag),
         EventCondition::SurfaceIs(surfaces) => {
             ctx.surface.map_or(false, |surface| surfaces.contains(&surface))
         }
@@ -158,7 +167,7 @@ mod tests {
     fn event_counts() {
         assert_eq!(content::landing_events().len(), 10);
         assert_eq!(content::asteroid_base_events().len(), 5);
-        assert_eq!(content::oort_cloud_base_events().len(), 3);
+        assert_eq!(content::oort_cloud_base_events().len(), 7);
         assert_eq!(content::maximum_space_events().len(), 3);
         assert_eq!(content::triggered_events().len(), 1);
     }

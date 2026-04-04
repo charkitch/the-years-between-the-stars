@@ -1,0 +1,48 @@
+id: ARRAY_ICE_NODE
+title: "LENS RUN: ICE NODE"
+requires:
+  - !AnyFlagSet quasar_array_stage1_done
+  - !AnyFlagNotSet quasar_array_stage2_done
+  - !FlagNotSet quasar_array_stage1_done
+narrativeLines:
+  - >-
+    This station hangs off a slow-rolling comet spine, all frost, work lights, and careful hands.
+  - >-
+    A technician meets you at the hatch, sees the shock crate in your hold manifest, and exhales with obvious relief.
+  - >-
+    "That lens assembly is our spare for the widefield branch," she says. "We lost the old one to microfracture."
+  - >-
+    Over tea that tastes faintly of copper, she shows you a wall display: quasar afterglow curves from war-affected targets drifting out of model range.
+choices:
+  - id: hand_off_lens
+    label: Hand over the lens crate and stay to talk
+    description: "Complete delivery and hear what this node has seen"
+    effect:
+      tradingReputation: 0
+    nextMoment:
+      narrativeLines:
+        - >-
+          They install the assembly while you wait by the thermal lock.
+        - >-
+          The technician points at two traces on her console. "See this? Control quasar is boring. War-scarred quasar keeps 'ringing' like it remembers being struck."
+        - >-
+          "If this is physical recovery and not noise, somebody fought on scales we still don't know how to measure."
+      choices:
+        - id: encourage_open_briefing
+          label: Encourage them to brief the public sciences nets
+          description: "CR 450 delivery pay, +Reputation, stage complete"
+          effect:
+            creditsReward: 450
+            tradingReputation: 1
+            fuelReward: 0.4
+            setsFlags: [quasar_array_stage2_done]
+        - id: recommend_caution
+          label: Recommend caution until the next node confirms
+          description: "CR 550 discretion pay, stage complete"
+          effect:
+            creditsReward: 550
+            setsFlags: [quasar_array_stage2_done]
+  - id: postpone_handoff
+    label: Keep the crate aboard for now
+    description: No effect
+    effect: {}

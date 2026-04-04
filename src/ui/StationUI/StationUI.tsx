@@ -30,17 +30,21 @@ export function StationUI({ onUndock }: StationUIProps) {
   if (!starData || !civState || !market) return null;
   const cargoTotal = Object.values(player.cargo).reduce((sum, qty) => sum + (qty ?? 0), 0);
   const cargoSpace = MAX_CARGO - cargoTotal;
+  const listedMarket = market.filter(entry => entry.listingMode === 'listed_buy_sell');
+  const sellOnlyMarket = market.filter(
+    entry => entry.listingMode === 'sell_only' && (player.cargo[entry.good] ?? 0) > 0,
+  );
 
   const handleBuy = (good: GoodName, price: number, stock: number, banned: boolean) => {
-    if (banned || stock === 0 || cargoSpace === 0 || player.credits < price) return;
+    if (banned || stock <= 0 || cargoSpace === 0 || player.credits < price) return;
     addCredits(-price);
     addCargo(good, 1, price);
     saveGame();
   };
 
-  const handleSell = (good: GoodName, price: number) => {
+  const handleSell = (good: GoodName, price: number, banned: boolean) => {
     const qty = player.cargo[good] ?? 0;
-    if (qty === 0) return;
+    if (qty === 0 || banned || price <= 0) return;
     addCredits(price);
     removeCargo(good, 1);
     saveGame();
@@ -117,70 +121,145 @@ export function StationUI({ onUndock }: StationUIProps) {
         </div>
 
         {tab === 'trade' && (
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>COMMODITY</th>
-                <th>BUY</th>
-                <th>SELL</th>
-                <th>PAID</th>
-                <th>STOCK</th>
-                <th>HELD</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {market.map(({ good, buyPrice, sellPrice, stock, banned }) => {
-                const held = player.cargo[good] ?? 0;
-                const avgPaid = player.cargoCostBasis[good];
-                const canBuy = !banned && stock > 0 && cargoSpace > 0 && player.credits >= buyPrice;
-                const canSell = held > 0;
-                const profit = avgPaid !== undefined ? sellPrice - avgPaid : null;
-                return (
-                  <tr key={good} style={banned ? { opacity: 0.45 } : undefined}>
-                    <td>
-                      {good}
-                      {banned && (
-                        <span style={{ color: 'var(--color-danger)', fontSize: '9px', marginLeft: 6, letterSpacing: 1 }}>
-                          PROHIBITED
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>LISTED FOR PURCHASE</th>
+                  <th>BUY</th>
+                  <th>SELL</th>
+                  <th>PAID</th>
+                  <th>STOCK</th>
+                  <th>HELD</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {listedMarket.map(({ good, buyPrice, sellPrice, stock, banned, legality }) => {
+                  const held = player.cargo[good] ?? 0;
+                  const avgPaid = player.cargoCostBasis[good];
+                  const canBuy = !banned && stock > 0 && cargoSpace > 0 && player.credits >= buyPrice;
+                  const canSell = held > 0 && !banned && sellPrice > 0;
+                  const profit = avgPaid !== undefined ? sellPrice - avgPaid : null;
+                  return (
+                    <tr key={`listed-${good}`} style={banned ? { opacity: 0.45 } : undefined}>
+                      <td>
+                        {good}
+                        {legality === 'licensed' && (
+                          <span style={{ color: 'var(--color-warning)', fontSize: '9px', marginLeft: 6, letterSpacing: 1 }}>
+                            LICENSED
+                          </span>
+                        )}
+                        {banned && (
+                          <span style={{ color: 'var(--color-danger)', fontSize: '9px', marginLeft: 6, letterSpacing: 1 }}>
+                            PROHIBITED
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ color: banned ? 'inherit' : 'var(--color-hud)' }}>
+                        {!banned ? buyPrice : '—'}
+                      </td>
+                      <td>
+                        <span style={{ color: profit === null ? 'var(--color-warning)' : profit >= 0 ? '#44FF88' : '#FF4422' }}>
+                          {!banned ? sellPrice : '—'}
                         </span>
-                      )}
-                    </td>
-                    <td style={{ color: banned ? 'inherit' : 'var(--color-hud)' }}>
-                      {!banned ? buyPrice : '—'}
-                    </td>
-                    <td>
-                      <span style={{ color: profit === null ? 'var(--color-warning)' : profit >= 0 ? '#44FF88' : '#FF4422' }}>
-                        {sellPrice}
-                      </span>
-                      {profit !== null && (
-                        <span style={{ fontSize: '9px', marginLeft: 4, opacity: 0.8, color: profit >= 0 ? '#44FF88' : '#FF4422' }}>
-                          {profit >= 0 ? '+' : ''}{Math.round(profit)}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ opacity: held > 0 ? 1 : 0.35, color: 'var(--color-hud-dim)' }}>
-                      {avgPaid !== undefined ? Math.round(avgPaid) : '—'}
-                    </td>
-                    <td style={{ opacity: 0.7 }}>{!banned ? stock : '—'}</td>
-                    <td style={{ color: held > 0 ? 'var(--color-station)' : 'inherit' }}>{held}</td>
-                    <td style={{ display: 'flex', gap: '4px' }}>
-                      <button
-                        className={styles.buyBtn}
-                        disabled={!canBuy}
-                        onClick={() => handleBuy(good, buyPrice, stock, banned)}
-                      >BUY</button>
-                      <button
-                        className={`${styles.buyBtn} ${styles.sellBtn}`}
-                        disabled={!canSell}
-                        onClick={() => handleSell(good, sellPrice)}
-                      >SELL</button>
+                        {profit !== null && !banned && (
+                          <span style={{ fontSize: '9px', marginLeft: 4, opacity: 0.8, color: profit >= 0 ? '#44FF88' : '#FF4422' }}>
+                            {profit >= 0 ? '+' : ''}{Math.round(profit)}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ opacity: held > 0 ? 1 : 0.35, color: 'var(--color-hud-dim)' }}>
+                        {avgPaid !== undefined ? Math.round(avgPaid) : '—'}
+                      </td>
+                      <td style={{ opacity: 0.7 }}>{!banned ? stock : '—'}</td>
+                      <td style={{ color: held > 0 ? 'var(--color-station)' : 'inherit' }}>{held}</td>
+                      <td style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          className={styles.buyBtn}
+                          disabled={!canBuy}
+                          onClick={() => handleBuy(good, buyPrice, stock, banned)}
+                        >BUY</button>
+                        <button
+                          className={`${styles.buyBtn} ${styles.sellBtn}`}
+                          disabled={!canSell}
+                          onClick={() => handleSell(good, sellPrice, banned)}
+                        >SELL</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>SELL OPPORTUNITIES</th>
+                  <th>BUY</th>
+                  <th>SELL</th>
+                  <th>PAID</th>
+                  <th>STOCK</th>
+                  <th>HELD</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {sellOnlyMarket.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ opacity: 0.55 }}>
+                      No off-manifest buyers for your current cargo.
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ) : (
+                  sellOnlyMarket.map(({ good, sellPrice, banned, legality }) => {
+                    const held = player.cargo[good] ?? 0;
+                    const avgPaid = player.cargoCostBasis[good];
+                    const profit = avgPaid !== undefined ? sellPrice - avgPaid : null;
+                    const canSell = held > 0 && !banned && sellPrice > 0;
+                    return (
+                      <tr key={`sellonly-${good}`} style={banned ? { opacity: 0.45 } : undefined}>
+                        <td>
+                          {good}
+                          <span style={{ color: 'var(--color-station)', fontSize: '9px', marginLeft: 6, letterSpacing: 1 }}>
+                            SELL-ONLY
+                          </span>
+                          {legality === 'licensed' && (
+                            <span style={{ color: 'var(--color-warning)', fontSize: '9px', marginLeft: 6, letterSpacing: 1 }}>
+                              LICENSED
+                            </span>
+                          )}
+                        </td>
+                        <td>—</td>
+                        <td>
+                          <span style={{ color: profit === null ? 'var(--color-warning)' : profit >= 0 ? '#44FF88' : '#FF4422' }}>
+                            {sellPrice}
+                          </span>
+                          {profit !== null && (
+                            <span style={{ fontSize: '9px', marginLeft: 4, opacity: 0.8, color: profit >= 0 ? '#44FF88' : '#FF4422' }}>
+                              {profit >= 0 ? '+' : ''}{Math.round(profit)}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ opacity: held > 0 ? 1 : 0.35, color: 'var(--color-hud-dim)' }}>
+                          {avgPaid !== undefined ? Math.round(avgPaid) : '—'}
+                        </td>
+                        <td>—</td>
+                        <td style={{ color: held > 0 ? 'var(--color-station)' : 'inherit' }}>{held}</td>
+                        <td style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            className={`${styles.buyBtn} ${styles.sellBtn}`}
+                            disabled={!canSell}
+                            onClick={() => handleSell(good, sellPrice, banned)}
+                          >SELL</button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {tab === 'refuel' && (

@@ -26,7 +26,7 @@ import type { FleetBattle } from '../mechanics/FleetBattleSystem';
 import { getFaction } from '../data/factions';
 import { PRNG } from '../generation/prng';
 import { CLUSTER_SEED, RENDER_CONFIG } from '../constants';
-import { createBlackHoleGroup } from './scene/blackHoleVisuals';
+import { createBlackHoleGroup, createXRayAccretorGroup } from './scene/blackHoleVisuals';
 import type { SceneEntity, XRayTransferStream } from './scene/types';
 import { createXRayTransferStream, updateXRayTransferStreams } from './scene/xrayStreams';
 import {
@@ -41,6 +41,34 @@ export type { SceneEntity } from './scene/types';
 const GALAXY_SEED = 0x5AFEF00D;
 const STARFIELD_POS_SCALE = (Math.PI / 2) / 100;
 const STARFIELD_YEAR_SCALE = 0.0002;
+
+function createTidallyBulgedDonorMesh(radius: number, color: number): THREE.Mesh {
+  const geometry = new THREE.SphereGeometry(radius, 24, 16);
+  const positions = geometry.attributes.position;
+  const bulgeStrength = radius * 0.14;
+  const sideCompression = 0.09;
+
+  for (let i = 0; i < positions.count; i++) {
+    const x = positions.getX(i);
+    const y = positions.getY(i);
+    const z = positions.getZ(i);
+    const nx = x / radius;
+
+    // Local +X points toward the accretor via per-frame tidal orientation.
+    const towardAccretor = Math.max(0, nx);
+    const displacedX = x + bulgeStrength * towardAccretor * towardAccretor;
+    const displacedY = y * (1 - sideCompression * towardAccretor);
+    const displacedZ = z * (1 - sideCompression * towardAccretor);
+    const displacedR = Math.sqrt(displacedX * displacedX + displacedY * displacedY + displacedZ * displacedZ);
+    const scale = radius / Math.max(displacedR, 1e-4);
+
+    positions.setXYZ(i, displacedX * scale, displacedY * scale, displacedZ * scale);
+  }
+
+  positions.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color }));
+}
 
 function computeDysonCollisionSamples(
   curveRadius: number,
@@ -239,19 +267,29 @@ export class SceneRenderer {
       this.starLight = new THREE.PointLight(0xFF8B47, 0.9, 60000);
       this.scene.add(this.starLight);
       this.systemObjects.push(this.starLight);
-    } else if (data.starType === 'XB' && data.companion) {
+    } else if ((data.starType === 'XB' || data.starType === 'XBB') && data.companion) {
       const companion = data.companion;
+      const isBurster = data.starType === 'XBB';
+      const compactRadius = isBurster ? data.starRadius * 1.12 : data.starRadius;
+      const diskHaloMul = isBurster ? 11.8 : 10.5;
+      const diskHaloOpacity = isBurster ? 0.29 : 0.24;
 
-      // Compact accretor — same visual language as BH, but brighter in X-ray.
-      this.xbDiskGroup = createBlackHoleGroup(data.starRadius, true);
+      // Compact accretor visuals: BH for XB, neutron-star core for XBB.
+      this.xbDiskGroup = createXRayAccretorGroup({
+        radius: compactRadius,
+        accretorKind: isBurster ? 'neutron_star' : 'black_hole',
+        donorColor: companion.color,
+        diskTintStrength: 0.82,
+      });
       starGroup.add(this.xbDiskGroup);
 
-      const diskHalo = makeGlowSprite(0xA9DCFF, data.starRadius * 10.5);
+      const diskHalo = makeGlowSprite(0xA9DCFF, data.starRadius * diskHaloMul);
       const diskHaloMat = diskHalo.material as THREE.SpriteMaterial;
-      diskHaloMat.opacity = 0.24;
+      diskHaloMat.opacity = diskHaloOpacity;
       starGroup.add(diskHalo);
 
-      const xRayCorona = makeGlowSprite(starColor, data.starRadius * 12.6);
+      const accretorLightColor = isBurster ? 0xCFE5FF : starColor;
+      const xRayCorona = makeGlowSprite(accretorLightColor, data.starRadius * 12.6);
       const xRayCoronaMat = xRayCorona.material as THREE.SpriteMaterial;
       xRayCoronaMat.opacity = 0.24;
       starGroup.add(xRayCorona);
@@ -259,7 +297,7 @@ export class SceneRenderer {
       // Light travels with the compact object group (no static starLight needed)
       if (this.starLight) this.scene.remove(this.starLight);
       this.starLight = null;
-      starGroup.add(new THREE.PointLight(starColor, 2, 60000));
+      starGroup.add(new THREE.PointLight(accretorLightColor, 2, 60000));
 
       // Compact object orbits opposite the companion, closer to CoM
       starOrbitRadius = companion.orbitRadius * 0.4;
@@ -272,10 +310,7 @@ export class SceneRenderer {
 
       // Companion star
       const companionGroup = new THREE.Group();
-      companionGroup.add(new THREE.Mesh(
-        new THREE.SphereGeometry(companion.radius, 8, 8),
-        new THREE.MeshBasicMaterial({ color: companion.color }),
-      ));
+      companionGroup.add(createTidallyBulgedDonorMesh(companion.radius, companion.color));
       companionGroup.add(makeGlowSprite(companion.color, companion.radius * 6));
       companionGroup.add(new THREE.PointLight(companion.color, 1.5, 60000));
       companionGroup.position.set(
@@ -297,16 +332,13 @@ export class SceneRenderer {
           Math.sin(companion.orbitPhase) * companion.orbitRadius,
         ),
         collisionRadius: companion.radius,
+        tidalTargetId: 'star',
       });
     } else {
-      // Normal/exotic star sphere — additive + transparent so glow shows through uniformly
+      // Normal/exotic star sphere. Keep the core opaque so bodies behind it are fully occluded.
       const starGeo = new THREE.SphereGeometry(data.starRadius, 32, 32);
       const starMat = new THREE.MeshBasicMaterial({
         color: starColor,
-        transparent: true,
-        opacity: 0.85,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
       });
       starGroup.add(new THREE.Mesh(starGeo, starMat));
 
@@ -378,8 +410,10 @@ export class SceneRenderer {
       collisionRadius: data.starRadius,
     });
 
-    if (data.starType === 'XB' && data.companion) {
-      const transferStream = createXRayTransferStream(data.companion.color, data.starRadius * 2.2);
+    if ((data.starType === 'XB' || data.starType === 'XBB') && data.companion) {
+      const captureRadiusRaw = this.xbDiskGroup?.userData.captureRadius;
+      const captureRadius = typeof captureRadiusRaw === 'number' ? captureRadiusRaw : data.starRadius * 2.2;
+      const transferStream = createXRayTransferStream(data.companion.color, captureRadius * 0.96);
       this.scene.add(transferStream.spine);
       this.scene.add(transferStream.ribbon);
       this.systemObjects.push(transferStream.spine, transferStream.ribbon);

@@ -2,6 +2,8 @@
 
 A browser-based space exploration and trading game inspired by classics like Elite and the works of Vernor Vinge and Alastair Reynolds. Fly your ship across a procedurally generated galaxy, trade goods between stations, navigate faction politics, and watch civilizations rise and fall as relativistic time passes with each hyperspace jump.
 
+Keeping in mind it is very much still in development, give it a try: [https://time-in-transit.anon14562.workers.dev/](https://time-in-transit.anon14562.workers.dev/). Mobile is also supported.
+
 Built with React, TypeScript, Three.js, and Vite — with a Rust/WASM game engine for procedural generation, galaxy simulation.
 
 ## Features

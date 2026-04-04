@@ -1,0 +1,53 @@
+id: ARRAY_OORT_FINAL_MANIFEST
+title: FINAL MANIFEST
+requires:
+  - !AnyFlagSet quasar_array_stage3_done
+  - !AnyFlagNotSet quasar_array_completed
+  - !FlagNotSet quasar_array_stage1_done
+  - !FlagNotSet quasar_array_stage2_done
+  - !FlagNotSet quasar_array_stage3_done
+narrativeLines:
+  - >-
+    The final node is almost domestic: warm lights, handwritten checklists, engineers asleep in chairs between shifts.
+  - >-
+    You unload your last manifest: vibration-damped lens packs, replacement thermal seals, and a crate of old-fashioned hand tools someone insisted on.
+  - >-
+    The coordinator scans your delivery signatures from three systems and smiles like she has been waiting a long time to make one phone call.
+  - >-
+    "That's the chain complete. We can hold lock long enough to publish with confidence."
+choices:
+  - id: stay_for_results
+    label: Stay for the first full comparative readout
+    description: "See what your deliveries made possible"
+    effect:
+      tradingReputation: 0
+    nextMoment:
+      narrativeLines:
+        - >-
+          The room quiets as the readout stabilizes: several Quasar War scar sites show ongoing structural recovery signatures, while control quasars remain statistically calm.
+        - >-
+          The coordinator taps the screen. "Not apocalypse. Not nothing either. The war ended, but its fingerprints are still propagating."
+        - >-
+          She hands you a final transfer chit. "You didn't fix the universe. You kept good instruments alive long enough for us to stop guessing."
+      choices:
+        - id: authorize_public_release
+          label: Encourage immediate public release
+          description: "CR 1200 completion bonus, +Reputation x2, chain complete"
+          effect:
+            creditsReward: 1200
+            tradingReputation: 2
+            fuelReward: 0.6
+            setsFlags: [quasar_array_completed]
+        - id: authorize_peer_review_first
+          label: Encourage peer review before broad release
+          description: "CR 1400 completion bonus, +Reputation, chain complete"
+          effect:
+            creditsReward: 1400
+            tradingReputation: 1
+            setsFlags: [quasar_array_completed]
+  - id: drop_manifest_and_go
+    label: Drop the manifest and keep moving
+    description: "CR 900 completion bonus, chain complete"
+    effect:
+      creditsReward: 900
+      setsFlags: [quasar_array_completed]

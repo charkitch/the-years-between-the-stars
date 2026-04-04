@@ -1,0 +1,48 @@
+id: ARRAY_OORT_BRIEFING
+title: THE QUIET ARRAY
+requires:
+  - !AnyFlagNotSet quasar_array_stage1_done
+narrativeLines:
+  - >-
+    The station is carved into a carbon-black comet and lit like a library after midnight.
+  - >-
+    A logistics chief in a patched pressure coat waves you toward a table covered in lens housings, shock foam, and handwritten route cards.
+  - >-
+    "You look like someone who knows how to keep fragile things alive between stars," she says.
+  - >-
+    When you ask what the parts are for, she lowers her voice. "A distributed telescope array. We've been watching long-tail changes in quasars touched by the old war."
+choices:
+  - id: hear_full_brief
+    label: Sit down and hear the whole job
+    description: "Ask what they're really tracking"
+    effect:
+      tradingReputation: 0
+    nextMoment:
+      narrativeLines:
+        - >-
+          She slides a star chart over: old Quasar War scar sites, plus distant control quasars that were never involved.
+        - >-
+          "We're not chasing legends," she says. "We're testing whether the aftermath is still unfolding. If so, everybody deserves to know before policy hardens around bad assumptions."
+        - >-
+          "We don't need you to run optics. We need you to move impossible glass and replacement assemblies where freight insurers refuse to go."
+      choices:
+        - id: accept_lens_contract
+          label: Accept the courier contract
+          description: "+Reputation, begin the Oort relay chain"
+          effect:
+            tradingReputation: 1
+            setsFlags: [quasar_array_stage1_done]
+        - id: negotiate_hazard_bonus
+          label: Accept, but ask for hazard terms
+          description: "CR 250 advance, begin the chain"
+          effect:
+            creditsReward: 250
+            setsFlags: [quasar_array_stage1_done]
+        - id: decline_briefing
+          label: Decline politely
+          description: No effect
+          effect: {}
+  - id: no_time_today
+    label: You're in a hurry and move on
+    description: No effect
+    effect: {}

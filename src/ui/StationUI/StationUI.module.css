@@ -93,8 +93,14 @@
   color: var(--color-warning);
 }
 
-.sellBtn:hover {
+.sellBtn:hover:not(:disabled) {
   background: rgba(255,170,0,0.15);
+}
+
+.buyBtn:disabled,
+.sellBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .cargo {

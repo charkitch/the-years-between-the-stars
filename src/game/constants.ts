@@ -183,7 +183,7 @@ export const STAR_DESCRIPTIONS: Record<string, { desc: string; wiki: string }> =
     wiki: "https://en.wikipedia.org/wiki/Black_hole"
   },
   XBB: {
-    desc: "An X-ray Burster. A class of X-ray binaries that show sudden, intense increases in X-ray luminosity.",
+    desc: "An X-ray Burster. A neutron star accreting from a main-sequence donor, producing sudden, intense X-ray bursts.",
     wiki: "https://en.wikipedia.org/wiki/X-ray_burster"
   },
   SGR: {
@@ -197,13 +197,26 @@ export const STAR_DESCRIPTIONS: Record<string, { desc: string; wiki: string }> =
 };
 
 const BUYABLE_GOODS = [
-  'Food',
-  'Textiles',
-  'Radioactives',
-  'Liquor',
-  'Luxuries',
-  'Narcotics',
-  'Computers',
+  'Starwind Rations',
+  'Hullskin Lace',
+  'Burial Sunstone',
+  'Rain Choir Spools',
+  'Reactor Salt',
+  'Pilgrim Maps',
+  'Witness Ink',
+  'Gravitic Bone',
+  'Embassy Masks',
+  'Dream Resin',
+  'Silence Vials',
+  'Jurisdiction Seals',
+  'Debt Petals',
+  'Memory Caskets',
+  'Oath Filaments',
+  'Quasar Glass',
+  'Weather Keys',
+  'Ancestral Backups',
+  'Surrender Codes',
+  'Impossible Seeds',
 ] as const;
 
 export const COMBAT_INTELLIGENCE_GOOD = 'Combat Intelligence' as const;

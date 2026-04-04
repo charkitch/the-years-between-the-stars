@@ -36,7 +36,7 @@ fn star_radius_range(st: StarType) -> (f64, f64) {
         StarType::XB  => (36.0, 64.0),
         StarType::MG  => (8.0, 12.0),
         StarType::BH  => (90.0, 140.0),
-        StarType::XBB => (280.0, 400.0),
+        StarType::XBB => (28.0, 48.0),
         StarType::SGR => (8.0, 12.0),
         _ => (400.0, 600.0),
     }
@@ -410,10 +410,25 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
     let (radius_min, radius_max) = star_radius_range(star.star_type);
     let star_radius = rng.float(radius_min, radius_max);
 
-    // Binary companion for XB star type
-    let companion = if star.star_type == StarType::XB {
-        let companion_types = [StarType::G, StarType::K, StarType::F, StarType::A];
-        let companion_type = *rng.pick(&companion_types);
+    // Binary companion for X-ray binaries (XB, XBB)
+    let companion = if matches!(star.star_type, StarType::XB | StarType::XBB) {
+        let companion_type = match star.star_type {
+            StarType::XBB => {
+                // X-ray bursters favor cooler main-sequence donors.
+                let roll = rng.next();
+                if roll < 0.55 {
+                    StarType::K
+                } else if roll < 0.90 {
+                    StarType::M
+                } else {
+                    StarType::G
+                }
+            }
+            _ => {
+                let companion_types = [StarType::G, StarType::K, StarType::F, StarType::A];
+                *rng.pick(&companion_types)
+            }
+        };
         Some(BinaryCompanionData {
             star_type: companion_type,
             radius: rng.float(350.0, 550.0),
@@ -676,6 +691,33 @@ mod tests {
             .fold(f64::INFINITY, f64::min);
 
         assert!(companion.orbit_radius >= 850.0);
+        assert!(innermost_planet >= binary_outer_edge + 200.0);
+    }
+
+    #[test]
+    fn xbb_systems_have_main_sequence_companions_and_compact_radius() {
+        let xbb_star = StarSystemData {
+            id: 1000,
+            name: "Test XBB".to_string(),
+            x: 0.0,
+            y: 0.0,
+            star_type: StarType::XBB,
+            economy: EconomyType::HighTech,
+            tech_level: 5,
+            population: 9,
+        };
+
+        let system = generate_solar_system(&xbb_star);
+        let companion = system.companion.as_ref().expect("XBB systems should have a companion");
+        let compact_outer_edge = companion.orbit_radius * 0.4 + system.star_radius;
+        let companion_outer_edge = companion.orbit_radius + companion.radius;
+        let binary_outer_edge = f64::max(compact_outer_edge, companion_outer_edge);
+        let innermost_planet = system.planets.iter()
+            .map(|planet| planet.orbit_radius)
+            .fold(f64::INFINITY, f64::min);
+
+        assert!(matches!(companion.star_type, StarType::G | StarType::K | StarType::M));
+        assert!((28.0..=48.0).contains(&system.star_radius));
         assert!(innermost_planet >= binary_outer_edge + 200.0);
     }
 
