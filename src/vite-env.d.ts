@@ -9,3 +9,9 @@ declare module '*.glsl' {
   const value: string;
   export default value;
 }
+
+declare const __APP_BUILD__: {
+  version: string;
+  sha: string;
+  number: number;
+};

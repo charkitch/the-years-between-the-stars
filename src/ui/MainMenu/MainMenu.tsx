@@ -6,9 +6,10 @@ interface MainMenuProps {
   onResume: () => void;
   invertControls: boolean;
   onToggleInvertControls: () => void;
+  buildLabel: string;
 }
 
-export function MainMenu({ onNewGame, onResume, invertControls, onToggleInvertControls }: MainMenuProps) {
+export function MainMenu({ onNewGame, onResume, invertControls, onToggleInvertControls, buildLabel }: MainMenuProps) {
   const [view, setView] = useState<'main' | 'controls'>('main');
 
   if (view === 'controls') {
@@ -17,6 +18,7 @@ export function MainMenu({ onNewGame, onResume, invertControls, onToggleInvertCo
         <div className={styles.panel}>
           <div className={styles.header}>
             <div className={styles.title}>CONTROLS</div>
+            <div className={styles.buildTag} aria-hidden="true">{buildLabel}</div>
           </div>
           <div className={styles.controlsList}>
             <div className={styles.controlRow}>
@@ -84,6 +86,7 @@ export function MainMenu({ onNewGame, onResume, invertControls, onToggleInvertCo
       <div className={styles.panel}>
         <div className={styles.header}>
           <div className={styles.title}>THE YEARS BETWEEN THE STARS</div>
+          <div className={styles.buildTag} aria-hidden="true">{buildLabel}</div>
         </div>
         <div className={styles.menuOptions}>
           <button className={styles.menuBtn} onClick={onResume}>

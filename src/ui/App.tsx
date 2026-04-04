@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import { useGameState } from '../game/GameState';
 import type { UIMode } from '../game/GameState';
 import { Game } from '../game/Game';
@@ -16,6 +16,9 @@ import type { GoodName } from '../game/constants';
 import { detectRuntimeProfile, type RuntimeProfile } from '../runtime/runtimeProfile';
 import * as THREE from 'three';
 
+const MOBILE_GAME_ASPECT = 16 / 9;
+const BUILD_TAG_LABEL = `${__APP_BUILD__.sha}-${__APP_BUILD__.number}`;
+
 function runtimeProfileInitKey(profile: RuntimeProfile | null): string {
   if (!profile) return 'none';
   return [
@@ -30,6 +33,7 @@ function runtimeProfileInitKey(profile: RuntimeProfile | null): string {
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<Game | null>(null);
+  const orientationLockAttemptedRef = useRef(false);
 
   const uiMode = useGameState(s => s.ui.mode);
   const hyperspaceCountdown = useGameState(s => s.ui.hyperspaceCountdown);
@@ -57,6 +61,29 @@ export function App() {
   }, []);
 
   const runtimeInitKey = runtimeProfileInitKey(runtimeProfile);
+  const frameStyle = useMemo(() => {
+    if (!runtimeProfile?.isMobile) {
+      return {
+        position: 'absolute' as const,
+        inset: 0,
+      };
+    }
+    const vv = window.visualViewport;
+    const viewportWidth = vv?.width ?? window.innerWidth;
+    const viewportHeight = vv?.height ?? window.innerHeight;
+    const width = Math.min(viewportWidth, viewportHeight * MOBILE_GAME_ASPECT);
+    const height = width / MOBILE_GAME_ASPECT;
+    return {
+      position: 'absolute' as const,
+      left: '50%',
+      top: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: `${width}px`,
+      height: `${height}px`,
+      overflow: 'hidden',
+      background: '#000',
+    };
+  }, [runtimeProfile]);
 
   useEffect(() => {
     if (!canvasRef.current || !runtimeProfile || gameRef.current) return;
@@ -86,6 +113,32 @@ export function App() {
       gameRef.current = null;
     };
   }, [runtimeInitKey, gameEpoch]);
+
+  useEffect(() => {
+    if (!runtimeProfile?.isMobile || orientationLockAttemptedRef.current) return;
+    const orientationApi = screen.orientation as (ScreenOrientation & {
+      lock?: (orientation: 'any' | 'natural' | 'landscape' | 'portrait' | 'portrait-primary' | 'portrait-secondary' | 'landscape-primary' | 'landscape-secondary') => Promise<void>;
+    }) | undefined;
+    if (!orientationApi?.lock) {
+      orientationLockAttemptedRef.current = true;
+      return;
+    }
+    const attemptLock = () => {
+      if (orientationLockAttemptedRef.current) return;
+      orientationLockAttemptedRef.current = true;
+      orientationApi.lock?.('landscape').catch(() => {
+        // Browser denied lock (common on iOS/without active user gesture). Keep letterboxed fallback.
+      });
+    };
+    window.addEventListener('pointerdown', attemptLock, { once: true });
+    window.addEventListener('touchstart', attemptLock, { once: true });
+    window.addEventListener('keydown', attemptLock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', attemptLock);
+      window.removeEventListener('touchstart', attemptLock);
+      window.removeEventListener('keydown', attemptLock);
+    };
+  }, [runtimeProfile]);
 
   // Detect uiMode transitions for flash effects
   useEffect(() => {
@@ -152,8 +205,7 @@ export function App() {
     setInvertControls(!invertControls);
   };
 
-  const isLandscapePlayable = !runtimeProfile?.isMobile || runtimeProfile.isLandscape;
-  const showRotateOverlay = Boolean(runtimeProfile?.isMobile && !runtimeProfile.isLandscape);
+  const isLandscapePlayable = Boolean(runtimeProfile);
 
   useEffect(() => {
     if (uiMode !== 'flight' || !isLandscapePlayable) {
@@ -177,7 +229,8 @@ export function App() {
   const handleTouchJump = () => gameRef.current?.requestJump();
 
   return (
-    <>
+    <div style={{ position: 'absolute', inset: 0, background: '#000' }}>
+      <div style={frameStyle}>
       <canvas
         ref={canvasRef}
         style={{
@@ -269,31 +322,31 @@ export function App() {
           onResume={handleResume}
           invertControls={invertControls}
           onToggleInvertControls={handleToggleInvertControls}
+          buildLabel={BUILD_TAG_LABEL}
         />
       )}
 
       {uiMode === 'dead' && <DeathScreen onRespawn={handleRespawn} onNewGame={handleNewGame} />}
+      </div>
 
-      {runtimeProfile && showRotateOverlay && (
+      {runtimeProfile?.isMobile && !runtimeProfile.isLandscape && (
         <div style={{
           position: 'absolute',
-          inset: 0,
-          zIndex: 200,
-          pointerEvents: 'all',
-          background: 'rgba(2, 4, 8, 0.96)',
+          top: 'max(10px, env(safe-area-inset-top))',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 210,
+          pointerEvents: 'none',
+          background: 'rgba(0, 0, 0, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
           color: 'var(--color-hud)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          padding: 'calc(24px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left))',
+          fontSize: 11,
+          letterSpacing: 1,
+          padding: '6px 10px',
+          borderRadius: 6,
+          whiteSpace: 'nowrap',
         }}>
-          <div style={{ maxWidth: 420, lineHeight: 1.6 }}>
-            <div style={{ fontSize: 20, letterSpacing: 3, marginBottom: 8 }}>ROTATE DEVICE</div>
-            <div style={{ opacity: 0.8, fontSize: 13 }}>
-              Mobile support in this build is landscape-first. Rotate to continue.
-            </div>
-          </div>
+          WIDESCREEN MODE ACTIVE
         </div>
       )}
 
@@ -333,7 +386,7 @@ export function App() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
