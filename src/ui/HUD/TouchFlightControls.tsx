@@ -11,6 +11,7 @@ interface TouchFlightInput {
 
 interface TouchFlightControlsProps {
   enabled: boolean;
+  isInMotion: boolean;
   canDockNow: boolean;
   onInputChange: (input: TouchFlightInput) => void;
   onDock: () => void;
@@ -24,13 +25,10 @@ interface TouchFlightControlsProps {
 const STICK_RADIUS = 48;
 const STICK_DEADZONE = 0.14;
 const ROLL_EDGE_THRESHOLD = 0.5;
-// Keep forward thrust engaged while the thumb is near center so moving toward boost
-// does not pass through a deceleration "dead band".
-const CENTER_THRUST_RADIUS = 0.55;
-const BOOST_TOP_Y = -0.78;
 
 export function TouchFlightControls({
   enabled,
+  isInMotion,
   canDockNow,
   onInputChange,
   onDock,
@@ -54,15 +52,22 @@ export function TouchFlightControls({
   const [rightY, setRightY] = useState(0);
   const [rightRawX, setRightRawX] = useState(0);
   const [rightRawY, setRightRawY] = useState(0);
+  const [boostPressed, setBoostPressed] = useState(false);
 
   const [actionsOpen, setActionsOpen] = useState(false);
 
-  const centerThrustActive = rightActive && Math.hypot(rightRawX, rightRawY) <= CENTER_THRUST_RADIUS;
-  const boostActive = rightActive && rightRawY <= BOOST_TOP_Y;
-  const thrust = boostActive || centerThrustActive ? 1 : 0;
+  const forwardThrust = Math.max(0, -rightRawY);
+  const boostActive = boostPressed && isInMotion;
+  const thrust = rightActive ? forwardThrust : 0;
   const roll = Math.abs(rightX) < ROLL_EDGE_THRESHOLD
     ? 0
     : Math.sign(rightX) * ((Math.abs(rightX) - ROLL_EDGE_THRESHOLD) / (1 - ROLL_EDGE_THRESHOLD));
+
+  useEffect(() => {
+    if (!isInMotion) {
+      setBoostPressed(false);
+    }
+  }, [isInMotion]);
 
   useEffect(() => {
     if (!enabled) {
@@ -76,6 +81,7 @@ export function TouchFlightControls({
       setRightY(0);
       setRightRawX(0);
       setRightRawY(0);
+      setBoostPressed(false);
       setActionsOpen(false);
       onInputChange({ pitch: 0, yaw: 0, roll: 0, thrust: 0, boost: false });
       return;
@@ -211,6 +217,21 @@ export function TouchFlightControls({
           }}
         />
       </div>
+      <button
+        type="button"
+        className={`${styles.boostButton} ${boostActive ? styles.boostButtonActive : ''}`}
+        disabled={!enabled || !isInMotion}
+        onPointerDown={(e) => {
+          if (!enabled || !isInMotion) return;
+          e.preventDefault();
+          setBoostPressed(true);
+        }}
+        onPointerUp={() => setBoostPressed(false)}
+        onPointerCancel={() => setBoostPressed(false)}
+        onPointerLeave={() => setBoostPressed(false)}
+      >
+        BOOST
+      </button>
 
       {enabled && canDockNow && (
         <button

@@ -2,7 +2,7 @@ export interface InputState {
   pitch: number;   // -1 to 1  (S=+1 pitch down, W=-1 pitch up)
   yaw: number;     // -1 to 1  (Q=-1, E=+1)
   roll: number;    // -1 to 1  (A=-1, D=+1)
-  thrust: number;  // 0 or 1
+  thrust: number;  // 0 to 1
   boost: boolean;
   dockRequest: boolean;
   clusterMap: boolean;

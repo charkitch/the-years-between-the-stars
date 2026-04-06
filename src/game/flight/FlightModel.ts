@@ -80,7 +80,7 @@ export class FlightModel {
     // Thrust along local -Z (forward)
     if (input.thrust > 0) {
       const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(shipGroup.quaternion);
-      const thrustMag = (isBoosting ? FLIGHT.boostMultiplier : 1) * 400 * dt;
+      const thrustMag = (isBoosting ? FLIGHT.boostMultiplier : 1) * 400 * input.thrust * dt;
       this.velocity.addScaledVector(fwd, thrustMag);
 
       if (isBoosting) {

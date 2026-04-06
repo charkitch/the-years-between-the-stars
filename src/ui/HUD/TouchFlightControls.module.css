@@ -49,25 +49,34 @@
   pointer-events: auto;
 }
 
-.rightLegend {
+.boostButton {
   position: absolute;
-  left: 50%;
-  top: calc(-56px - env(safe-area-inset-bottom) * 0.1);
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  width: 140px;
-  font-size: 9px;
-  letter-spacing: 1px;
-  color: rgba(170, 255, 220, 0.85);
-  text-shadow: 0 0 10px rgba(65, 230, 160, 0.35);
+  left: calc(24px + env(safe-area-inset-left));
+  bottom: calc(150px + env(safe-area-inset-bottom));
+  width: 112px;
+  min-height: 38px;
+  border: 1px solid rgba(255, 214, 102, 0.72);
+  background: rgba(38, 30, 8, 0.88);
+  color: rgba(255, 224, 158, 0.96);
+  letter-spacing: 1.2px;
+  font-size: 11px;
+  box-shadow: 0 0 14px rgba(255, 170, 0, 0.24);
+  pointer-events: auto;
 }
 
-.boostHot {
-  color: rgba(255, 214, 102, 0.95);
+.boostButtonActive {
+  background: rgba(76, 44, 8, 0.95);
+  border-color: rgba(255, 226, 120, 0.95);
   text-shadow: 0 0 12px rgba(255, 170, 0, 0.45);
+  box-shadow: 0 0 18px rgba(255, 170, 0, 0.35);
+}
+
+.boostButton:disabled {
+  border-color: rgba(155, 155, 155, 0.62);
+  background: rgba(42, 42, 42, 0.82);
+  color: rgba(165, 165, 165, 0.78);
+  box-shadow: none;
+  text-shadow: none;
 }
 
 .quickDockButton {

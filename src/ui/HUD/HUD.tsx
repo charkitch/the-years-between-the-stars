@@ -105,6 +105,7 @@ export function HUD({
       : undefined;
   const isMobileHUD = Boolean(runtimeProfile?.isMobile);
   const touchFlightEnabled = isMobileHUD && isLandscapePlayable && uiMode === 'flight';
+  const isInMotion = player.speed > 1;
 
   return (
     <div className={`${styles.hud} ${isMobileHUD ? styles.mobile : ''}`}>
@@ -257,6 +258,7 @@ export function HUD({
       {isMobileHUD && (
         <TouchFlightControls
           enabled={touchFlightEnabled}
+          isInMotion={isInMotion}
           canDockNow={canDockNow}
           onInputChange={onTouchFlightInput}
           onDock={onDock}
