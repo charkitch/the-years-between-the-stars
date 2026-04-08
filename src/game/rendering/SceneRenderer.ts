@@ -27,7 +27,7 @@ import type { FleetBattle } from '../mechanics/FleetBattleSystem';
 import { getFaction } from '../data/factions';
 import { PRNG } from '../generation/prng';
 import { CLUSTER_SEED, RENDER_CONFIG } from '../constants';
-import { createBlackHoleGroup, createMicroquasarJetGroup, createXRayAccretorGroup } from './scene/blackHoleVisuals';
+import { createBlackHoleGroup, createMicroquasarJetGroup, createXRayAccretorGroup, createBeamMaterial, updateBeamTime } from './scene/blackHoleVisuals';
 import type { SceneEntity, XRayTransferStream } from './scene/types';
 import { createXRayTransferStream, updateXRayTransferStreams } from './scene/xrayStreams';
 import { sampleAndClassifyByUV } from '../systems/interactionField';
@@ -180,6 +180,11 @@ export class SceneRenderer {
   private collidables: SceneEntity[] = [];
   private xRayTransferStreams: XRayTransferStream[] = [];
   private xbDiskGroup: THREE.Group | null = null;
+  private mqJetParams: { axis: THREE.Vector3; halfAngle: number; length: number; starEntityId: string } | null = null;
+  private mqJetGroup: THREE.Group | null = null;
+  private pulsarBeamGroup: THREE.Group | null = null;
+  private pulsarBeamAngle: number = 0;
+  private pulsarBeamParams: { axis: THREE.Vector3; halfAngle: number; length: number; starEntityId: string } | null = null;
   private dysonShellMaterials: {
     shellMat: THREE.ShaderMaterial;
     weatherMat: THREE.ShaderMaterial;
@@ -301,8 +306,11 @@ export class SceneRenderer {
     galaxyX = 0,
     galaxyY = 0,
   ): void {
-    // Remove old system objects
-    this.systemObjects.forEach(o => this.scene.remove(o));
+    // Dispose GPU resources and remove old system objects
+    for (const obj of this.systemObjects) {
+      this.disposeObject3D(obj);
+      this.scene.remove(obj);
+    }
     this.systemObjects = [];
     this.lightningMaterials = [];
     this.dysonShellMaterials = [];
@@ -313,6 +321,11 @@ export class SceneRenderer {
     this.fleetBattleData = null;
     this.xRayTransferStreams = [];
     this.xbDiskGroup = null;
+    this.mqJetParams = null;
+    this.mqJetGroup = null;
+    this.pulsarBeamGroup = null;
+    this.pulsarBeamAngle = 0;
+    this.pulsarBeamParams = null;
     this.landingSiteCounter = 0;
 
     this.scene.remove(this.starfield);
@@ -376,11 +389,21 @@ export class SceneRenderer {
           color: 0x67D8FF,
         });
         starGroup.add(jetGroup);
+        this.mqJetGroup = jetGroup;
 
         const jetHalo = makeGlowSprite(0xB6F3FF, data.starRadius * 19.2);
         const jetHaloMat = jetHalo.material as THREE.SpriteMaterial;
         jetHaloMat.opacity = 0.14;
         starGroup.add(jetHalo);
+
+        // Compute jet axis in world space from the precession tilt
+        const jetAxis = new THREE.Vector3(0, 1, 0);
+        const jetEuler = new THREE.Euler(-0.2, 0, 0.32);
+        jetAxis.applyEuler(jetEuler).normalize();
+        const outerLength = 75000;
+        // half-angle of the outer sheath cone: atan(tipRadius / length)
+        const halfAngle = Math.atan((outerLength * 0.09) / outerLength);
+        this.mqJetParams = { axis: jetAxis, halfAngle, length: outerLength, starEntityId: 'star' };
       }
 
       // Light travels with the compact object group (no static starLight needed)
@@ -443,36 +466,37 @@ export class SceneRenderer {
         starGroup.add(glow);
       }
 
-      // Pulsar beam jets — tapered cones anchored at the star surface
+      // Pulsar beam jets — tapered cones anchored at the star surface, rotating
       if (data.starType === 'PU') {
         const beamColor = 0x44AAFF;
-        const beamLen = data.starRadius * 12;
+        const beamLen = 60000;
         const baseWidth = data.starRadius * 0.6;
         const tipWidth = data.starRadius * 0.05;
-        const beamMat = new THREE.MeshBasicMaterial({
-          color: beamColor,
-          transparent: true,
-          opacity: 0.45,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        });
+        const outerMat = createBeamMaterial(beamColor, 0.65, 0.6);
+        const coreMat = createBeamMaterial(beamColor, 0.9, 0.3);
+        const beamGroup = new THREE.Group();
         for (const sign of [1, -1]) {
-          const beamGeo = new THREE.CylinderGeometry(tipWidth, baseWidth, beamLen, 8, 1, true);
-          const beam = new THREE.Mesh(beamGeo, beamMat);
-          // Position so the wide base sits at the star surface
+          const beamGeo = new THREE.CylinderGeometry(0, baseWidth, beamLen, 8, 40, true);
+          const beam = new THREE.Mesh(beamGeo, outerMat);
+          beam.frustumCulled = false;
           beam.position.set(0, sign * (data.starRadius + beamLen / 2), 0);
           if (sign < 0) beam.rotation.x = Math.PI;
-          starGroup.add(beam);
+          beamGroup.add(beam);
           // Inner brighter core
-          const coreGeo = new THREE.CylinderGeometry(tipWidth * 0.3, baseWidth * 0.3, beamLen, 6, 1, true);
-          const coreMat = beamMat.clone();
-          coreMat.opacity = 0.7;
+          const coreGeo = new THREE.CylinderGeometry(0, baseWidth * 0.3, beamLen, 6, 40, true);
           const core = new THREE.Mesh(coreGeo, coreMat);
+          core.frustumCulled = false;
           core.position.copy(beam.position);
           if (sign < 0) core.rotation.x = Math.PI;
-          starGroup.add(core);
+          beamGroup.add(core);
         }
+        // Tilt slightly off-vertical for characteristic pulsar wobble
+        beamGroup.rotation.set(0.15, 0, 0);
+        starGroup.add(beamGroup);
+        this.pulsarBeamGroup = beamGroup;
+        this.pulsarBeamAngle = 0;
+        const halfAngle = Math.atan(baseWidth / beamLen);
+        this.pulsarBeamParams = { axis: new THREE.Vector3(0, 1, 0), halfAngle, length: beamLen, starEntityId: 'star' };
       }
 
       // Point light
@@ -1187,6 +1211,24 @@ export class SceneRenderer {
       entry.cityMat.uniforms.uLightPos.value.copy(worldPos);
     }
 
+    // Rotate pulsar beam group
+    if (this.pulsarBeamGroup && dt > 0) {
+      this.pulsarBeamAngle += (Math.PI * 2 / 6) * dt; // 1 revolution per 6 seconds
+      this.pulsarBeamGroup.rotation.y = this.pulsarBeamAngle;
+      if (this.pulsarBeamParams) {
+        const axis = new THREE.Vector3(0, 1, 0);
+        this.pulsarBeamGroup.getWorldQuaternion(new THREE.Quaternion()).normalize();
+        const q = new THREE.Quaternion();
+        this.pulsarBeamGroup.getWorldQuaternion(q);
+        axis.applyQuaternion(q).normalize();
+        this.pulsarBeamParams.axis.copy(axis);
+      }
+    }
+
+    // Update beam shader time uniforms
+    if (this.pulsarBeamGroup) updateBeamTime(this.pulsarBeamGroup, time);
+    if (this.mqJetGroup) updateBeamTime(this.mqJetGroup, time);
+
     // Battle projectile + explosion animation
     if (this.battleProjectiles && dt > 0) {
       updateBattleProjectiles(this.battleProjectiles, dt, this.battleExplosions);
@@ -1204,12 +1246,27 @@ export class SceneRenderer {
     return this.entities;
   }
 
+  removeLandingSite(id: string): void {
+    const entity = this.entities.get(id);
+    if (!entity || entity.type !== 'landing_site') return;
+    entity.group.removeFromParent();
+    this.entities.delete(id);
+  }
+
   getNPCShip(id: string): NPCShipState | undefined {
     return this.npcShips.get(id);
   }
 
   getFleetBattle(): FleetBattle | null {
     return this.fleetBattleData;
+  }
+
+  getMicroquasarJetParams(): { axis: THREE.Vector3; halfAngle: number; length: number; starEntityId: string } | null {
+    return this.mqJetParams;
+  }
+
+  getPulsarBeamParams(): { axis: THREE.Vector3; halfAngle: number; length: number; starEntityId: string } | null {
+    return this.pulsarBeamParams;
   }
 
   getXRayStreamCurveBuffer(): Float32Array | null {
@@ -1243,11 +1300,22 @@ export class SceneRenderer {
     this.renderer.render(this.scene, this.camera);
   }
 
+  private disposeObject3D(obj: THREE.Object3D): void {
+    obj.traverse((child) => {
+      if (child instanceof THREE.Mesh || child instanceof THREE.Points || child instanceof THREE.Line) {
+        child.geometry?.dispose();
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        for (const mat of materials) mat?.dispose();
+      }
+    });
+  }
+
   dispose(): void {
     window.removeEventListener('resize', this.handleResize);
     window.visualViewport?.removeEventListener('resize', this.handleResize);
     this.canvas.removeEventListener('webglcontextlost', this.handleContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
+    for (const obj of this.systemObjects) this.disposeObject3D(obj);
     disposeTextureCache();
     this.renderer.dispose();
   }

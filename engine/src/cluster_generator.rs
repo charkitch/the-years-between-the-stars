@@ -174,6 +174,16 @@ mod tests {
     }
 
     #[test]
+    fn print_cluster_types() {
+        let cluster = generate_cluster();
+        for (i, s) in cluster.iter().enumerate() {
+            let mut sys_rng = PRNG::from_index(CLUSTER_SEED, i as u32);
+            let r = sys_rng.next();
+            println!("System {}: {} - {:?} (r={:.4})", i, s.name, s.star_type, r);
+        }
+    }
+
+    #[test]
     fn deterministic_iron_placement() {
         let a = generate_cluster();
         let b = generate_cluster();

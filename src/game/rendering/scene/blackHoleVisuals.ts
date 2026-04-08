@@ -137,14 +137,75 @@ function createDonorTintedDiskTexture(palette: DiskPalette): THREE.CanvasTexture
   return texture;
 }
 
-function createJetMaterial(color: number, opacity: number): THREE.MeshBasicMaterial {
-  return new THREE.MeshBasicMaterial({
-    color,
+const beamVertexShader = /* glsl */ `
+varying vec2 vUv;
+uniform float uTime;
+uniform float uUndulate;
+void main() {
+  vUv = uv;
+  vec3 pos = position;
+  float along = uv.y;
+  float r = length(pos.xz);
+  if (r > 0.001) {
+    float w1 = sin(along * 14.0 - uTime * 2.4) * 0.18;
+    float w2 = sin(along * 7.0 - uTime * 1.1 + 2.0) * 0.10;
+    float w3 = sin(along * 28.0 - uTime * 4.2) * 0.06;
+    float undulation = (w1 + w2 + w3) * uUndulate;
+    pos.x *= 1.0 + undulation;
+    pos.z *= 1.0 + undulation;
+  }
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+}
+`;
+
+const beamFragmentShader = /* glsl */ `
+varying vec2 vUv;
+uniform float uTime;
+uniform vec3 uColor;
+uniform float uOpacity;
+void main() {
+  float along = vUv.y;
+  float w1 = sin(along * 18.0 - uTime * 3.2) * 0.5 + 0.5;
+  float w2 = sin(along * 9.0 - uTime * 1.6 + 1.4) * 0.5 + 0.5;
+  float w3 = sin(along * 32.0 - uTime * 5.8) * 0.5 + 0.5;
+  float wave = w1 * 0.5 + w2 * 0.3 + w3 * 0.2;
+  float brightness = 0.75 + 0.25 * wave;
+  // Long gradual fade so the beam dissolves into nothing — no hard endpoint
+  float tipFade = 1.0 - along * along * along;
+  float baseFade = smoothstep(0.0, 0.04, along);
+  float pulse = 0.94 + 0.06 * sin(uTime * 1.3);
+  float alpha = uOpacity * tipFade * baseFade * pulse;
+  gl_FragColor = vec4(uColor * brightness, alpha);
+}
+`;
+
+export function createBeamMaterial(color: number, opacity: number, undulate: number): THREE.ShaderMaterial {
+  const c = new THREE.Color(color);
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Vector3(c.r, c.g, c.b) },
+      uOpacity: { value: opacity },
+      uUndulate: { value: undulate },
+    },
+    vertexShader: beamVertexShader,
+    fragmentShader: beamFragmentShader,
     transparent: true,
-    opacity,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     side: THREE.DoubleSide,
+  });
+}
+
+/** Update all beam shader time uniforms in a group */
+export function updateBeamTime(group: THREE.Group, time: number): void {
+  group.traverse((obj) => {
+    if ((obj as THREE.Mesh).isMesh) {
+      const mat = (obj as THREE.Mesh).material;
+      if (mat instanceof THREE.ShaderMaterial && mat.uniforms.uTime) {
+        mat.uniforms.uTime.value = time;
+      }
+    }
   });
 }
 
@@ -155,44 +216,30 @@ export function createMicroquasarJetGroup(options: MicroquasarJetOptions): THREE
   const brightJetColor = jetColor.clone().lerp(new THREE.Color(0xFFFFFF), 0.34).getHex();
   const lobeColor = jetColor.clone().lerp(new THREE.Color(0xD5F6FF), 0.5).getHex();
 
-  const outerLength = radius * 34;
-  const plumeLength = radius * 24;
-  const coreLength = radius * 38;
+  const outerLength = 75000;
+  const plumeLength = 55000;
+  const coreLength = 75000;
   const baseOffset = radius * 1.05;
 
-  const sheathMaterial = createJetMaterial(color, 0.18);
-  const plumeMaterial = createJetMaterial(brightJetColor, 0.34);
-  const coreMaterial = createJetMaterial(0xFFFFFF, 0.7);
-  const shockMaterial = createJetMaterial(lobeColor, 0.46);
+  const sheathMaterial = createBeamMaterial(color, 0.35, 0.8);
+  const plumeMaterial = createBeamMaterial(brightJetColor, 0.55, 0.5);
+  const coreMaterial = createBeamMaterial(0xFFFFFF, 0.85, 0.25);
 
   const buildJet = (length: number, nearRadius: number, farRadius: number, material: THREE.Material, sign: number) => {
     const jet = new THREE.Mesh(
-      new THREE.CylinderGeometry(farRadius, nearRadius, length, 18, 1, true),
+      new THREE.CylinderGeometry(nearRadius, farRadius, length, 18, 48, true),
       material,
     );
+    jet.frustumCulled = false;
     jet.position.y = sign * (baseOffset + length / 2);
     if (sign < 0) jet.rotation.z = Math.PI;
     group.add(jet);
   };
 
   for (const sign of [1, -1]) {
-    buildJet(outerLength, radius * 0.82, radius * 0.2, sheathMaterial, sign);
-    buildJet(plumeLength, radius * 0.42, radius * 0.09, plumeMaterial, sign);
-    buildJet(coreLength, radius * 0.16, radius * 0.03, coreMaterial, sign);
-
-    const shockRing = new THREE.Mesh(
-      new THREE.TorusGeometry(radius * 1.18, radius * 0.07, 8, 48),
-      shockMaterial,
-    );
-    shockRing.rotation.x = Math.PI / 2;
-    shockRing.position.y = sign * (baseOffset + outerLength * 0.8);
-    group.add(shockRing);
-
-    const terminalLobe = makeGlowSprite(lobeColor, radius * 8.4);
-    const terminalLobeMat = terminalLobe.material as THREE.SpriteMaterial;
-    terminalLobeMat.opacity = 0.22;
-    terminalLobe.position.y = sign * (baseOffset + outerLength + radius * 2.5);
-    group.add(terminalLobe);
+    buildJet(outerLength, 0, radius * 0.3, sheathMaterial, sign);
+    buildJet(plumeLength, 0, radius * 0.12, plumeMaterial, sign);
+    buildJet(coreLength, 0, radius * 0.04, coreMaterial, sign);
   }
 
   const throatGlow = makeGlowSprite(brightJetColor, radius * 5.8);

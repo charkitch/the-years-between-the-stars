@@ -12,7 +12,7 @@ import { LandingDialog } from './LandingDialog/LandingDialog';
 import { SystemEntryDialog } from './SystemEntryDialog/SystemEntryDialog';
 import { CommDialog } from './CommDialog/CommDialog';
 import type { SceneEntity } from '../game/rendering/SceneRenderer';
-import type { GoodName } from '../game/constants';
+import { TRAVEL_TERMS, type GoodName } from '../game/constants';
 import { detectRuntimeProfile, type RuntimeProfile } from '../runtime/runtimeProfile';
 import * as THREE from 'three';
 
@@ -87,6 +87,10 @@ export function App() {
     });
     gameRef.current = game;
     game.start();
+    if (import.meta.env.DEV) {
+      (window as any).__GAME__ = game;
+      (window as any).__STORE__ = useGameState;
+    }
 
     return () => {
       game.dispose();
@@ -225,6 +229,8 @@ export function App() {
         }}
       />
 
+      {uiMode === 'loading' && <LoadingScreen />}
+
       {(uiMode === 'flight' || uiMode === 'comms') && (
         <HUD
           getEntities={getEntities}
@@ -272,11 +278,11 @@ export function App() {
           pointerEvents: 'none',
           zIndex: 21,
         }}>
-          HYPERSPACE
+          {TRAVEL_TERMS.modeNameUpper}
         </div>
       )}
 
-      {/* Hyperspace charge glow — pulses during countdown */}
+      {/* Nearlight passage charge glow — pulses during countdown */}
       {hyperspaceCountdown > 0 && (
         <div className="hyperChargeGlow" />
       )}
@@ -371,6 +377,63 @@ export function App() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div style={{
+      position: 'absolute',
+      inset: 0,
+      zIndex: 200,
+      background: '#000',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 16,
+      fontFamily: 'var(--font-hud)',
+      pointerEvents: 'all',
+    }}>
+      <div style={{
+        fontSize: 22,
+        letterSpacing: 6,
+        color: 'var(--color-hud)',
+        opacity: 0.9,
+      }}>
+        INITIALIZING
+      </div>
+      <div style={{
+        width: 180,
+        height: 2,
+        background: 'rgba(255,255,255,0.1)',
+        borderRadius: 1,
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          width: '40%',
+          height: '100%',
+          background: 'var(--color-hud)',
+          opacity: 0.6,
+          animation: 'loadingSlide 1.2s ease-in-out infinite',
+        }} />
+      </div>
+      <div style={{
+        fontSize: 11,
+        letterSpacing: 3,
+        color: 'var(--color-hud)',
+        opacity: 0.4,
+        marginTop: 4,
+      }}>
+        GENERATING STAR SYSTEM
+      </div>
+      <style>{`
+        @keyframes loadingSlide {
+          0% { transform: translateX(-180px); }
+          100% { transform: translateX(270px); }
+        }
+      `}</style>
     </div>
   );
 }

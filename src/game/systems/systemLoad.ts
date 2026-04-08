@@ -73,14 +73,15 @@ export function placeShipNearMainStation(sceneRenderer: SceneRenderer, systemDat
   const planetZ = Math.sin(angle) * mainPlanet.orbitRadius;
   const radialX = Math.cos(angle);
   const radialZ = Math.sin(angle);
-  const spawnDist = mainPlanet.radius * 3 + 80;
-  const lateralOffset = -10;
+  const spawnDist = mainPlanet.radius * 2.2 + 45;
+  const lateralOffset = -20;
   sceneRenderer.shipGroup.position.set(
     planetX + radialX * spawnDist + radialZ * lateralOffset,
     0,
     planetZ + radialZ * spawnDist - radialX * lateralOffset,
   );
-  sceneRenderer.shipGroup.rotation.set(0.1, Math.atan2(radialX, radialZ), 0);
+  const safeApproachYawOffset = 0.36;
+  sceneRenderer.shipGroup.rotation.set(0.1, Math.atan2(radialX, radialZ) + safeApproachYawOffset, 0);
 
   const stationEntity = sceneRenderer.getAllEntities().get(`station-${mainPlanetId}`);
   if (stationEntity) {

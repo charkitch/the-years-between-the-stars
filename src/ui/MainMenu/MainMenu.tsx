@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { TRAVEL_TERMS } from '../../game/constants';
 import styles from './MainMenu.module.css';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -103,7 +104,7 @@ export function MainMenu({ onNewGame, onResume, invertControls, onToggleInvertCo
             </div>
             <div className={styles.controlRow}>
               <span className={styles.key}>J</span>
-              <span className={styles.action}>HYPERSPACE JUMP</span>
+              <span className={styles.action}>{TRAVEL_TERMS.modeNameUpper} JUMP</span>
             </div>
             <div className={styles.controlRow}>
               <span className={styles.key}>H</span>

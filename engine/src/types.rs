@@ -54,6 +54,10 @@ pub enum GoodName {
     SurrenderCodes,
     #[serde(rename = "Impossible Seeds")]
     ImpossibleSeeds,
+    #[serde(rename = "Relativistic Ash")]
+    RelativisticAsh,
+    #[serde(rename = "Pulsar Silk")]
+    PulsarSilk,
 }
 
 impl GoodName {
@@ -78,6 +82,8 @@ impl GoodName {
         GoodName::AncestralBackups,
         GoodName::SurrenderCodes,
         GoodName::ImpossibleSeeds,
+        GoodName::RelativisticAsh,
+        GoodName::PulsarSilk,
     ];
 }
 

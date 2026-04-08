@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SceneRenderer } from './rendering/SceneRenderer';
+import { SceneRenderer, type SceneEntity } from './rendering/SceneRenderer';
 import { FlightModel } from './flight/FlightModel';
 import { InputSystem } from './input/InputSystem';
 import { DockingSystem } from './mechanics/DockingSystem';
@@ -14,6 +14,8 @@ import {
   FUEL_HARVEST,
   GAS_GIANT_SCOOP,
   COMBAT_INTELLIGENCE_GOOD,
+  RELATIVISTIC_ASH_GOOD,
+  PULSAR_SILK_GOOD,
   MARKET_GOODS,
   STAR_ATTRIBUTES,
   PLANET_SCAN_RANGE_PADDING,
@@ -34,6 +36,9 @@ import {
 } from './systems/systemLoad';
 import {
   applyBattleZoneEffects,
+  checkBlackHoleHazard,
+  checkMicroquasarJetHazard,
+  checkPulsarBeamHazard,
   checkProximityAlerts,
   checkXRayStreamHazard,
 } from './systems/flightHazards';
@@ -45,6 +50,7 @@ import type { RuntimeProfile } from '../runtime/runtimeProfile';
 import { stationHostTypeToken } from './archetypes';
 
 const COMBAT_INTEL_INTERVAL = 8;
+const BEAM_HARVEST_INTERVAL = 5;
 const INFINITE_FUEL_DEV = import.meta.env.DEV;
 const FIRST_SYSTEM_ID = 0;
 const SYSTEM_ENTRY_EVENT_CHANCE = 0.3;
@@ -56,6 +62,23 @@ const LAND_RANGE_PADDING_DYSON = 180;
 const LAND_MAX_SPEED = 55;
 const TARGET_IDLE_RESET_MS = 20_000;
 
+function collisionDeathMessage(type: SceneEntity['type']): string[] {
+  switch (type) {
+    case 'star':
+      return ['STELLAR IMPACT', 'Ship incinerated on approach to stellar surface.', 'No wreckage found.'];
+    case 'planet':
+      return ['PLANETARY IMPACT', 'Uncontrolled descent into planetary body.', 'Crash site detected on surface.'];
+    case 'moon':
+      return ['LUNAR IMPACT', 'Collision with lunar surface at terminal velocity.', 'Debris field detected in low orbit.'];
+    case 'station':
+      return ['STATION COLLISION', 'Hull breached on impact with orbital structure.', 'Station authorities notified.'];
+    case 'dyson_shell':
+      return ['SHELL IMPACT', 'Ship destroyed on collision with Dyson shell.', 'Wreckage embedded in superstructure.'];
+    default:
+      return ['SHIP DESTROYED', 'Impact with stellar body.'];
+  }
+}
+
 export class Game {
   private sceneRenderer: SceneRenderer;
   private flightModel: FlightModel;
@@ -66,10 +89,13 @@ export class Game {
   private lastTime = 0;
   private hyperspaceTimer = 0;
   private hyperspaceActive = false;
+  private hyperspaceStartTime = 0;
   private scoopingFuel = false;
   private gasGiantScoopingFuel = false;
   private harvestingFuel = false;
   private combatIntelTimer = 0;
+  private jetHarvestTimer = 0;
+  private pulsarHarvestTimer = 0;
   private isDead = false;
   private hasUndocked = false;
   private pendingSystemPayload: SystemPayload | null = null;
@@ -78,6 +104,7 @@ export class Game {
   private activeScanTargetId: string | null = null;
   private activeScanTimer = 0;
   private currentVisitScannedHosts = new Set<string>();
+  private lastLandedSiteId: string | null = null;
   private lastTargetActionAt = 0;
   private readonly _tmpCameraPos = new THREE.Vector3();
   private readonly _tmpCameraForward = new THREE.Vector3();
@@ -155,6 +182,8 @@ export class Game {
     placeShipNearMainStation(this.sceneRenderer, systemData);
 
     this.flightModel.reset(this.sceneRenderer.shipGroup.position);
+
+    state.setUIMode('flight');
   }
 
   // loadCurrentSystem removed — initialization now handled by initFromEngine
@@ -214,18 +243,33 @@ export class Game {
     this.lastTime = now;
 
     const state = useGameState.getState();
+    const uiMode = state.ui.mode;
+
+    // Skip rendering entirely while the first system is loading
+    if (uiMode === 'loading') {
+      this.rafId = requestAnimationFrame(this.loop);
+      return;
+    }
+
     if (INFINITE_FUEL_DEV && state.player.fuel < HYPERSPACE.tankSize) {
       state.setFuel(HYPERSPACE.tankSize);
     }
-    const uiMode = state.ui.mode;
 
     if (uiMode === 'flight') {
       this.updateFlight(dt, state);
     } else if (uiMode === 'hyperspace') {
       this.updateHyperspace(dt, state);
+      if (performance.now() - this.hyperspaceStartTime > 10_000) {
+        console.warn('Hyperspace safety timeout: forcing recovery to flight mode');
+        this.hyperspaceActive = false;
+        this.sceneRenderer.stopHyperspace();
+        state.setUIMode('flight');
+      }
     }
     if (uiMode !== 'flight') {
       state.setCanDockNow(false);
+      state.setCanLandNow(false);
+      state.setCanScanNow(false);
       this.clearScanProgress(state);
     }
 
@@ -258,18 +302,18 @@ export class Game {
 
     // Collision avoidance — push ship out of celestial bodies
     const collidables = this.sceneRenderer.getCollidables();
-    const hit = this.flightModel.resolveCollisions(this.sceneRenderer.shipGroup, collidables);
-    if (hit) {
-      if (!this.isDead) {
-        this.triggerDeath(['SHIP DESTROYED', 'Impact with stellar body']);
-        return;
-      }
+    const hitEntity = this.flightModel.resolveCollisions(this.sceneRenderer.shipGroup, collidables);
+    if (hitEntity && !this.isDead) {
+      this.triggerDeath(collisionDeathMessage(hitEntity.type));
+      return;
     }
 
     const pos = this.sceneRenderer.shipGroup.position;
     state.setPlayerPosition({ x: pos.x, y: pos.y, z: pos.z });
     state.setPlayerSpeed(speed);
     state.setCanDockNow(this.canDockNow(speed));
+    state.setCanLandNow(this.canLandNow(speed));
+    state.setCanScanNow(this.canScanNow());
     this.tickScanProgress(dt, state, pos);
 
     // Fuel scooping near star
@@ -300,14 +344,9 @@ export class Game {
         this.scoopingFuel = false;
       }
 
-      // Overheat damage
+      // Overheat damage (death check deferred until after hazard-specific checks)
       if (state.player.heat >= 100) {
-        const newShields = state.player.shields - 20 * dt;
-        state.setShields(newShields);
-        if (newShields <= 0 && !this.isDead) {
-          this.triggerDeath();
-          return;
-        }
+        state.setShields(state.player.shields - 20 * dt);
         state.setAlert('OVERHEAT!');
       }
     }
@@ -392,7 +431,7 @@ export class Game {
       maxCargo: MAX_CARGO,
       combatIntelGood: COMBAT_INTELLIGENCE_GOOD,
       isDead: this.isDead,
-      onDeath: () => this.triggerDeath(),
+      onDeath: (msg: string[]) => this.triggerDeath(msg),
     });
 
     checkXRayStreamHazard({
@@ -402,6 +441,81 @@ export class Game {
       curve: this.sceneRenderer.getXRayStreamCurveBuffer(),
       hazardRadius: XB_STREAM_HAZARD_RADIUS,
     });
+
+    const mqJet = this.sceneRenderer.getMicroquasarJetParams();
+    if (mqJet) {
+      const starEntity = this.sceneRenderer.getAllEntities().get(mqJet.starEntityId);
+      const jetResult = checkMicroquasarJetHazard({
+        pos,
+        dt,
+        state,
+        jetParams: mqJet,
+        starWorldPos: starEntity?.worldPos ?? null,
+        isDead: this.isDead,
+        onDeath: (msg: string[]) => this.triggerDeath(msg),
+      });
+      if (jetResult === 'scooping') {
+        state.setFuel(state.player.fuel + 1.5 * dt);
+        const cargoUsed = Object.values(state.player.cargo).reduce((sum, qty) => sum + (qty ?? 0), 0);
+        if (cargoUsed < MAX_CARGO) {
+          this.jetHarvestTimer += dt;
+          if (this.jetHarvestTimer >= BEAM_HARVEST_INTERVAL) {
+            state.addCargo(RELATIVISTIC_ASH_GOOD, 1, 0);
+            this.jetHarvestTimer -= BEAM_HARVEST_INTERVAL;
+            state.setAlert('HARVESTING RELATIVISTIC ASH');
+          }
+        }
+      } else {
+        this.jetHarvestTimer = 0;
+      }
+    }
+
+    const pulsarBeam = this.sceneRenderer.getPulsarBeamParams();
+    if (pulsarBeam) {
+      const starEntity = this.sceneRenderer.getAllEntities().get(pulsarBeam.starEntityId);
+      const pulsarResult = checkPulsarBeamHazard({
+        pos,
+        dt,
+        state,
+        beamParams: pulsarBeam,
+        starWorldPos: starEntity?.worldPos ?? null,
+        starRadius: starEntity?.collisionRadius ?? 0,
+        isDead: this.isDead,
+        onDeath: (msg: string[]) => this.triggerDeath(msg),
+      });
+      if (pulsarResult === 'harvesting') {
+        const cargoUsed = Object.values(state.player.cargo).reduce((sum, qty) => sum + (qty ?? 0), 0);
+        if (cargoUsed < MAX_CARGO) {
+          this.pulsarHarvestTimer += dt;
+          if (this.pulsarHarvestTimer >= BEAM_HARVEST_INTERVAL) {
+            state.addCargo(PULSAR_SILK_GOOD, 1, 0);
+            this.pulsarHarvestTimer -= BEAM_HARVEST_INTERVAL;
+            state.setAlert('HARVESTING PULSAR SILK');
+          }
+        }
+      } else {
+        this.pulsarHarvestTimer = 0;
+      }
+    }
+
+    if (starType === 'BH' || starType === 'MQ') {
+      const starEntity = this.sceneRenderer.getAllEntities().get('star');
+      checkBlackHoleHazard({
+        pos,
+        dt,
+        state,
+        starWorldPos: starEntity?.worldPos ?? null,
+        starRadius: starEntity?.collisionRadius ?? 0,
+        isDead: this.isDead,
+        onDeath: (msg: string[]) => this.triggerDeath(msg),
+      });
+    }
+
+    // Overheat death — checked after hazards so hazard-specific messages take priority
+    if (state.player.heat >= 100 && state.player.shields <= 0 && !this.isDead) {
+      this.triggerDeath(['THERMAL FAILURE', 'Reactor overheat destroyed primary systems.', 'Emergency coolant exhausted.']);
+      return;
+    }
 
     this.tryProximityGameEvent(state, pos);
 
@@ -424,6 +538,38 @@ export class Game {
     const nearest = this.docking.findNearestStation(pos, entities);
     if (!nearest) return false;
     return this.docking.canDock(pos, nearest.pos, speed);
+  }
+
+  private canLandNow(speed: number): boolean {
+    if (speed > LAND_MAX_SPEED) return false;
+    const state = useGameState.getState();
+    const targetId = state.player.targetId;
+    if (!targetId) return false;
+    const entities = this.sceneRenderer.getAllEntities();
+    const site = entities.get(targetId);
+    if (!site || site.type !== 'landing_site' || !site.siteDiscovered) return false;
+    const hostId = site.siteHostId;
+    const host = hostId ? entities.get(hostId) : null;
+    if (!host || (host.type !== 'planet' && host.type !== 'dyson_shell')) return false;
+    const shipPos = this.sceneRenderer.shipGroup.position;
+    const dist = shipPos.distanceTo(site.worldPos);
+    const required = host.collisionRadius + (host.type === 'dyson_shell' ? LAND_RANGE_PADDING_DYSON : LAND_RANGE_PADDING_PLANET);
+    return dist <= required;
+  }
+
+  private canScanNow(): boolean {
+    if (this.activeScanTargetId) return false;
+    const state = useGameState.getState();
+    const targetId = state.player.targetId;
+    if (!targetId) return false;
+    const entities = this.sceneRenderer.getAllEntities();
+    const entity = entities.get(targetId);
+    if (!entity || (entity.type !== 'planet' && entity.type !== 'dyson_shell')) return false;
+    if (this.currentVisitScannedHosts.has(targetId)) return false;
+    const shipPos = this.sceneRenderer.shipGroup.position;
+    const dist = shipPos.distanceTo(entity.worldPos);
+    const required = entity.collisionRadius + (entity.type === 'dyson_shell' ? DYSON_SCAN_RANGE_PADDING : PLANET_SCAN_RANGE_PADDING);
+    return dist <= required;
   }
 
   private tryDock(): void {
@@ -565,6 +711,13 @@ export class Game {
     refreshedState.setCurrentSystemMarket(
       engineGetMarket(systemId, buildWasmPlayerState(refreshedState)),
     );
+    // Remove landing site after planet/dyson landing (returnMode 'flight')
+    if (returnMode === 'flight' && this.lastLandedSiteId) {
+      this.sceneRenderer.removeLandingSite(this.lastLandedSiteId);
+      state.setTarget(null);
+      this.lastLandedSiteId = null;
+    }
+
     state.setPendingGameEvent(null);
     state.saveGame();
     state.setUIMode(returnMode);
@@ -750,6 +903,7 @@ export class Game {
       });
     }
 
+    this.lastLandedSiteId = targetId;
     state.setPendingGameEvent({
       systemId: state.currentSystemId,
       civState: currentPayload.civState,
@@ -802,7 +956,7 @@ export class Game {
     const revealed = this.sceneRenderer.revealLandingSitesForHost(targetId);
     const stats = this.sceneRenderer.getLandingSiteStatsForHost(targetId);
     this.clearScanProgress(state);
-    state.setAlert(`SCAN COMPLETE: ${revealed} NEW / ${stats.total} TOTAL SITES`);
+    state.setAlert(`LANDING SITES MAPPED: ${revealed} NEW · ${stats.total} TOTAL`);
     setTimeout(() => useGameState.getState().setAlert(null), 1800);
   }
 
@@ -880,6 +1034,7 @@ export class Game {
 
     this.hyperspaceActive = true;
     this.hyperspaceTimer = HYPERSPACE.duration;
+    this.hyperspaceStartTime = performance.now();
     this.sceneRenderer.startHyperspace();
 
     // Schedule arrival
@@ -891,6 +1046,8 @@ export class Game {
   private arriveInSystem(targetId: number): void {
     const state = useGameState.getState();
     this.combatIntelTimer = 0;
+    this.jetHarvestTimer = 0;
+    this.pulsarHarvestTimer = 0;
     state.setHyperspaceTarget(null);
     state.setHyperspaceCountdown(0);
     this.hyperspaceActive = false;
@@ -900,36 +1057,45 @@ export class Game {
     const payload = this.pendingSystemPayload;
     this.pendingSystemPayload = null;
 
-    if (!payload) return;
-    applySystemArrival({
-      state,
-      targetId,
-      payload,
-      sceneRenderer: this.sceneRenderer,
-      flightModel: this.flightModel,
-      discoverFactions: discoverFactionsFromSystem,
-    });
-    this.syncCurrentVisitScanSetFromState(state);
-    this.restoreScanIntelForCurrentSystem(state);
-    this.tryProximityGameEvent(state, this.sceneRenderer.shipGroup.position);
-    const refreshed = useGameState.getState();
-    if (
-      targetId !== FIRST_SYSTEM_ID
-      && !refreshed.pendingGameEvent
-      && payload.gameEvent
-      && this.shouldTriggerEvent(SYSTEM_ENTRY_EVENT_CHANCE)
-    ) {
-      state.setPendingGameEvent({
-        systemId: targetId,
-        civState: payload.civState,
-        event: payload.gameEvent,
-        rootEventId: payload.gameEvent.id,
-        yearsSinceLastVisit: null,
-        returnMode: 'flight',
-      });
-      state.setUIMode('landing');
+    if (!payload) {
+      console.warn('arriveInSystem: no pending system payload, recovering to flight mode');
+      state.setUIMode('flight');
+      return;
     }
-    state.saveGame();
+    try {
+      applySystemArrival({
+        state,
+        targetId,
+        payload,
+        sceneRenderer: this.sceneRenderer,
+        flightModel: this.flightModel,
+        discoverFactions: discoverFactionsFromSystem,
+      });
+      this.syncCurrentVisitScanSetFromState(state);
+      this.restoreScanIntelForCurrentSystem(state);
+      this.tryProximityGameEvent(state, this.sceneRenderer.shipGroup.position);
+      const refreshed = useGameState.getState();
+      if (
+        targetId !== FIRST_SYSTEM_ID
+        && !refreshed.pendingGameEvent
+        && payload.gameEvent
+        && this.shouldTriggerEvent(SYSTEM_ENTRY_EVENT_CHANCE)
+      ) {
+        state.setPendingGameEvent({
+          systemId: targetId,
+          civState: payload.civState,
+          event: payload.gameEvent,
+          rootEventId: payload.gameEvent.id,
+          yearsSinceLastVisit: null,
+          returnMode: 'flight',
+        });
+        state.setUIMode('landing');
+      }
+      state.saveGame();
+    } catch (err) {
+      console.error('arriveInSystem failed, recovering to flight mode:', err);
+      state.setUIMode('flight');
+    }
   }
 
   private tryProximityGameEvent(
@@ -1004,8 +1170,11 @@ export class Game {
     state.setDeathMessage(null);
     this.isDead = false;
     this.combatIntelTimer = 0;
+    this.jetHarvestTimer = 0;
+    this.pulsarHarvestTimer = 0;
     this.hyperspaceActive = false;
     this.hyperspaceTimer = 0;
+    this.hyperspaceStartTime = 0;
     this.sceneRenderer.stopHyperspace();
     // Re-initialize from Rust engine
     this.initFromEngine(useGameState.getState());
@@ -1021,6 +1190,8 @@ export class Game {
     state.setDeathMessage(null);
     this.isDead = false;
     this.combatIntelTimer = 0;
+    this.jetHarvestTimer = 0;
+    this.pulsarHarvestTimer = 0;
     this.hasUndocked = false;
 
     // Teleport to safety near the main station before going docked
@@ -1205,6 +1376,30 @@ export class Game {
     const state = useGameState.getState();
     state.setUIMode('flight');
     this.hasUndocked = true;
+
+    // Eject ship away from station
+    const entities = this.sceneRenderer.getAllEntities();
+    const shipPos = this.sceneRenderer.shipGroup.position;
+    const nearest = this.docking.findNearestStation(shipPos, entities);
+
+    if (nearest) {
+      const station = entities.get(nearest.id);
+      if (station?.parentId) {
+        const parent = entities.get(station.parentId);
+        if (parent) {
+          // Direction: planet center → station (i.e. outward)
+          const dir = new THREE.Vector3()
+            .subVectors(station.worldPos, parent.worldPos)
+            .normalize();
+
+          // Offset position outward
+          shipPos.addScaledVector(dir, 30);
+
+          // Initial velocity outward
+          this.flightModel.velocity.copy(dir).multiplyScalar(80);
+        }
+      }
+    }
   }
 
   dispose(): void {

@@ -15,7 +15,7 @@ import { STARTING_CREDITS, STARTING_FUEL, HYPERSPACE, GALAXY_YEAR_START, type Go
 import type { NPCCargoEntry } from './mechanics/NPCSystem';
 import type { NPCShipArchetype } from './archetypes';
 
-export type UIMode = 'flight' | 'cluster_map' | 'system_map' | 'docked' | 'hyperspace' | 'landing' | 'comms' | 'dead' | 'menu';
+export type UIMode = 'loading' | 'flight' | 'cluster_map' | 'system_map' | 'docked' | 'hyperspace' | 'landing' | 'comms' | 'dead' | 'menu';
 
 export interface PendingCommContext {
   npcId: string;
@@ -98,6 +98,8 @@ export interface GameStateData {
     hyperspaceCountdown: number;
     deathMessage: string[] | null;
     canDockNow: boolean;
+    canLandNow: boolean;
+    canScanNow: boolean;
   };
   time: number; // game time in seconds
 
@@ -142,6 +144,8 @@ export interface GameActions {
   setHyperspaceCountdown: (n: number) => void;
   setDeathMessage: (lines: string[] | null) => void;
   setCanDockNow: (canDockNow: boolean) => void;
+  setCanLandNow: (canLandNow: boolean) => void;
+  setCanScanNow: (canScanNow: boolean) => void;
   addCredits: (delta: number) => void;
   addCargo: (good: GoodName, qty: number, purchasePrice?: number) => void;
   removeCargo: (good: GoodName, qty: number) => void;
@@ -280,7 +284,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
   clusterSummary: [],
   visitedSystems: new Set(),
   ui: {
-    mode: 'flight',
+    mode: 'loading',
     alertMessage: null,
     scanLabel: null,
     scanProgress: 0,
@@ -288,6 +292,8 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
     hyperspaceCountdown: 0,
     deathMessage: null,
     canDockNow: false,
+    canLandNow: false,
+    canScanNow: false,
   },
   time: 0,
 
@@ -348,6 +354,12 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
   setDeathMessage: (lines) => set(s => ({ ui: { ...s.ui, deathMessage: lines } })),
   setCanDockNow: (canDockNow) => set((s) => (
     s.ui.canDockNow === canDockNow ? {} : { ui: { ...s.ui, canDockNow } }
+  )),
+  setCanLandNow: (canLandNow) => set((s) => (
+    s.ui.canLandNow === canLandNow ? {} : { ui: { ...s.ui, canLandNow } }
+  )),
+  setCanScanNow: (canScanNow) => set((s) => (
+    s.ui.canScanNow === canScanNow ? {} : { ui: { ...s.ui, canScanNow } }
   )),
   addCredits: (delta) => set(s => ({ player: { ...s.player, credits: s.player.credits + delta } })),
   addCargo: (good, qty, purchasePrice) => set(s => {
@@ -482,6 +494,8 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
         hyperspaceCountdown: 0,
         deathMessage: null,
         canDockNow: false,
+        canLandNow: false,
+        canScanNow: false,
       },
     });
   },

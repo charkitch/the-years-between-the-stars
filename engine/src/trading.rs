@@ -29,6 +29,8 @@ fn base_price(good: GoodName) -> i32 {
         GoodName::AncestralBackups => 790,
         GoodName::SurrenderCodes => 828,
         GoodName::ImpossibleSeeds => 910,
+        GoodName::RelativisticAsh => 1280,
+        GoodName::PulsarSilk => 1340,
     }
 }
 
@@ -54,6 +56,8 @@ fn volatility(good: GoodName) -> f64 {
         GoodName::AncestralBackups => 0.38,
         GoodName::SurrenderCodes => 0.44,
         GoodName::ImpossibleSeeds => 0.46,
+        GoodName::RelativisticAsh => 0.38,
+        GoodName::PulsarSilk => 0.40,
     }
 }
 
@@ -79,6 +83,8 @@ fn rarity(good: GoodName) -> f64 {
         GoodName::AncestralBackups => 0.82,
         GoodName::SurrenderCodes => 0.88,
         GoodName::ImpossibleSeeds => 0.93,
+        GoodName::RelativisticAsh => 0.98,
+        GoodName::PulsarSilk => 0.98,
     }
 }
 
@@ -263,6 +269,9 @@ fn economy_modifier(economy: EconomyType, good: GoodName) -> i32 {
 }
 
 fn listing_probability(economy: EconomyType, good: GoodName) -> f64 {
+    if matches!(good, GoodName::RelativisticAsh | GoodName::PulsarSilk) {
+        return 0.0;
+    }
     let rarity_discount = (1.0 - rarity(good)) * 0.38;
     let econ = economy_modifier(economy, good);
     let abundance_bonus = ((-econ).max(0) as f64 / 220.0) * 0.30;

@@ -13,6 +13,8 @@ interface TouchFlightControlsProps {
   enabled: boolean;
   isInMotion: boolean;
   canDockNow: boolean;
+  canLandNow: boolean;
+  canScanNow: boolean;
   onInputChange: (input: TouchFlightInput) => void;
   onDock: () => void;
   onHail: () => void;
@@ -32,6 +34,8 @@ export function TouchFlightControls({
   enabled,
   isInMotion,
   canDockNow,
+  canLandNow,
+  canScanNow,
   onInputChange,
   onDock,
   onHail,
@@ -244,6 +248,24 @@ export function TouchFlightControls({
           onClick={onDock}
         >
           DOCK
+        </button>
+      )}
+      {enabled && canLandNow && !canDockNow && (
+        <button
+          type="button"
+          className={styles.quickLandButton}
+          onClick={onLand}
+        >
+          LAND
+        </button>
+      )}
+      {enabled && canScanNow && (
+        <button
+          type="button"
+          className={styles.quickScanButton}
+          onClick={onScan}
+        >
+          SCAN
         </button>
       )}
 

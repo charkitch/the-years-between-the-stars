@@ -111,10 +111,10 @@ export class FlightModel {
     return Math.max(0.5, Math.min(3.0, dist * HYPERSPACE.fuelPerUnit));
   }
 
-  resolveCollisions(shipGroup: THREE.Group, collidables: SceneEntity[]): boolean {
+  resolveCollisions(shipGroup: THREE.Group, collidables: SceneEntity[]): SceneEntity | null {
     const shipPos = shipGroup.position;
     const SHIP_RADIUS = 10;
-    let hit = false;
+    let hitEntity: SceneEntity | null = null;
     for (const body of collidables) {
       if (resolveDysonShellCollision(shipPos, body, SHIP_RADIUS, _dysonNormalWorld)) {
         const dot = this.velocity.dot(_dysonNormalWorld);
@@ -122,7 +122,7 @@ export class FlightModel {
           this.velocity.addScaledVector(_dysonNormalWorld, -dot * 1.5);
           this.velocity.multiplyScalar(0.5);
         }
-        hit = true;
+        hitEntity = body;
         continue;
       }
       if (body.type === 'dyson_shell') continue;
@@ -140,7 +140,7 @@ export class FlightModel {
               this.velocity.addScaledVector(normal, -dot * 1.5);
               this.velocity.multiplyScalar(0.5);
             }
-            hit = true;
+            hitEntity = body;
             break;
           }
         }
@@ -156,11 +156,11 @@ export class FlightModel {
             this.velocity.addScaledVector(normal, -dot * 1.5);
             this.velocity.multiplyScalar(0.5);
           }
-          hit = true;
+          hitEntity = body;
         }
       }
     }
-    return hit;
+    return hitEntity;
   }
 
   reset(position: THREE.Vector3) {

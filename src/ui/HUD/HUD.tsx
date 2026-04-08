@@ -58,6 +58,8 @@ export function HUD({
   const scanLabel = useGameState(s => s.ui.scanLabel);
   const uiMode = useGameState(s => s.ui.mode);
   const canDockNow = useGameState(s => s.ui.canDockNow);
+  const canLandNow = useGameState(s => s.ui.canLandNow);
+  const canScanNow = useGameState(s => s.ui.canScanNow);
   const galaxyYear = useGameState(s => s.galaxyYear);
   const knownFactions = useGameState(s => s.knownFactions);
   const currentSystemPayload = useGameState(s => s.currentSystemPayload);
@@ -160,6 +162,7 @@ export function HUD({
   const isMobileHUD = Boolean(runtimeProfile?.isMobile);
   const touchFlightEnabled = isMobileHUD && isLandscapePlayable && uiMode === 'flight';
   const isInMotion = player.speed > 1;
+  const isLandingIntelAlert = Boolean(alert?.startsWith('LANDING SITES MAPPED:'));
 
   return (
     <div className={`${styles.hud} ${isMobileHUD ? styles.mobile : ''}`}>
@@ -170,7 +173,7 @@ export function HUD({
       </div>
 
       {/* Alert */}
-      {alert && <div className={styles.alertBanner}>{alert}</div>}
+      {alert && <div className={`${styles.alertBanner} ${isLandingIntelAlert ? styles.alertBannerIntel : ''}`}>{alert}</div>}
       {scanProgress > 0 && scanLabel && (
         <div className={styles.scanWidget}>
           <div className={styles.scanLabel}>{scanLabel}</div>
@@ -356,14 +359,24 @@ export function HUD({
           <StatusBars />
         </div>
       )}
-      {!isMobileHUD && uiMode === 'flight' && canDockNow && (
-        <button
-          type="button"
-          className={styles.desktopDockButton}
-          onClick={onDock}
-        >
-          DOCK
-        </button>
+      {!isMobileHUD && uiMode === 'flight' && (canDockNow || canLandNow || canScanNow) && (
+        <div className={styles.desktopActionStack}>
+          {canDockNow && (
+            <button type="button" className={`${styles.desktopActionButton} ${styles.desktopDockButton}`} onClick={onDock}>
+              DOCK
+            </button>
+          )}
+          {canLandNow && !canDockNow && (
+            <button type="button" className={`${styles.desktopActionButton} ${styles.desktopLandButton}`} onClick={onLand}>
+              LAND
+            </button>
+          )}
+          {canScanNow && (
+            <button type="button" className={`${styles.desktopActionButton} ${styles.desktopScanButton}`} onClick={onScan}>
+              SCAN
+            </button>
+          )}
+        </div>
       )}
 
       {/* Top-center: thin status bars (mobile only) */}
@@ -378,6 +391,8 @@ export function HUD({
           enabled={touchFlightEnabled}
           isInMotion={isInMotion}
           canDockNow={canDockNow}
+          canLandNow={canLandNow}
+          canScanNow={canScanNow}
           onInputChange={onTouchFlightInput}
           onDock={onDock}
           onHail={onHail}

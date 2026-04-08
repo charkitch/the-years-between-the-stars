@@ -55,6 +55,11 @@ export const HYPERSPACE = {
   duration:    2,  // tunnel animation seconds
 } as const;
 
+export const TRAVEL_TERMS = {
+  modeName: 'Nearlight Passage',
+  modeNameUpper: 'NEARLIGHT PASSAGE',
+} as const;
+
 export const FUEL_HARVEST = {
   range: 400,            // units from base to begin harvesting
   rates: {               // fuel units per second
@@ -233,10 +238,14 @@ const BUYABLE_GOODS = [
 ] as const;
 
 export const COMBAT_INTELLIGENCE_GOOD = 'Combat Intelligence' as const;
+export const RELATIVISTIC_ASH_GOOD = 'Relativistic Ash' as const;
+export const PULSAR_SILK_GOOD = 'Pulsar Silk' as const;
 
 export const GOODS = [
   ...BUYABLE_GOODS,
   COMBAT_INTELLIGENCE_GOOD,
+  RELATIVISTIC_ASH_GOOD,
+  PULSAR_SILK_GOOD,
 ] as const;
 
 export type GoodName = typeof GOODS[number];

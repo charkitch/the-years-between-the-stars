@@ -42,7 +42,7 @@ fn star_radius_range(st: StarType) -> (f64, f64) {
         StarType::MG  => (8.0, 12.0),
         StarType::BH  => (90.0, 140.0),
         StarType::XBB => (28.0, 48.0),
-        StarType::MQ  => (42.0, 70.0),
+        StarType::MQ  => (80.0, 120.0),
         StarType::SGR => (8.0, 12.0),
         _ => (400.0, 600.0),
     }
@@ -332,121 +332,6 @@ fn pick_station_archetype(star: &StarSystemData, rng: &mut PRNG) -> StationArche
     }
 }
 
-fn generate_origin_debug_planets(star: &StarSystemData, rng: &mut PRNG) -> Vec<PlanetData> {
-    const DEBUG_ROCKY_SURFACES: &[SurfaceType] = &[
-        SurfaceType::Continental,
-        SurfaceType::Ocean,
-        SurfaceType::Marsh,
-        SurfaceType::Venus,
-        SurfaceType::Barren,
-        SurfaceType::Desert,
-        SurfaceType::Ice,
-        SurfaceType::Volcanic,
-        SurfaceType::ForestMoon,
-        SurfaceType::Mountain,
-    ];
-    const DEBUG_GAS_TYPES: &[GasGiantType] = &[
-        GasGiantType::Jovian,
-        GasGiantType::Saturnian,
-        GasGiantType::Neptunian,
-        GasGiantType::Inferno,
-        GasGiantType::Chromatic,
-        GasGiantType::Helium,
-    ];
-
-    let mut planets: Vec<PlanetData> = Vec::new();
-    let mut orbit_base = 1000.0;
-
-    for (i, &surface_type) in DEBUG_ROCKY_SURFACES.iter().enumerate() {
-        let orbit_radius = orbit_base + 350.0;
-        orbit_base = orbit_radius + 450.0;
-        let planet_radius = 85.0 + (i % 3) as f64 * 10.0;
-        let (has_clouds, cloud_density) = generate_rocky_clouds(rng, surface_type);
-        let interaction_field = build_planet_interaction_field(
-            star.id,
-            i as u32,
-            PlanetType::Rocky,
-            surface_type,
-            GasGiantType::Jovian,
-        );
-
-        let has_station = i == 0;
-        planets.push(PlanetData {
-            id: format!("{}-debug-r{}", star.id, i),
-            name: planet_name(&star.name, i),
-            planet_type: PlanetType::Rocky,
-            surface_type,
-            gas_type: GasGiantType::Jovian,
-            radius: planet_radius,
-            orbit_radius,
-            orbit_speed: 0.00008 + (i as f64 * 0.000003),
-            orbit_phase: rng.float(0.0, PI * 2.0),
-            color: *rng.pick(ROCKY_COLORS),
-            has_rings: false,
-            ring_count: 1,
-            ring_inclination: 0.0,
-            has_clouds,
-            cloud_density,
-            great_spot: false,
-            great_spot_lat: 0.0,
-            great_spot_size: 0.0,
-            moons: Vec::new(),
-            has_station,
-            station_archetype: if has_station {
-                Some(StationArchetype::TradeHub)
-            } else {
-                None
-            },
-            interaction_field,
-        });
-    }
-
-    // Insert a clear orbit gap where asteroid belts usually appear.
-    orbit_base += 1200.0;
-
-    for (i, &gas_type) in DEBUG_GAS_TYPES.iter().enumerate() {
-        let orbit_radius = orbit_base + 1400.0;
-        orbit_base = orbit_radius + 1800.0;
-        let (great_spot, great_spot_lat, great_spot_size) = generate_great_spot(rng, gas_type);
-        let has_rings = matches!(gas_type, GasGiantType::Saturnian | GasGiantType::Helium);
-        let ring_count = if matches!(gas_type, GasGiantType::Saturnian) { 3 } else { 1 };
-        let interaction_field = build_planet_interaction_field(
-            star.id,
-            (DEBUG_ROCKY_SURFACES.len() + i) as u32,
-            PlanetType::GasGiant,
-            SurfaceType::Barren,
-            gas_type,
-        );
-
-        planets.push(PlanetData {
-            id: format!("{}-debug-g{}", star.id, i),
-            name: planet_name(&star.name, DEBUG_ROCKY_SURFACES.len() + i),
-            planet_type: PlanetType::GasGiant,
-            surface_type: SurfaceType::Barren,
-            gas_type,
-            radius: 215.0 + (i % 2) as f64 * 18.0,
-            orbit_radius,
-            orbit_speed: 0.000015 + (i as f64 * 0.000001),
-            orbit_phase: rng.float(0.0, PI * 2.0),
-            color: *rng.pick(GAS_COLORS),
-            has_rings,
-            ring_count,
-            ring_inclination: if has_rings { 0.12 } else { 0.0 },
-            has_clouds: false,
-            cloud_density: 0.0,
-            great_spot,
-            great_spot_lat,
-            great_spot_size,
-            moons: Vec::new(),
-            has_station: false,
-            station_archetype: None,
-            interaction_field,
-        });
-    }
-
-    planets
-}
-
 fn generate_dyson_shells(star: &StarSystemData) -> Vec<DysonShellSegmentData> {
     if star.star_type != StarType::Iron {
         return vec![];
@@ -560,30 +445,62 @@ fn generate_dyson_shells(star: &StarSystemData) -> Vec<DysonShellSegmentData> {
     shells
 }
 
+fn generate_binary_companion(star_type: StarType, rng: &mut PRNG) -> Option<BinaryCompanionData> {
+    if !matches!(star_type, StarType::XB | StarType::XBB | StarType::MQ) {
+        return None;
+    }
+    let companion_type = match star_type {
+        StarType::XBB => {
+            let roll = rng.next();
+            if roll < 0.55 {
+                StarType::K
+            } else if roll < 0.90 {
+                StarType::M
+            } else {
+                StarType::G
+            }
+        }
+        StarType::MQ => {
+            let roll = rng.next();
+            if roll < 0.42 {
+                StarType::A
+            } else if roll < 0.77 {
+                StarType::F
+            } else {
+                StarType::G
+            }
+        }
+        _ => {
+            let companion_types = [StarType::G, StarType::K, StarType::F, StarType::A];
+            *rng.pick(&companion_types)
+        }
+    };
+    Some(BinaryCompanionData {
+        star_type: companion_type,
+        radius: if matches!(star_type, StarType::MQ) {
+            rng.float(420.0, 620.0)
+        } else {
+            rng.float(350.0, 550.0)
+        },
+        color: star_color(companion_type),
+        orbit_radius: if matches!(star_type, StarType::MQ) {
+            rng.float(900.0, 1250.0)
+        } else {
+            rng.float(850.0, 1150.0)
+        },
+        orbit_speed: if matches!(star_type, StarType::MQ) {
+            rng.float(0.00014, 0.00028)
+        } else {
+            rng.float(0.00016, 0.00034)
+        },
+        orbit_phase: rng.float(0.0, PI * 2.0),
+    })
+}
+
 pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
     let mut rng = PRNG::from_index(CLUSTER_SEED, star.id.wrapping_mul(97).wrapping_add(13));
 
-    if star.id == 0 {
-        let (radius_min, radius_max) = star_radius_range(star.star_type);
-        let star_radius = rng.float(radius_min, radius_max);
-        let planets = generate_origin_debug_planets(star, &mut rng);
-        let main_station_planet_id = planets.iter()
-            .find(|p| p.has_station)
-            .or_else(|| planets.first())
-            .map(|p| p.id.clone())
-            .unwrap_or_default();
-
-        return SolarSystemData {
-            star_type: star.star_type,
-            star_radius,
-            companion: None,
-            planets,
-            dyson_shells: vec![],
-            asteroid_belt: None,
-            main_station_planet_id,
-            secret_bases: vec![],
-        };
-    }
+    // Home system (id 0) now uses normal generation like every other system.
 
     let profile = system_profile_for(star.star_type);
 
@@ -593,59 +510,7 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
     let (radius_min, radius_max) = star_radius_range(star.star_type);
     let star_radius = rng.float(radius_min, radius_max);
 
-    // Binary companion for accreting compact systems (XB, XBB, MQ)
-    let companion = if matches!(star.star_type, StarType::XB | StarType::XBB | StarType::MQ) {
-        let companion_type = match star.star_type {
-            StarType::XBB => {
-                // X-ray bursters favor cooler main-sequence donors.
-                let roll = rng.next();
-                if roll < 0.55 {
-                    StarType::K
-                } else if roll < 0.90 {
-                    StarType::M
-                } else {
-                    StarType::G
-                }
-            }
-            StarType::MQ => {
-                // Microquasars skew toward brighter donors so the binary reads clearly.
-                let roll = rng.next();
-                if roll < 0.42 {
-                    StarType::A
-                } else if roll < 0.77 {
-                    StarType::F
-                } else {
-                    StarType::G
-                }
-            }
-            _ => {
-                let companion_types = [StarType::G, StarType::K, StarType::F, StarType::A];
-                *rng.pick(&companion_types)
-            }
-        };
-        Some(BinaryCompanionData {
-            star_type: companion_type,
-            radius: if matches!(star.star_type, StarType::MQ) {
-                rng.float(420.0, 620.0)
-            } else {
-                rng.float(350.0, 550.0)
-            },
-            color: star_color(companion_type),
-            orbit_radius: if matches!(star.star_type, StarType::MQ) {
-                rng.float(900.0, 1250.0)
-            } else {
-                rng.float(850.0, 1150.0)
-            },
-            orbit_speed: if matches!(star.star_type, StarType::MQ) {
-                rng.float(0.00014, 0.00028)
-            } else {
-                rng.float(0.00016, 0.00034)
-            },
-            orbit_phase: rng.float(0.0, PI * 2.0),
-        })
-    } else {
-        None
-    };
+    let companion = generate_binary_companion(star.star_type, &mut rng);
 
     let binary_outer_edge = companion.as_ref().map_or(0.0, |binary_companion| {
         let compact_outer_edge = binary_companion.orbit_radius * 0.4 + star_radius;
@@ -985,7 +850,7 @@ mod tests {
             .fold(f64::INFINITY, f64::min);
 
         assert!(matches!(companion.star_type, StarType::A | StarType::F | StarType::G));
-        assert!((42.0..=70.0).contains(&system.star_radius));
+        assert!((80.0..=120.0).contains(&system.star_radius));
         assert!(innermost_planet >= binary_outer_edge + 200.0);
     }
 
@@ -1028,43 +893,4 @@ mod tests {
         assert!(system.dyson_shells.is_empty());
     }
 
-    #[test]
-    fn origin_system_includes_all_planet_variants_for_debugging() {
-        let cluster = generate_cluster();
-        let origin = &cluster[0];
-        let system = generate_solar_system(origin);
-
-        let rocky_surfaces = [
-            SurfaceType::Continental,
-            SurfaceType::Ocean,
-            SurfaceType::Marsh,
-            SurfaceType::Venus,
-            SurfaceType::Barren,
-            SurfaceType::Desert,
-            SurfaceType::Ice,
-            SurfaceType::Volcanic,
-            SurfaceType::ForestMoon,
-            SurfaceType::Mountain,
-        ];
-        let gas_types = [
-            GasGiantType::Jovian,
-            GasGiantType::Saturnian,
-            GasGiantType::Neptunian,
-            GasGiantType::Inferno,
-            GasGiantType::Chromatic,
-            GasGiantType::Helium,
-        ];
-
-        for surface in rocky_surfaces {
-            assert!(system.planets.iter().any(|planet| {
-                planet.planet_type == PlanetType::Rocky && planet.surface_type == surface
-            }));
-        }
-
-        for gas in gas_types {
-            assert!(system.planets.iter().any(|planet| {
-                planet.planet_type == PlanetType::GasGiant && planet.gas_type == gas
-            }));
-        }
-    }
 }
