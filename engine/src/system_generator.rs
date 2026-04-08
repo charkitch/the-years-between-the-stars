@@ -551,8 +551,20 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
                 cloud_density: moon_cloud_density,
             });
         }
-        let rocky_surface = pick_weighted_surface(&mut rng, profile.rocky_weights);
-        let (has_clouds, cloud_density) = generate_rocky_clouds(&mut rng, rocky_surface);
+        let rocky_surface = if star.id == 0 && i == 0 {
+            // Keep the first planet in the home system continental
+            let _ = pick_weighted_surface(&mut rng, profile.rocky_weights);
+            SurfaceType::Continental
+        } else {
+            pick_weighted_surface(&mut rng, profile.rocky_weights)
+        };
+        let (has_clouds, cloud_density) = if star.id == 0 && i == 0 {
+            // Home planet always has clouds
+            let _ = generate_rocky_clouds(&mut rng, rocky_surface);
+            (true, 0.45)
+        } else {
+            generate_rocky_clouds(&mut rng, rocky_surface)
+        };
         let interaction_field = build_planet_interaction_field(
             star.id,
             i as u32,
@@ -583,7 +595,13 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
             moons,
             has_station,
             station_archetype: if has_station {
-                Some(pick_station_archetype(star, &mut rng))
+                if star.id == 0 && i == 0 {
+                    // Keep the home station as the familiar ring (TradeHub)
+                    let _ = pick_station_archetype(star, &mut rng);
+                    Some(StationArchetype::TradeHub)
+                } else {
+                    Some(pick_station_archetype(star, &mut rng))
+                }
             } else {
                 None
             },

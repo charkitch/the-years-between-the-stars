@@ -314,6 +314,7 @@ export class Game {
     state.setCanDockNow(this.canDockNow(speed));
     state.setCanLandNow(this.canLandNow(speed));
     state.setCanScanNow(this.canScanNow());
+    state.setCanHailNow(this.canHailNow());
     this.tickScanProgress(dt, state, pos);
 
     // Fuel scooping near star
@@ -570,6 +571,14 @@ export class Game {
     const dist = shipPos.distanceTo(entity.worldPos);
     const required = entity.collisionRadius + (entity.type === 'dyson_shell' ? DYSON_SCAN_RANGE_PADDING : PLANET_SCAN_RANGE_PADDING);
     return dist <= required;
+  }
+
+  private canHailNow(): boolean {
+    const state = useGameState.getState();
+    const targetId = state.player.targetId;
+    if (!targetId) return false;
+    const entity = this.sceneRenderer.getAllEntities().get(targetId);
+    return entity?.type === 'npc_ship';
   }
 
   private tryDock(): void {
@@ -1394,9 +1403,6 @@ export class Game {
 
           // Offset position outward
           shipPos.addScaledVector(dir, 30);
-
-          // Initial velocity outward
-          this.flightModel.velocity.copy(dir).multiplyScalar(80);
         }
       }
     }
