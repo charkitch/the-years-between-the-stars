@@ -19,7 +19,7 @@ import {
 } from './meshFactory';
 import { selectSkin } from './planetSkins';
 import { disposeAll as disposeTextureCache } from './textureCache';
-import type { InteractionFieldData, SolarSystemData, SystemFactionState } from '../engine';
+import type { InteractionFieldData, MoonData, SolarSystemData, SystemFactionState } from '../engine';
 import { generateNPCShips } from '../mechanics/NPCSystem';
 import type { NPCShipState } from '../mechanics/NPCSystem';
 import { generateFleetBattle } from '../mechanics/FleetBattleSystem';
@@ -435,6 +435,7 @@ export class SceneRenderer {
 
       this.entities.set('companion-star', {
         id: 'companion-star',
+        name: systemName,
         group: companionGroup,
         orbitRadius: companion.orbitRadius,
         orbitSpeed: companion.orbitSpeed,
@@ -471,7 +472,6 @@ export class SceneRenderer {
         const beamColor = 0x44AAFF;
         const beamLen = 60000;
         const baseWidth = data.starRadius * 0.6;
-        const tipWidth = data.starRadius * 0.05;
         const outerMat = createBeamMaterial(beamColor, 0.65, 0.6);
         const coreMat = createBeamMaterial(beamColor, 0.9, 0.3);
         const beamGroup = new THREE.Group();
@@ -513,6 +513,7 @@ export class SceneRenderer {
 
     this.entities.set('star', {
       id: 'star',
+      name: systemName,
       group: starGroup,
       orbitRadius: starOrbitRadius,
       orbitSpeed: starOrbitSpeed,
@@ -583,6 +584,7 @@ export class SceneRenderer {
 
       this.entities.set(planet.id, {
         id: planet.id,
+        name: planet.name,
         group: planetGroup,
         orbitRadius: planet.orbitRadius,
         orbitSpeed: planet.orbitSpeed,
@@ -632,6 +634,7 @@ export class SceneRenderer {
         this.systemObjects.push(stationGroup);
         this.entities.set(stationId, {
           id: stationId,
+          name: `${planet.name} Station`,
           group: stationGroup,
           orbitRadius: planet.radius * 2.5,
           orbitSpeed: planet.orbitSpeed * 2,
@@ -645,37 +648,9 @@ export class SceneRenderer {
       }
 
       // Moons
-      for (const moon of planet.moons) {
-        const moonSeed = rng.next() * 100;
-        let moonGroup: THREE.Group;
-        if (texturesEnabled) {
-          const skin = selectSkin('moon', skinRng);
-          moonGroup = makeTexturedPlanet(moon.radius, moon.color, skin, wireOverlay, moonSeed, moon.surfaceType);
-        } else {
-          moonGroup = makePlanet(moon.radius, moon.color, 0, moonSeed, moon.surfaceType);
-        }
-        if (moon.hasClouds) {
-          addCloudLayer(moonGroup, moon.radius, moonSeed, moon.cloudDensity, moon.surfaceType);
-        }
-        addCityLights(moonGroup, moon.radius, moonSeed, moon.surfaceType);
-        addSunAtmosphere(moonGroup, moon.radius);
-        if (rng.next() < 0.05) {
-          this.lightningMaterials.push(addLightning(moonGroup, moon.radius, moonSeed));
-        }
-        this.scene.add(moonGroup);
-        this.systemObjects.push(moonGroup);
-        this.entities.set(moon.id, {
-          id: moon.id,
-          group: moonGroup,
-          orbitRadius: moon.orbitRadius,
-          orbitSpeed: moon.orbitSpeed,
-          orbitPhase: moon.orbitPhase,
-          parentId: planet.id,
-          type: 'moon',
-          worldPos: new THREE.Vector3(),
-          collisionRadius: moon.radius,
-        });
-      }
+      planet.moons.forEach((moon, mi) =>
+        this.addMoon(moon, mi, planet, rng, skinRng),
+      );
     }
 
     for (const shell of data.dysonShells) {
@@ -738,6 +713,7 @@ export class SceneRenderer {
 
       this.entities.set(shell.id, {
         id: shell.id,
+        name: shell.name,
         group: shellGroup,
         orbitRadius: shell.orbitRadius,
         orbitSpeed: shell.orbitSpeed,
@@ -797,6 +773,7 @@ export class SceneRenderer {
 
       this.entities.set(base.id, {
         id: base.id,
+        name: base.name,
         group: baseGroup,
         orbitRadius: base.orbitRadius,
         orbitSpeed: base.orbitSpeed,
@@ -871,6 +848,7 @@ export class SceneRenderer {
 
       this.entities.set(shipData.id, {
         id: shipData.id,
+        name: shipData.name,
         group: mesh,
         orbitRadius: 0,
         orbitSpeed: 0,
@@ -916,49 +894,31 @@ export class SceneRenderer {
         const factionB = getFaction(battle.factionB);
         const colorA = factionA?.color ?? 0xFF4444;
         const colorB = factionB?.color ?? 0x4488FF;
+        const nameA = `${factionA?.name ?? 'Unknown'} Fleet`;
+        const nameB = `${factionB?.name ?? 'Unknown'} Fleet`;
 
-        const shipWorldPosA: THREE.Vector3[] = [];
-        const shipWorldPosB: THREE.Vector3[] = [];
-
-        for (const ship of battle.shipsA) {
-          const mesh = makeFleetShipMesh(colorA, ship.scale);
-          mesh.position.copy(ship.localOffset);
-          battleGroup.add(mesh);
-
-          const worldPos = ship.localOffset.clone().add(battle.position);
-          shipWorldPosA.push(worldPos);
-
-          this.entities.set(ship.id, {
-            id: ship.id,
-            group: mesh,
-            orbitRadius: 0,
-            orbitSpeed: 0,
-            orbitPhase: 0,
-            type: 'fleet_ship',
-            worldPos: worldPos,
-            collisionRadius: 0,
+        const addFleetShips = (ships: typeof battle.shipsA, color: number, name: string) =>
+          ships.map((ship) => {
+            const mesh = makeFleetShipMesh(color, ship.scale);
+            mesh.position.copy(ship.localOffset);
+            battleGroup.add(mesh);
+            const worldPos = ship.localOffset.clone().add(battle.position);
+            this.entities.set(ship.id, {
+              id: ship.id,
+              name,
+              group: mesh,
+              orbitRadius: 0,
+              orbitSpeed: 0,
+              orbitPhase: 0,
+              type: 'fleet_ship',
+              worldPos,
+              collisionRadius: 0,
+            });
+            return worldPos;
           });
-        }
 
-        for (const ship of battle.shipsB) {
-          const mesh = makeFleetShipMesh(colorB, ship.scale);
-          mesh.position.copy(ship.localOffset);
-          battleGroup.add(mesh);
-
-          const worldPos = ship.localOffset.clone().add(battle.position);
-          shipWorldPosB.push(worldPos);
-
-          this.entities.set(ship.id, {
-            id: ship.id,
-            group: mesh,
-            orbitRadius: 0,
-            orbitSpeed: 0,
-            orbitPhase: 0,
-            type: 'fleet_ship',
-            worldPos: worldPos,
-            collisionRadius: 0,
-          });
-        }
+        const shipWorldPosA = addFleetShips(battle.shipsA, colorA, nameA);
+        const shipWorldPosB = addFleetShips(battle.shipsB, colorB, nameB);
 
         // Create projectile + explosion effects
         this.battleProjectiles = createBattleProjectiles(
@@ -1008,6 +968,43 @@ export class SceneRenderer {
     }
   }
 
+  private addMoon(
+    moon: MoonData,
+    index: number,
+    planet: { id: string; name: string },
+    rng: PRNG,
+    skinRng: PRNG,
+  ): void {
+    const moonSeed = rng.next() * 100;
+    const suffix = String.fromCharCode(97 + index); // a, b, c, ...
+    const { planetTexturesEnabled: textured, planetWireOverlayEnabled: wireOverlay } = RENDER_CONFIG;
+    const moonGroup = textured
+      ? makeTexturedPlanet(moon.radius, moon.color, selectSkin('moon', skinRng), wireOverlay, moonSeed, moon.surfaceType)
+      : makePlanet(moon.radius, moon.color, 0, moonSeed, moon.surfaceType);
+    if (moon.hasClouds) {
+      addCloudLayer(moonGroup, moon.radius, moonSeed, moon.cloudDensity, moon.surfaceType);
+    }
+    addCityLights(moonGroup, moon.radius, moonSeed, moon.surfaceType);
+    addSunAtmosphere(moonGroup, moon.radius);
+    if (rng.next() < 0.05) {
+      this.lightningMaterials.push(addLightning(moonGroup, moon.radius, moonSeed));
+    }
+    this.scene.add(moonGroup);
+    this.systemObjects.push(moonGroup);
+    this.entities.set(moon.id, {
+      id: moon.id,
+      name: `${planet.name}-${suffix}`,
+      group: moonGroup,
+      orbitRadius: moon.orbitRadius,
+      orbitSpeed: moon.orbitSpeed,
+      orbitPhase: moon.orbitPhase,
+      parentId: planet.id,
+      type: 'moon',
+      worldPos: new THREE.Vector3(),
+      collisionRadius: moon.radius,
+    });
+  }
+
   private addPlanetLandingSites(params: {
     hostId: string;
     hostLabel: string;
@@ -1048,8 +1045,10 @@ export class SceneRenderer {
 
       const idx = ++this.landingSiteCounter;
       const id = `site-${hostId}-${idx}`;
+      const siteLabel = `${hostLabel} ${bodyKind === 'gas_giant' ? 'BAND' : 'SITE'} ${created + 1}`;
       this.entities.set(id, {
         id,
+        name: siteLabel,
         group: marker,
         orbitRadius: 0,
         orbitSpeed: 0,
@@ -1057,7 +1056,7 @@ export class SceneRenderer {
         type: 'landing_site',
         worldPos: new THREE.Vector3(),
         collisionRadius: 0,
-        siteLabel: `${hostLabel} ${bodyKind === 'gas_giant' ? 'BAND' : 'SITE'} ${created + 1}`,
+        siteLabel,
         siteClassification: cls,
         siteHostLabel: hostLabel,
         siteHostId: hostId,
@@ -1123,8 +1122,10 @@ export class SceneRenderer {
 
       const idx = ++this.landingSiteCounter;
       const id = `site-${hostId}-${idx}`;
+      const siteLabel = `${hostLabel} ZONE ${created + 1}`;
       this.entities.set(id, {
         id,
+        name: siteLabel,
         group: marker,
         orbitRadius: 0,
         orbitSpeed: 0,
@@ -1132,7 +1133,7 @@ export class SceneRenderer {
         type: 'landing_site',
         worldPos: new THREE.Vector3(),
         collisionRadius: 0,
-        siteLabel: `${hostLabel} ZONE ${created + 1}`,
+        siteLabel,
         siteClassification: best.classification,
         siteHostLabel: hostLabel,
         siteHostId: hostId,

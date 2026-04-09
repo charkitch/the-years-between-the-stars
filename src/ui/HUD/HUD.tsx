@@ -156,10 +156,6 @@ export function HUD({
     player.targetId && currentSystem
       ? currentSystem.secretBases.find(b => b.id === player.targetId)
       : undefined;
-  const targetDyson =
-    player.targetId && currentSystem
-      ? currentSystem.dysonShells.find(s => s.id === player.targetId)
-      : undefined;
   const isMobileHUD = Boolean(runtimeProfile?.isMobile);
   const touchFlightEnabled = isMobileHUD && isLandscapePlayable && uiMode === 'flight';
   const isInMotion = player.speed > 1;
@@ -306,9 +302,7 @@ export function HUD({
               <>
                 <div className={styles.targetLabel}>TARGET</div>
                 <div>
-                  {targetEntity.type === 'landing_site'
-                    ? (targetEntity.siteLabel ?? 'INTERACTION SITE')
-                    : (targetDyson ? targetDyson.name.toUpperCase() : targetEntity.id.replace(`${currentSystemId}-`, '').replace(/(\d+)$/, (_, n) => String(Number(n) + 1)))}
+                  {targetEntity.name.toUpperCase()}
                 </div>
                 <div style={{ color: 'var(--color-hud-dim)', fontSize: '11px' }}>
                   DIST: {targetDist} wu
