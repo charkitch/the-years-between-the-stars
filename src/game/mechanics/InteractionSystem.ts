@@ -1,0 +1,444 @@
+import * as THREE from 'three';
+import type { SceneRenderer } from '../rendering/SceneRenderer';
+import type { FlightModel } from '../flight/FlightModel';
+import type { DockingSystem } from './DockingSystem';
+import type { TargetingSystem } from './TargetingSystem';
+import { useGameState } from '../GameState';
+import type { SystemChoices } from '../GameState';
+import { MARKET_GOODS, MAX_CARGO } from '../constants';
+import type { GoodName } from '../constants';
+import {
+  engineGetGameEvent, engineGetMarket,
+  type ChoiceEffect, type GameEvent,
+} from '../engine';
+import { buildWasmPlayerState } from '../systems/systemLoad';
+import { stationHostTypeToken } from '../archetypes';
+
+const FIRST_SYSTEM_ID = 0;
+const LAND_RANGE_PADDING_PLANET = 130;
+const LAND_RANGE_PADDING_DYSON = 180;
+const LAND_MAX_SPEED = 55;
+
+export class InteractionSystem {
+  private lastLandedSiteId: string | null = null;
+  hasUndocked = false;
+
+  constructor(
+    private sceneRenderer: SceneRenderer,
+    private flightModel: FlightModel,
+    private docking: DockingSystem,
+    private targeting: TargetingSystem,
+  ) {}
+
+  canDockNow(speed: number): boolean {
+    const pos = this.sceneRenderer.shipGroup.position;
+    const entities = this.sceneRenderer.getAllEntities();
+    const nearest = this.docking.findNearestStation(pos, entities);
+    if (!nearest) return false;
+    return this.docking.canDock(pos, nearest.pos, speed);
+  }
+
+  canLandNow(speed: number): boolean {
+    if (speed > LAND_MAX_SPEED) return false;
+    const state = useGameState.getState();
+    const targetId = state.player.targetId;
+    if (!targetId) return false;
+    const entities = this.sceneRenderer.getAllEntities();
+    const site = entities.get(targetId);
+    if (!site || site.type !== 'landing_site' || !site.siteDiscovered) return false;
+    const hostId = site.siteHostId;
+    const host = hostId ? entities.get(hostId) : null;
+    if (!host || (host.type !== 'planet' && host.type !== 'dyson_shell')) return false;
+    const shipPos = this.sceneRenderer.shipGroup.position;
+    const dist = shipPos.distanceTo(site.worldPos);
+    const required = host.collisionRadius + (host.type === 'dyson_shell' ? LAND_RANGE_PADDING_DYSON : LAND_RANGE_PADDING_PLANET);
+    return dist <= required;
+  }
+
+  canHailNow(): boolean {
+    const state = useGameState.getState();
+    const targetId = state.player.targetId;
+    if (!targetId) return false;
+    const entity = this.sceneRenderer.getAllEntities().get(targetId);
+    return entity?.type === 'npc_ship';
+  }
+
+  tryInteract(): void {
+    const state = useGameState.getState();
+    if (state.ui.mode !== 'flight') return;
+    const targetId = state.player.targetId;
+    if (targetId) {
+      const target = this.sceneRenderer.getAllEntities().get(targetId);
+      if (target?.type === 'landing_site' && target.siteDiscovered) {
+        this.tryLandAtTarget();
+        return;
+      }
+    }
+    this.tryDock();
+  }
+
+  tryLandAtTarget(): void {
+    const state = useGameState.getState();
+    if (state.ui.mode !== 'flight') return;
+
+    const targetId = state.player.targetId;
+    if (!targetId) {
+      state.setAlert('NO TARGET TO LAND');
+      setTimeout(() => useGameState.getState().setAlert(null), 1400);
+      return;
+    }
+    const site = this.sceneRenderer.getAllEntities().get(targetId);
+    if (!site || site.type !== 'landing_site' || !site.siteDiscovered) {
+      state.setAlert('TARGET A SCANNED LANDING SITE');
+      setTimeout(() => useGameState.getState().setAlert(null), 1800);
+      return;
+    }
+    const hostId = site.siteHostId;
+    const host = hostId ? this.sceneRenderer.getAllEntities().get(hostId) : null;
+    if (!host || (host.type !== 'planet' && host.type !== 'dyson_shell')) {
+      state.setAlert('INVALID LANDING TARGET');
+      setTimeout(() => useGameState.getState().setAlert(null), 1600);
+      return;
+    }
+
+    const shipPos = this.sceneRenderer.shipGroup.position;
+    const dist = shipPos.distanceTo(site.worldPos);
+    const required = host.collisionRadius + (host.type === 'dyson_shell' ? LAND_RANGE_PADDING_DYSON : LAND_RANGE_PADDING_PLANET);
+    if (dist > required) {
+      state.setAlert('TOO FAR TO LAND');
+      setTimeout(() => useGameState.getState().setAlert(null), 1600);
+      return;
+    }
+    if (state.player.speed > LAND_MAX_SPEED) {
+      state.setAlert('SPEED TOO HIGH TO LAND');
+      setTimeout(() => useGameState.getState().setAlert(null), 1600);
+      return;
+    }
+
+    const wasmState = buildWasmPlayerState(state);
+    const currentPayload = state.currentSystemPayload;
+    if (!currentPayload) return;
+    let event: GameEvent | null = null;
+    if (host.type === 'planet') {
+      const planet = currentPayload.system.planets.find((p) => p.id === host.id);
+      event = engineGetGameEvent(state.currentSystemId, wasmState, {
+        context: 'planet_landing',
+        surface: planet?.surfaceType,
+        siteClass: site.siteClassification,
+        hostType: 'planet',
+      });
+    } else {
+      event = engineGetGameEvent(state.currentSystemId, wasmState, {
+        context: 'dyson_landing',
+        siteClass: site.siteClassification,
+        hostType: 'dyson_shell',
+      });
+    }
+
+    this.lastLandedSiteId = targetId;
+    state.setPendingGameEvent({
+      systemId: state.currentSystemId,
+      civState: currentPayload.civState,
+      event,
+      rootEventId: event?.id ?? null,
+      yearsSinceLastVisit: null,
+      returnMode: 'flight',
+      landingSiteLabel: site.siteLabel ?? 'LANDING SITE',
+      landingHostLabel: site.siteHostLabel ?? null,
+    });
+    state.setUIMode('landing');
+  }
+
+  completeLanding(choiceId: string): void {
+    const state = useGameState.getState();
+    const ctx = state.pendingGameEvent;
+    if (!ctx) return;
+
+    const { systemId, event, rootEventId, returnMode } = ctx;
+
+    // Apply choice effect
+    if (event) {
+      const choice = event.choices.find(c => c.id === choiceId);
+      if (choice) {
+        const fx: ChoiceEffect = choice.effect;
+        const partial: SystemChoices = {
+          tradingReputation: fx.tradingReputation ?? 0,
+          bannedGoods: (fx.bannedGoods ?? []) as GoodName[],
+          priceModifier: fx.priceModifier ?? 1.0,
+          factionTag: fx.factionTag ?? null,
+          completedEventIds: [],
+          flags: fx.setsFlags ?? [],
+          firedTriggers: fx.fires ?? [],
+        };
+        state.recordPlayerChoice(systemId, rootEventId ?? event.id, partial);
+
+        if (fx.creditsReward) state.addCredits(fx.creditsReward);
+        if (fx.fuelReward) state.setFuel(state.player.fuel + fx.fuelReward);
+
+        if (choice.nextMoment) {
+          const followUp: GameEvent = {
+            id: event.id,
+            title: event.title,
+            narrativeLines: choice.nextMoment.narrativeLines,
+            choices: choice.nextMoment.choices,
+            triggeredBy: null,
+            triggeredOnly: false,
+          };
+          state.setPendingGameEvent({
+            ...ctx,
+            event: followUp,
+            rootEventId: rootEventId ?? event.id,
+          });
+          state.saveGame();
+          return;
+        }
+      }
+    }
+
+    // Record this visit year
+    state.recordVisitYear(systemId, state.galaxyYear);
+    const refreshedState = useGameState.getState();
+    refreshedState.setCurrentSystemMarket(
+      engineGetMarket(systemId, buildWasmPlayerState(refreshedState)),
+    );
+    // Remove landing site after planet/dyson landing (returnMode 'flight')
+    if (returnMode === 'flight' && this.lastLandedSiteId) {
+      this.sceneRenderer.removeLandingSite(this.lastLandedSiteId);
+      state.setTarget(null);
+      this.lastLandedSiteId = null;
+    }
+
+    state.setPendingGameEvent(null);
+    state.saveGame();
+    state.setUIMode(returnMode);
+  }
+
+  undock(): void {
+    const state = useGameState.getState();
+    state.setUIMode('flight');
+    this.hasUndocked = true;
+
+    // Eject ship away from station
+    const entities = this.sceneRenderer.getAllEntities();
+    const shipPos = this.sceneRenderer.shipGroup.position;
+    const nearest = this.docking.findNearestStation(shipPos, entities);
+
+    if (nearest) {
+      const station = entities.get(nearest.id);
+      if (station?.parentId) {
+        const parent = entities.get(station.parentId);
+        if (parent) {
+          // Direction: planet center → station (i.e. outward)
+          const dir = new THREE.Vector3()
+            .subVectors(station.worldPos, parent.worldPos)
+            .normalize();
+
+          // Offset position outward
+          shipPos.addScaledVector(dir, 30);
+        }
+      }
+    }
+  }
+
+  tryHail(): void {
+    const state = useGameState.getState();
+    if (state.ui.mode !== 'flight') return;
+
+    // If current target is already an NPC ship, hail it directly
+    let targetId = state.player.targetId;
+    const currentEntity = targetId ? this.sceneRenderer.getAllEntities().get(targetId) : null;
+    if (!targetId || !currentEntity || currentEntity.type !== 'npc_ship') {
+      // Auto-find nearest NPC ship
+      targetId = this.findNearestNPCShip();
+      if (!targetId) return;
+      this.targeting.setTargetAndRemember(targetId);
+    }
+
+    const npcState = this.sceneRenderer.getNPCShip(targetId);
+    if (!npcState) return;
+
+    const entity = this.sceneRenderer.getAllEntities().get(targetId)!;
+    const dist = this.sceneRenderer.shipGroup.position.distanceTo(entity.worldPos);
+    const bonusDemand = this.buildBonusDemandOffer(npcState.id);
+    state.setPendingCommContext({
+      npcId: npcState.id,
+      npcName: npcState.name,
+      originSystemName: npcState.originSystemName,
+      npcArchetype: npcState.archetype,
+      commLines: npcState.commLines,
+      cargo: npcState.cargo,
+      factionTag: npcState.factionTag,
+      inTradeRange: dist <= npcState.tradeRange,
+      bonusDemand,
+    });
+    state.setUIMode('comms');
+  }
+
+  tradeWithNPC(action: 'buy' | 'sell', good: GoodName): void {
+    const state = useGameState.getState();
+    const ctx = state.pendingCommContext;
+    if (!ctx || !ctx.inTradeRange) return;
+    const entry = ctx.cargo.find(c => c.good === good);
+
+    if (action === 'buy') {
+      if (!entry) return;
+      const totalCargo = Object.values(state.player.cargo).reduce((a, b) => a + (b ?? 0), 0);
+      if (state.player.credits >= entry.buyPrice && totalCargo < MAX_CARGO) {
+        state.addCredits(-entry.buyPrice);
+        state.addCargo(good, 1, entry.buyPrice);
+        state.saveGame();
+      }
+    } else {
+      const sellPrice =
+        ctx.bonusDemand?.good === good
+          ? ctx.bonusDemand.sellPrice
+          : entry?.sellPrice;
+      if (!sellPrice) return;
+      if ((state.player.cargo[good] ?? 0) > 0) {
+        state.addCredits(sellPrice);
+        state.removeCargo(good, 1);
+        state.saveGame();
+      }
+    }
+  }
+
+  completeComm(): void {
+    const state = useGameState.getState();
+    state.setPendingCommContext(null);
+    state.setUIMode('flight');
+  }
+
+  resetOnRespawn(): void {
+    this.hasUndocked = false;
+    this.lastLandedSiteId = null;
+  }
+
+  private tryDock(): void {
+    const state = useGameState.getState();
+    if (state.ui.mode !== 'flight') return;
+
+    const pos = this.sceneRenderer.shipGroup.position;
+    const entities = this.sceneRenderer.getAllEntities();
+    const nearest = this.docking.findNearestStation(pos, entities);
+
+    if (!nearest) {
+      state.setAlert('No station nearby');
+      setTimeout(() => useGameState.getState().setAlert(null), 2000);
+      return;
+    }
+
+    const canDock = this.docking.canDock(pos, nearest.pos, state.player.speed);
+    if (canDock) {
+      // Move ship to station
+      this.sceneRenderer.shipGroup.position.copy(nearest.pos);
+      this.flightModel.reset(nearest.pos);
+
+      // Set up landing event then switch to landing mode
+      this.prepareLanding(state.currentSystemId, nearest.id);
+    } else {
+      const reason = nearest.dist > 80 ? 'TOO FAR FROM STATION' : 'SPEED TOO HIGH';
+      state.setAlert(reason);
+      setTimeout(() => useGameState.getState().setAlert(null), 2000);
+    }
+  }
+
+  private prepareLanding(systemId: number, stationId?: string): void {
+    const state = useGameState.getState();
+    const lastYear = state.lastVisitYear[systemId] ?? null;
+    const yearsSinceLastVisit = lastYear !== null ? state.galaxyYear - lastYear : null;
+
+    // Get landing event from Rust engine
+    const wasmState = buildWasmPlayerState(state);
+    const secretBase = state.currentSystem?.secretBases.find(b => b.id === stationId);
+    const stationPlanetId = stationId?.startsWith('station-') ? stationId.slice('station-'.length) : null;
+    const stationPlanet = stationPlanetId
+      ? state.currentSystem?.planets.find((planet) => planet.id === stationPlanetId)
+      : null;
+    const hostType = stationPlanet?.stationArchetype ? stationHostTypeToken(stationPlanet.stationArchetype) : '';
+    const event = systemId === FIRST_SYSTEM_ID
+      ? null
+      : engineGetGameEvent(
+        systemId,
+        wasmState,
+        {
+          context: 'landing',
+          secretBaseId: secretBase ? stationId : undefined,
+          siteClass: secretBase ? 'secret_base' : 'station',
+          hostType: secretBase ? secretBase.type : hostType,
+        },
+      );
+
+    // Get civ state from the pending payload or request from engine
+    // For simplicity, build a minimal civState from what we have
+    const civState = state.currentSystemPayload?.civState;
+    if (!civState) return;
+
+    state.setPendingGameEvent({
+      systemId,
+      civState,
+      event,
+      rootEventId: event?.id ?? null,
+      yearsSinceLastVisit,
+      returnMode: 'docked',
+    });
+    state.setUIMode('landing');
+  }
+
+  private buildBonusDemandOffer(npcId: string): { good: GoodName; sellPrice: number; label: string } | null {
+    const state = useGameState.getState();
+    const market = state.currentSystemPayload?.market ?? [];
+    if (MARKET_GOODS.length === 0) return null;
+
+    const seed = this.hashInt(`${state.currentSystemId}:${state.galaxyYear}:${npcId}`);
+    const good = MARKET_GOODS[seed % MARKET_GOODS.length] as GoodName;
+    const marketEntry = market.find((entry) => entry.good === good);
+    const base = Math.max(1, marketEntry?.sellPrice ?? marketEntry?.buyPrice ?? 120);
+
+    const roll = (seed >>> 9) % 100;
+    let multiplier = 1.12;
+    let label = 'FLEX DEMAND';
+    if (roll < 18) {
+      multiplier = 1.72;
+      label = 'HOT BUYER';
+    } else if (roll < 42) {
+      multiplier = 1.45;
+      label = 'HIGH DEMAND';
+    } else if (roll < 70) {
+      multiplier = 1.26;
+      label = 'PRIORITY BUY';
+    }
+
+    return {
+      good,
+      sellPrice: Math.round(base * multiplier),
+      label,
+    };
+  }
+
+  private hashInt(text: string): number {
+    let h = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  private findNearestNPCShip(): string | null {
+    const shipPos = this.sceneRenderer.shipGroup.position;
+    const entities = this.sceneRenderer.getAllEntities();
+    let bestId: string | null = null;
+    let bestDist = Infinity;
+
+    for (const [id, entity] of entities) {
+      if (entity.type !== 'npc_ship') continue;
+      const dist = shipPos.distanceTo(entity.worldPos);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestId = id;
+      }
+    }
+
+    return bestId;
+  }
+}

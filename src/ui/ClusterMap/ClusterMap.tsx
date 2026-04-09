@@ -1,13 +1,12 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { useGameState } from '../../game/GameState';
-import { HyperspaceSystem } from '../../game/mechanics/HyperspaceSystem';
+import { canJump as checkCanJump, jumpCost as calcJumpCost, getReachableSystems } from '../../game/mechanics/hyperspaceCalc';
 import { jumpYearsElapsed } from '../../game/mechanics/RelativisticTime';
 import type { StarSystemData, ClusterSystemSummary } from '../../game/engine';
 import { HYPERSPACE, POLITICAL_TYPE_DISPLAY } from '../../game/constants';
 import { getFaction } from '../../game/data/factions';
 import styles from './ClusterMap.module.css';
 
-const hyperspace = new HyperspaceSystem();
 const MAP_W = 520;
 const MAP_H = 420;
 const MOBILE_BREAKPOINT = 820;
@@ -107,7 +106,7 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
   const chainTargets = useGameState(s => s.chainTargets);
 
   const currentSys = cluster[currentSystemId];
-  const reachable = hyperspace.getReachableSystems(currentSys, cluster);
+  const reachable = getReachableSystems(currentSys, cluster);
   const reachableIds = new Set(reachable.map(s => s.id));
   const clusterSummaryById = new Map<number, ClusterSystemSummary>(
     clusterSummary.map(summary => [summary.id, summary]),
@@ -476,9 +475,9 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
 
   const selectedSys = hyperspaceTarget !== null ? cluster[hyperspaceTarget] : null;
   const selectedSummary = selectedSys ? clusterSummaryById.get(selectedSys.id) : undefined;
-  const jumpCost = selectedSys ? hyperspace.jumpCost(currentSys, selectedSys) : 0;
+  const jumpCost = selectedSys ? calcJumpCost(currentSys, selectedSys) : 0;
   const canJump = selectedSys
-    ? hyperspace.canJump(currentSys, selectedSys, player.fuel).ok
+    ? checkCanJump(currentSys, selectedSys, player.fuel).ok
     : false;
 
   const handleJump = () => {
