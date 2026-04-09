@@ -1,6 +1,9 @@
 mod prng;
 mod types;
 mod cluster_generator;
+mod star_properties;
+mod system_profiles;
+mod dyson_generator;
 mod system_generator;
 mod civilization;
 mod factions;
