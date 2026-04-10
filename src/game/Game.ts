@@ -230,6 +230,10 @@ export class Game {
     // Always update orbits
     const time = state.time;
     this.sceneRenderer.updateOrbits(time, dt);
+
+    if (uiMode === 'docked' || uiMode === 'landing') {
+      this.interaction.trackDockedStation();
+    }
     state.tickTime(dt);
 
     this.sceneRenderer.render();

@@ -21,6 +21,9 @@ const LAND_MAX_SPEED = 55;
 
 export class InteractionSystem {
   private lastLandedSiteId: string | null = null;
+  private dockedStationId: string | null = null;
+  private dockedShipQuaternion = new THREE.Quaternion();
+  private dockedApproachDir = new THREE.Vector3();
   hasUndocked = false;
 
   constructor(
@@ -213,31 +216,32 @@ export class InteractionSystem {
     state.setUIMode(returnMode);
   }
 
+  trackDockedStation(): void {
+    if (!this.dockedStationId) return;
+    const entity = this.sceneRenderer.getAllEntities().get(this.dockedStationId);
+    if (entity) {
+      this.sceneRenderer.shipGroup.position.copy(entity.worldPos);
+      this.sceneRenderer.shipGroup.quaternion.copy(this.dockedShipQuaternion);
+    }
+  }
+
   undock(): void {
     const state = useGameState.getState();
     state.setUIMode('flight');
     this.hasUndocked = true;
 
-    // Eject ship away from station
+    // Snap ship to the station we docked at and eject outward
     const entities = this.sceneRenderer.getAllEntities();
     const shipPos = this.sceneRenderer.shipGroup.position;
-    const nearest = this.docking.findNearestStation(shipPos, entities);
+    const station = this.dockedStationId ? entities.get(this.dockedStationId) : null;
 
-    if (nearest) {
-      const station = entities.get(nearest.id);
-      if (station?.parentId) {
-        const parent = entities.get(station.parentId);
-        if (parent) {
-          // Direction: planet center → station (i.e. outward)
-          const dir = new THREE.Vector3()
-            .subVectors(station.worldPos, parent.worldPos)
-            .normalize();
-
-          // Offset position outward
-          shipPos.addScaledVector(dir, 30);
-        }
-      }
+    if (station) {
+      shipPos.copy(station.worldPos);
+      shipPos.addScaledVector(this.dockedApproachDir, 30);
     }
+
+    this.flightModel.reset(shipPos);
+    this.dockedStationId = null;
   }
 
   tryHail(): void {
@@ -311,6 +315,7 @@ export class InteractionSystem {
   resetOnRespawn(): void {
     this.hasUndocked = false;
     this.lastLandedSiteId = null;
+    this.dockedStationId = null;
   }
 
   private tryDock(): void {
@@ -329,7 +334,10 @@ export class InteractionSystem {
 
     const canDock = this.docking.canDock(pos, nearest.pos, state.player.speed);
     if (canDock) {
-      // Move ship to station
+      // Move ship to station and remember which station we docked at
+      this.dockedStationId = nearest.id;
+      this.dockedShipQuaternion.copy(this.sceneRenderer.shipGroup.quaternion);
+      this.dockedApproachDir.subVectors(pos, nearest.pos).normalize();
       this.sceneRenderer.shipGroup.position.copy(nearest.pos);
       this.flightModel.reset(nearest.pos);
 
