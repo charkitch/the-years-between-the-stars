@@ -10,7 +10,10 @@ import { buildWasmPlayerState, discoverFactionsFromSystem } from '../systems/sys
 import { canJump, jumpCost } from './hyperspaceCalc';
 
 const INFINITE_FUEL_DEV = import.meta.env.DEV;
-const FIRST_SYSTEM_ID = 0;
+import { STARTING_SYSTEM_ID } from '../constants';
+import type { SystemId } from '../types';
+
+const FIRST_SYSTEM_ID = STARTING_SYSTEM_ID;
 const SYSTEM_ENTRY_EVENT_CHANCE = 0.3;
 
 export class JumpSystem {
@@ -137,7 +140,7 @@ export class JumpSystem {
     this.pendingSystemPayload = null;
   }
 
-  private arriveInSystem(targetId: number): void {
+  private arriveInSystem(targetId: SystemId): void {
     const state = useGameState.getState();
     this.hazards.resetTimers();
     state.setHyperspaceTarget(null);

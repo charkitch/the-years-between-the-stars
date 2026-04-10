@@ -1,3 +1,5 @@
+import type { SystemId, GalaxyYear } from './types';
+
 export const CLUSTER_SEED = 0xDEADBEEF;
 
 export const PALETTE = {
@@ -259,7 +261,8 @@ export const MAX_CARGO = 20;
 export const STARTING_CREDITS = 1000;
 export const STARTING_FUEL = 7;
 
-export const GALAXY_YEAR_START = 3200;
+export const STARTING_SYSTEM_ID = 0 as SystemId;
+export const GALAXY_YEAR_START = 3200 as GalaxyYear;
 export const ERA_LENGTH = 250;
 
 export const POLITICAL_TYPES = [

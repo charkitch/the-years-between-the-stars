@@ -13,8 +13,10 @@ import {
 } from '../engine';
 import { buildWasmPlayerState } from '../systems/systemLoad';
 import { stationHostTypeToken } from '../archetypes';
+import { STARTING_SYSTEM_ID } from '../constants';
+import type { SystemId } from '../types';
 
-const FIRST_SYSTEM_ID = 0;
+const FIRST_SYSTEM_ID = STARTING_SYSTEM_ID;
 const LAND_RANGE_PADDING_PLANET = 130;
 const LAND_RANGE_PADDING_DYSON = 180;
 const LAND_MAX_SPEED = 55;
@@ -352,7 +354,7 @@ export class InteractionSystem {
     }
   }
 
-  private prepareLanding(systemId: number, stationId?: string): void {
+  private prepareLanding(systemId: SystemId, stationId?: string): void {
     const state = useGameState.getState();
     const lastYear = state.lastVisitYear[systemId] ?? null;
     const yearsSinceLastVisit = lastYear !== null ? state.galaxyYear - lastYear : null;

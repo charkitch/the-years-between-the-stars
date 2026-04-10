@@ -7,6 +7,7 @@ import {
 } from './effects';
 import { disposeAll as disposeTextureCache } from './textureCache';
 import type { SolarSystemData, SystemFactionState } from '../engine';
+import type { SystemId, GalaxyYear } from '../types';
 import type { NPCShipState } from '../mechanics/NPCSystem';
 import type { FleetBattle } from '../mechanics/FleetBattleSystem';
 import type { SceneEntity, XRayTransferStream } from './scene/types';
@@ -139,8 +140,8 @@ export class SceneRenderer {
 
   loadSystem(
     data: SolarSystemData,
-    systemId: number,
-    galaxyYear = 0,
+    systemId: SystemId,
+    galaxyYear: GalaxyYear = 0 as GalaxyYear,
     systemName = '',
     factionState?: SystemFactionState,
     galaxyX = 0,

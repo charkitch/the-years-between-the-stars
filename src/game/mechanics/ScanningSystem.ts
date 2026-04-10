@@ -7,11 +7,12 @@ import {
   DYSON_SCAN_RANGE_PADDING,
   SCAN_INTEL_MAX_AGE_YEARS,
 } from '../constants';
+import type { ScannableBodyId, GalaxyYear } from '../types';
 
 export class ScanningSystem {
-  private activeScanTargetId: string | null = null;
+  private activeScanTargetId: ScannableBodyId | null = null;
   private activeScanTimer = 0;
-  private currentVisitScannedHosts = new Set<string>();
+  private currentVisitScannedHosts = new Set<ScannableBodyId>();
 
   constructor(private sceneRenderer: SceneRenderer) {}
 
@@ -23,7 +24,7 @@ export class ScanningSystem {
     const entities = this.sceneRenderer.getAllEntities();
     const entity = entities.get(targetId);
     if (!entity || (entity.type !== 'planet' && entity.type !== 'dyson_shell')) return false;
-    if (this.currentVisitScannedHosts.has(targetId)) return false;
+    if (this.currentVisitScannedHosts.has(targetId as ScannableBodyId)) return false;
     const shipPos = this.sceneRenderer.shipGroup.position;
     const dist = shipPos.distanceTo(entity.worldPos);
     const required = entity.collisionRadius + (entity.type === 'dyson_shell' ? DYSON_SCAN_RANGE_PADDING : PLANET_SCAN_RANGE_PADDING);
@@ -56,13 +57,14 @@ export class ScanningSystem {
       setTimeout(() => useGameState.getState().setAlert(null), 1600);
       return;
     }
-    if (this.currentVisitScannedHosts.has(targetId)) {
+    const bodyId = targetId as ScannableBodyId;
+    if (this.currentVisitScannedHosts.has(bodyId)) {
       state.setAlert('ALREADY SCANNED THIS VISIT');
       setTimeout(() => useGameState.getState().setAlert(null), 1700);
       return;
     }
 
-    this.activeScanTargetId = targetId;
+    this.activeScanTargetId = bodyId;
     this.activeScanTimer = 0;
     const hostLabel = entity.type === 'dyson_shell' ? 'DYSON SHELL' : 'PLANET';
     state.setScanProgress(0, `SCANNING ${hostLabel}`);
@@ -96,7 +98,7 @@ export class ScanningSystem {
 
     if (p < 1) return;
 
-    state.markHostScanned(state.currentSystemId, targetId, state.galaxyYear);
+    state.markBodyScanned(state.currentSystemId, targetId, state.galaxyYear);
     this.currentVisitScannedHosts.add(targetId);
     const revealed = this.sceneRenderer.revealLandingSitesForHost(targetId);
     const stats = this.sceneRenderer.getLandingSiteStatsForHost(targetId);
@@ -112,26 +114,26 @@ export class ScanningSystem {
   }
 
   restoreIntelForSystem(state: ReturnType<typeof useGameState.getState>): void {
-    const perSystem = state.scannedHosts[state.currentSystemId];
+    const perSystem = state.scannedBodies[state.currentSystemId];
     if (!perSystem) return;
-    const freshHostIds = new Set<string>();
-    for (const [hostId, scannedYear] of Object.entries(perSystem)) {
+    const freshBodyIds = new Set<string>();
+    for (const [bodyId, scannedYear] of Object.entries(perSystem) as [ScannableBodyId, GalaxyYear][]) {
       if (state.galaxyYear - scannedYear <= SCAN_INTEL_MAX_AGE_YEARS) {
-        freshHostIds.add(hostId);
+        freshBodyIds.add(bodyId);
       }
     }
-    if (freshHostIds.size > 0) {
-      this.sceneRenderer.revealLandingSitesForHosts(freshHostIds);
+    if (freshBodyIds.size > 0) {
+      this.sceneRenderer.revealLandingSitesForHosts(freshBodyIds);
     }
   }
 
   syncFromState(state: ReturnType<typeof useGameState.getState>): void {
     this.currentVisitScannedHosts.clear();
-    const perSystem = state.scannedHosts[state.currentSystemId];
+    const perSystem = state.scannedBodies[state.currentSystemId];
     if (!perSystem) return;
-    for (const [hostId, scannedYear] of Object.entries(perSystem)) {
+    for (const [bodyId, scannedYear] of Object.entries(perSystem) as [ScannableBodyId, GalaxyYear][]) {
       if (state.galaxyYear - scannedYear <= SCAN_INTEL_MAX_AGE_YEARS) {
-        this.currentVisitScannedHosts.add(hostId);
+        this.currentVisitScannedHosts.add(bodyId);
       }
     }
   }

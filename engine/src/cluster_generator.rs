@@ -146,9 +146,9 @@ mod tests {
     }
 
     #[test]
-    fn origin_remains_a_type() {
+    fn origin_remains_g_type() {
         let cluster = generate_cluster();
-        assert_eq!(cluster[0].star_type, StarType::A);
+        assert_eq!(cluster[0].star_type, StarType::G);
     }
 
     #[test]

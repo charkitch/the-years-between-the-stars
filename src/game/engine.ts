@@ -17,6 +17,7 @@ import initWasm, {
 import type { StationArchetype } from './archetypes';
 
 import type { GoodName, EconomyType, PoliticalType } from './constants';
+import type { SystemId, GalaxyYear, FactionId } from './types';
 
 // ─── Types matching Rust camelCase serde output ─────────────────────────────
 
@@ -49,7 +50,7 @@ export interface InteractionFieldData {
 }
 
 export interface StarSystemData {
-  id: number;
+  id: SystemId;
   name: string;
   x: number;
   y: number;
@@ -166,8 +167,8 @@ export interface SolarSystemData {
 }
 
 export interface CivilizationState {
-  systemId: number;
-  galaxyYear: number;
+  systemId: SystemId;
+  galaxyYear: GalaxyYear;
   era: number;
   politics: PoliticalType;
   economy: EconomyType;
@@ -179,8 +180,8 @@ export interface CivilizationState {
 }
 
 export interface SystemFactionState {
-  controllingFactionId: string;
-  contestingFactionId: string | null;
+  controllingFactionId: FactionId;
+  contestingFactionId: FactionId | null;
   isContested: boolean;
 }
 
@@ -232,20 +233,20 @@ export interface GameEvent {
 
 export interface ChainTarget {
   chainId: string;
-  targetSystemId: number;
+  targetSystemId: SystemId;
   stage: string;
 }
 
 export interface ClusterSystemSummary {
-  id: number;
+  id: SystemId;
   name: string;
   x: number;
   y: number;
   starType: StarType;
   politics: PoliticalType;
   economy: EconomyType;
-  controllingFactionId: string;
-  contestingFactionId: string | null;
+  controllingFactionId: FactionId;
+  contestingFactionId: FactionId | null;
   isContested: boolean;
   techLevel: number;
   population: number;
@@ -272,7 +273,7 @@ export interface JumpResult {
   systemPayload: SystemPayload;
   clusterSummary: ClusterSystemSummary[];
   yearsElapsed: number;
-  newGalaxyYear: number;
+  newGalaxyYear: GalaxyYear;
   galaxySimState: SystemSimState[];
   chainTargets: ChainTarget[];
 }
@@ -288,10 +289,10 @@ export interface InitResult {
 // ─── Galaxy Simulation State ────────────────────────────────────────────────
 
 export interface SystemSimState {
-  systemId: number;
+  systemId: SystemId;
   stability: number;
   prosperity: number;
-  factionStrength: Record<string, number>;
+  factionStrength: Record<FactionId, number>;
   recentEvents: string[];
 }
 
@@ -303,10 +304,10 @@ export interface WasmPlayerState {
   cargoCostBasis: Record<string, number>;
   fuel: number;
   shields: number;
-  currentSystemId: number;
-  visitedSystems: number[];
-  galaxyYear: number;
-  playerChoices: Record<number, {
+  currentSystemId: SystemId;
+  visitedSystems: SystemId[];
+  galaxyYear: GalaxyYear;
+  playerChoices: Record<SystemId, {
     tradingReputation: number;
     bannedGoods: GoodName[];
     priceModifier: number;
@@ -315,17 +316,17 @@ export interface WasmPlayerState {
     flags: string[];
     firedTriggers: string[];
   }>;
-  lastVisitYear: Record<number, number>;
+  lastVisitYear: Record<SystemId, GalaxyYear>;
   knownFactions: string[];
-  factionMemory: Record<number, {
-    factionId: string;
-    contestingFactionId: string | null;
-    galaxyYear: number;
+  factionMemory: Record<SystemId, {
+    factionId: FactionId;
+    contestingFactionId: FactionId | null;
+    galaxyYear: GalaxyYear;
   }>;
   seenSystemDialogIds: string[];
   chainTargets: ChainTarget[];
   playerHistory: {
-    completedEvents: Record<string, { systemId: number; galaxyYear: number }>;
+    completedEvents: Record<string, { systemId: SystemId; galaxyYear: GalaxyYear }>;
     galacticFlags: string[];
   };
 }
@@ -355,7 +356,7 @@ export function engineJumpToSystem(
 }
 
 export function engineGetMarket(
-  systemId: number,
+  systemId: SystemId,
   playerState: WasmPlayerState,
 ): MarketEntry[] {
   const result = get_system_market(systemId, JSON.stringify(playerState));
@@ -363,7 +364,7 @@ export function engineGetMarket(
 }
 
 export function engineGetGameEvent(
-  systemId: number,
+  systemId: SystemId,
   playerState: WasmPlayerState,
   options?: {
     context?: 'landing' | 'system_entry' | 'proximity_star' | 'proximity_base' | 'planet_landing' | 'dyson_landing' | 'triggered';
@@ -386,7 +387,7 @@ export function engineGetGameEvent(
 }
 
 export function engineGetLandingEvent(
-  systemId: number,
+  systemId: SystemId,
   playerState: WasmPlayerState,
   secretBaseId?: string,
 ): GameEvent | null {
@@ -398,7 +399,7 @@ export function engineGetLandingEvent(
   return JSON.parse(result);
 }
 
-export function engineGetClusterSummary(galaxyYear: number): ClusterSystemSummary[] {
+export function engineGetClusterSummary(galaxyYear: GalaxyYear): ClusterSystemSummary[] {
   const result = get_cluster_summary(galaxyYear);
   return JSON.parse(result);
 }

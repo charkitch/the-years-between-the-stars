@@ -1,5 +1,6 @@
 import { useGameState } from '../GameState';
 import type { SolarSystemData, WasmPlayerState } from '../engine';
+import type { SystemId } from '../types';
 import { SceneRenderer } from '../rendering/SceneRenderer';
 
 export function buildWasmPlayerState(
@@ -17,7 +18,7 @@ export function buildWasmPlayerState(
 
   const playerChoices: WasmPlayerState['playerChoices'] = {};
   for (const [k, v] of Object.entries(state.playerChoices)) {
-    playerChoices[Number(k)] = {
+    playerChoices[Number(k) as SystemId] = {
       tradingReputation: v.tradingReputation,
       bannedGoods: v.bannedGoods,
       priceModifier: v.priceModifier,
@@ -30,7 +31,7 @@ export function buildWasmPlayerState(
 
   const factionMemory: WasmPlayerState['factionMemory'] = {};
   for (const [k, v] of Object.entries(state.factionMemory)) {
-    factionMemory[Number(k)] = {
+    factionMemory[Number(k) as SystemId] = {
       factionId: v.factionId,
       contestingFactionId: v.contestingFactionId,
       galaxyYear: v.galaxyYear,

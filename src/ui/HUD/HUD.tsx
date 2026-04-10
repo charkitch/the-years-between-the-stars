@@ -7,6 +7,7 @@ import { getFaction } from '../../game/data/factions';
 import type { SecretBaseData } from '../../game/engine';
 import { STAR_TYPE_DISPLAY, STAR_DESCRIPTIONS, ECONOMY_DESCRIPTIONS, SCAN_INTEL_MAX_AGE_YEARS } from '../../game/constants';
 import type { RuntimeProfile } from '../../runtime/runtimeProfile';
+import type { ScannableBodyId } from '../../game/types';
 import { TouchFlightControls } from './TouchFlightControls';
 import styles from './HUD.module.css';
 import * as THREE from 'three';
@@ -64,7 +65,7 @@ export function HUD({
   const galaxyYear = useGameState(s => s.galaxyYear);
   const knownFactions = useGameState(s => s.knownFactions);
   const currentSystemPayload = useGameState(s => s.currentSystemPayload);
-  const scannedHosts = useGameState(s => s.scannedHosts);
+  const scannedBodies = useGameState(s => s.scannedBodies);
 
   useEffect(() => {
     if (!isStarTooltipOpen) return;
@@ -129,23 +130,23 @@ export function HUD({
     const sp = getShipPos();
     targetDist = Math.round(sp.distanceTo(targetEntity.worldPos));
   }
-  const targetScanHostId = targetEntity
+  const targetScanBodyId = targetEntity
     ? (
       targetEntity.type === 'landing_site'
         ? targetEntity.siteHostId ?? null
         : targetEntity.type === 'planet' || targetEntity.type === 'dyson_shell'
           ? targetEntity.id
           : null
-    )
+    ) as ScannableBodyId | null
     : null;
-  const scannedYear = targetScanHostId ? scannedHosts[currentSystemId]?.[targetScanHostId] : undefined;
+  const scannedYear = targetScanBodyId ? scannedBodies[currentSystemId]?.[targetScanBodyId] : undefined;
   const targetIsScanned = scannedYear !== undefined && (galaxyYear - scannedYear <= SCAN_INTEL_MAX_AGE_YEARS);
   let targetSiteTotal = 0;
   let targetSiteDiscovered = 0;
-  if (targetScanHostId) {
+  if (targetScanBodyId) {
     for (const [, entity] of entities) {
       if (entity.type !== 'landing_site') continue;
-      if (entity.siteHostId !== targetScanHostId) continue;
+      if (entity.siteHostId !== targetScanBodyId) continue;
       targetSiteTotal++;
       if (entity.siteDiscovered) targetSiteDiscovered++;
     }
