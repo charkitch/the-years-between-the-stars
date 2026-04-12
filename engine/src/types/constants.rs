@@ -1,0 +1,12 @@
+pub const CLUSTER_SEED: u32 = 0xDEADBEEF;
+pub const CLUSTER_SIZE: usize = 30;
+pub const GALAXY_YEAR_START: u32 = 3200;
+pub const ERA_LENGTH: u32 = 250;
+pub const STARTING_CREDITS: i32 = 1000;
+pub const STARTING_FUEL: f64 = 7.0;
+pub const MAX_CARGO: u32 = 20;
+pub const HEAT_MAX: f64 = 100.0;
+pub const COOLING_RATE: f64 = 10.0;
+pub const OVERHEAT_SHIELD_DMG: f64 = 20.0;
+pub const SHIELD_REGEN_RATE: f64 = 5.0;
+pub const REGEN_HEAT_CEIL: f64 = 50.0;
