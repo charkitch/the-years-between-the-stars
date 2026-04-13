@@ -32,6 +32,8 @@ import type { RuntimeProfile } from '../../../runtime/runtimeProfile';
 import { LandingSiteManager } from './LandingSiteManager';
 import type { DysonShellMaterialEntry, BeamParams } from './tickSceneAnimations';
 
+const PLANET_COLLISION_SCALE = 1.04;
+
 export const GALAXY_SEED = 0x5AFEF00D;
 export const STARFIELD_POS_SCALE = (Math.PI / 2) / 100;
 export const STARFIELD_YEAR_SCALE = 0.0002;
@@ -580,14 +582,14 @@ export function buildSystemScene(params: {
       orbitPhase: planet.orbitPhase,
       type: 'planet',
       worldPos: new THREE.Vector3(),
-      collisionRadius: planet.radius * 1.04,
+      collisionRadius: planet.radius * PLANET_COLLISION_SCALE,
       axialTilt: planet.axialTilt || undefined,
     });
     const siteClasses = landingSites.addPlanetSites({
       hostId: planet.id,
       hostLabel: planet.name,
       hostGroup: planetGroup,
-      radius: planet.radius,
+      hostCollisionRadius: planet.radius * PLANET_COLLISION_SCALE,
       field: planet.interactionField,
       bodyKind: planet.type,
     });

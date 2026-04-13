@@ -6,7 +6,7 @@ import { sampleAndClassifyByUV } from '../../systems/interactionField';
 import { PRNG } from '../../generation/prng';
 import { CLUSTER_SEED } from '../../constants';
 
-const LANDING_SITE_OFFSET_PLANET = 4;
+const LANDING_SITE_CLEARANCE_PLANET = 3;
 const LANDING_SITE_OFFSET_DYSON_INTERIOR = -8;
 const LANDING_SITE_OFFSET_DYSON_EXTERIOR = 8;
 
@@ -19,15 +19,14 @@ function hashString32(input: string): number {
   return h >>> 0;
 }
 
-function sphereUvToLocal(radius: number, u: number, v: number, offset = 0): THREE.Vector3 {
+function sphereUvToLocal(radius: number, u: number, v: number): THREE.Vector3 {
   const lon = u * Math.PI * 2 - Math.PI;
   const lat = v * Math.PI - Math.PI * 0.5;
-  const r = radius + offset;
   const cosLat = Math.cos(lat);
   return new THREE.Vector3(
-    Math.cos(lon) * cosLat * r,
-    Math.sin(lat) * r,
-    Math.sin(lon) * cosLat * r,
+    Math.cos(lon) * cosLat * radius,
+    Math.sin(lat) * radius,
+    Math.sin(lon) * cosLat * radius,
   );
 }
 
@@ -68,13 +67,14 @@ export class LandingSiteManager {
     hostId: string;
     hostLabel: string;
     hostGroup: THREE.Group;
-    radius: number;
+    hostCollisionRadius: number;
     field: InteractionFieldData;
     bodyKind: 'rocky' | 'gas_giant';
   }): Set<string> {
-    const { hostId, hostLabel, hostGroup, radius, field, bodyKind } = params;
+    const { hostId, hostLabel, hostGroup, hostCollisionRadius, field, bodyKind } = params;
     const siteRng = PRNG.fromIndex(CLUSTER_SEED ^ 0x51A17E, hashString32(hostId));
     const desired = bodyKind === 'gas_giant' ? 2 : 3;
+    const spawnRadius = hostCollisionRadius + LANDING_SITE_CLEARANCE_PLANET;
     const acceptedNormals: THREE.Vector3[] = [];
     const classifications = new Set<string>();
     let created = 0;
@@ -91,7 +91,7 @@ export class LandingSiteManager {
         : cls === 'rocky_landable';
       if (!allowed) continue;
 
-      const pos = sphereUvToLocal(radius, u, v, LANDING_SITE_OFFSET_PLANET);
+      const pos = sphereUvToLocal(spawnRadius, u, v);
       const normal = pos.clone().normalize();
       if (acceptedNormals.some(n => n.dot(normal) > 0.9)) continue;
       acceptedNormals.push(normal);
