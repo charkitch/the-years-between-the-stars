@@ -1,0 +1,25 @@
+id: TOPOPOLIS_ENTRANCE_SCAN_HAIL
+title: APPROACH CONTROL
+requires:
+  - !HostTypeIs [topopolis]
+  - !SiteClassIs [topopolis_entrance]
+  - !FlagNotSet crown_entrance_hailed
+narrativeLines:
+  - >-
+    As you close on the entrance gate, your comms crackle. A bored voice reads from a script that has clearly been read ten thousand times today.
+  - >-
+    "Approach Control, Crown Topopolis. Vessel identified. You are cleared for docking at Gate Marker Alpha. Maintain approach speed below two hundred. Do not deviate into the tube interior without gate clearance. The interior is populated. There are weather systems. There are schools. Do not fly through the schools."
+  - >-
+    A pause. Then, off-script: "First time? It's something. The gate office will walk you through entry regs. There's a good bakery on the first terrace past processing. Tell Maren that Desh sent you."
+choices:
+  - id: acknowledge
+    label: Acknowledge approach control
+    description: "Cleared for docking"
+    effect:
+      setsFlags: [crown_entrance_hailed]
+  - id: ask_about_bakery
+    label: "Copy, Approach Control. Which bakery?"
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1
+      setsFlags: [crown_entrance_hailed]

@@ -94,6 +94,7 @@ pub enum EconomyType {
     Tributary,
     Resonance,
     Synthesis,
+    Everything,
 }
 
 impl EconomyType {
@@ -121,6 +122,7 @@ pub enum PoliticalType {
     TheAsking,
     Arrival,
     DriftSovereignty,
+    CrownPatchwork,
 }
 
 impl PoliticalType {

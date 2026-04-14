@@ -1,0 +1,19 @@
+id: TOPOPOLIS_HABITAT_CROSSING
+title: HABITAT CROSSING
+requires:
+  - !HostTypeIs [topopolis]
+narrativeLines:
+  - >-
+    You set down where forest canopy gives way to coastal shallows, the biome boundary drawn in a clean arc across the tube's interior. Above you, the far side of the cylinder is a patchwork of cloud and city light, curving upward in every direction.
+  - >-
+    A transit guide with sun-darkened skin and a surveyor's sextant waves you toward a market running along the waterline. Ships like yours come rarely here. Most traffic is local ferries running the long spiral.
+choices:
+  - id: trade_at_market
+    label: Browse the waterline market
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1
+  - id: walk_the_boundary
+    label: Walk the biome boundary
+    description: No effect
+    effect: {}

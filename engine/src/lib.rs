@@ -4,6 +4,7 @@ mod cluster_generator;
 mod star_properties;
 mod system_profiles;
 mod dyson_generator;
+mod topopolis_generator;
 mod system_generator;
 mod civilization;
 mod factions;
@@ -304,6 +305,7 @@ pub fn get_game_event(
         "proximity_base" => EventPool::ProximityBase,
         "planet_landing" => EventPool::PlanetLanding,
         "dyson_landing" => EventPool::DysonLanding,
+        "topopolis_landing" => EventPool::TopopolisLanding,
         "triggered" => EventPool::Triggered,
         _ => EventPool::Landing,
     };
@@ -413,13 +415,30 @@ pub fn apply_choice_effect(
         ps.player_history.galactic_flags.insert(flag.clone());
     }
 
+    // Advance galaxy time and simulation
+    let years_advance = effect.galaxy_years_advance;
+    if years_advance > 0 {
+        ps.galaxy_year += years_advance;
+    }
+
     // Record global event completion
     ps.player_history.completed_events.insert(
         tracking_id.to_string(),
         CompletedEvent { system_id, galaxy_year: ps.galaxy_year },
     );
 
-    serde_json::to_string(&*ps)
+    // Run galaxy simulation forward if years advanced.
+    // Done after all player_state mutations so the borrow on `ps` is released.
+    if years_advance > 0 {
+        simulate_galaxy(
+            &engine.cluster,
+            &mut engine.galaxy_state,
+            &engine.player_state,
+            years_advance,
+        );
+    }
+
+    serde_json::to_string(&engine.player_state)
         .map_err(|e| JsValue::from_str(&format!("Failed to serialize: {}", e)))
 }
 

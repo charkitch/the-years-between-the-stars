@@ -1,0 +1,28 @@
+id: TOPOPOLIS_LONG_BAZAAR_MARKET
+title: THE LONG BAZAAR — TIDEWATER MARKET
+requires:
+  - !HostTypeIs [topopolis]
+  - !SiteClassIs [topopolis_interior]
+narrativeLines:
+  - >-
+    The Tidewater Market occupies a stretch of the Bazaar where the topopolis curves through an ocean biome. The stalls are built on pontoons. The goods arrive by boat from habitats upstream and downstream — upstream and downstream being relative terms in a tube that wraps around a star.
+  - >-
+    A shipwright offers hull patches made from topopolis structural alloy. "Nothing stronger in the cluster," she says. "This stuff holds a star inside it." She is not wrong. A chandler two stalls down sells navigational almanacs calibrated to the topopolis interior — useless outside, invaluable within.
+  - >-
+    Somewhere in the distance, past the curve of the water and the shimmer of the far wall, you can hear music. The Bazaar never stops. It just changes key.
+choices:
+  - id: buy_hull_patch
+    label: Buy structural alloy hull patches
+    description: "-60 credits, ship repair materials"
+    effect:
+      credits: -60
+  - id: trade_cargo
+    label: Offer your cargo at Tidewater prices
+    description: "+100 credits"
+    effect:
+      credits: 100
+  - id: listen_to_music
+    label: Follow the music
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1

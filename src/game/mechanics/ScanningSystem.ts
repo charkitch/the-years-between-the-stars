@@ -8,6 +8,24 @@ import {
   SCAN_INTEL_MAX_AGE_YEARS,
 } from '../constants';
 import type { ScannableBodyId, GalaxyYear } from '../types';
+import type { SceneEntity } from '../rendering/SceneRenderer';
+
+/**
+ * Distance from a point to the nearest part of an entity.
+ * For topopolis entities, uses collision sample points instead of worldPos
+ * (since worldPos is at origin, not on the tube surface).
+ */
+function nearestEntityDist(pos: THREE.Vector3, entity: SceneEntity): number {
+  if (entity.type === 'topopolis' && entity.collisionSamplesWorld?.length) {
+    let min = Infinity;
+    for (const sample of entity.collisionSamplesWorld) {
+      const d = pos.distanceTo(sample);
+      if (d < min) min = d;
+    }
+    return min;
+  }
+  return pos.distanceTo(entity.worldPos);
+}
 
 export class ScanningSystem {
   private activeScanTargetId: ScannableBodyId | null = null;
@@ -22,11 +40,11 @@ export class ScanningSystem {
     const targetId = state.player.targetId;
     if (!targetId) return false;
     const entity = this.sceneRenderer.getEntity(targetId);
-    if (!entity || (entity.type !== 'planet' && entity.type !== 'dyson_shell')) return false;
+    if (!entity || (entity.type !== 'planet' && entity.type !== 'dyson_shell' && entity.type !== 'topopolis')) return false;
     if (this.currentVisitScannedHosts.has(targetId as ScannableBodyId)) return false;
     const shipPos = this.sceneRenderer.shipGroup.position;
-    const dist = shipPos.distanceTo(entity.worldPos);
-    const required = entity.collisionRadius + (entity.type === 'dyson_shell' ? DYSON_SCAN_RANGE_PADDING : PLANET_SCAN_RANGE_PADDING);
+    const dist = nearestEntityDist(shipPos, entity);
+    const required = entity.collisionRadius + (entity.type === 'dyson_shell' || entity.type === 'topopolis' ? DYSON_SCAN_RANGE_PADDING : PLANET_SCAN_RANGE_PADDING);
     return dist <= required;
   }
 
@@ -42,15 +60,15 @@ export class ScanningSystem {
       return;
     }
     const entity = this.sceneRenderer.getEntity(targetId);
-    if (!entity || (entity.type !== 'planet' && entity.type !== 'dyson_shell')) {
-      state.setAlert('TARGET PLANET OR DYSON SHELL TO SCAN');
+    if (!entity || (entity.type !== 'planet' && entity.type !== 'dyson_shell' && entity.type !== 'topopolis')) {
+      state.setAlert('TARGET PLANET OR MEGASTRUCTURE TO SCAN');
       setTimeout(() => useGameState.getState().setAlert(null), 1800);
       return;
     }
 
     const shipPos = this.sceneRenderer.shipGroup.position;
-    const dist = shipPos.distanceTo(entity.worldPos);
-    const required = entity.collisionRadius + (entity.type === 'dyson_shell' ? DYSON_SCAN_RANGE_PADDING : PLANET_SCAN_RANGE_PADDING);
+    const dist = nearestEntityDist(shipPos, entity);
+    const required = entity.collisionRadius + (entity.type === 'dyson_shell' || entity.type === 'topopolis' ? DYSON_SCAN_RANGE_PADDING : PLANET_SCAN_RANGE_PADDING);
     if (dist > required) {
       state.setAlert('TOO FAR TO SCAN');
       setTimeout(() => useGameState.getState().setAlert(null), 1600);
@@ -65,7 +83,8 @@ export class ScanningSystem {
 
     this.activeScanTargetId = bodyId;
     this.activeScanTimer = 0;
-    const hostLabel = entity.type === 'dyson_shell' ? 'DYSON SHELL' : 'PLANET';
+    const hostLabel = entity.type === 'topopolis' ? 'TOPOPOLIS'
+      : entity.type === 'dyson_shell' ? 'DYSON SHELL' : 'PLANET';
     state.setScanProgress(0, `SCANNING ${hostLabel}`);
   }
 
@@ -77,13 +96,13 @@ export class ScanningSystem {
     const targetId = this.activeScanTargetId;
     if (!targetId) return;
     const entity = this.sceneRenderer.getEntity(targetId);
-    if (!entity || (entity.type !== 'planet' && entity.type !== 'dyson_shell')) {
+    if (!entity || (entity.type !== 'planet' && entity.type !== 'dyson_shell' && entity.type !== 'topopolis')) {
       this.clear(state);
       return;
     }
 
-    const required = entity.collisionRadius + (entity.type === 'dyson_shell' ? DYSON_SCAN_RANGE_PADDING : PLANET_SCAN_RANGE_PADDING);
-    const dist = shipPos.distanceTo(entity.worldPos);
+    const required = entity.collisionRadius + (entity.type === 'dyson_shell' || entity.type === 'topopolis' ? DYSON_SCAN_RANGE_PADDING : PLANET_SCAN_RANGE_PADDING);
+    const dist = nearestEntityDist(shipPos, entity);
     if (dist > required) {
       this.clear(state);
       state.setAlert('SCAN INTERRUPTED');
@@ -93,7 +112,10 @@ export class ScanningSystem {
 
     this.activeScanTimer += dt;
     const p = Math.max(0, Math.min(1, this.activeScanTimer / SCAN_DURATION_SECONDS));
-    state.setScanProgress(p, entity.type === 'dyson_shell' ? 'SCANNING DYSON SHELL' : 'SCANNING PLANET');
+    const scanLabel = entity.type === 'topopolis' ? 'SCANNING TOPOPOLIS'
+      : entity.type === 'dyson_shell' ? 'SCANNING DYSON SHELL'
+      : 'SCANNING PLANET';
+    state.setScanProgress(p, scanLabel);
 
     if (p < 1) return;
 

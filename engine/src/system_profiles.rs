@@ -95,7 +95,18 @@ pub struct SystemProfile {
     pub ring_chance:     f64,
 }
 
-pub fn system_profile_for(st: StarType) -> SystemProfile {
+pub fn system_profile_for(st: StarType, special: SpecialSystemKind) -> SystemProfile {
+    // Crown system: megastructure-dominant with some planets for visual interest
+    if special == SpecialSystemKind::TheCrown {
+        return SystemProfile {
+            rocky_weights:   ROCKY_SURFACE_WEIGHTS,
+            moon_weights:    MOON_SURFACE_WEIGHTS,
+            gas_giant_types: GasGiantType::ALL,
+            inner_count: (1, 2), outer_count: (0, 1),
+            asteroid_chance: 0.30, ring_chance: 0.50,
+        };
+    }
+
     match st {
         StarType::G | StarType::K | StarType::M | StarType::F | StarType::A => SystemProfile {
             rocky_weights:   ROCKY_SURFACE_WEIGHTS,

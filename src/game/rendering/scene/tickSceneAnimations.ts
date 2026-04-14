@@ -19,6 +19,13 @@ export interface DysonShellMaterialEntry {
   miniStar: THREE.Object3D;
 }
 
+export interface TopopolisMaterialEntry {
+  interiorMats: THREE.ShaderMaterial[];
+  cityMats: THREE.ShaderMaterial[];
+  cloudMats: THREE.ShaderMaterial[];
+  lightningMats: THREE.ShaderMaterial[];
+}
+
 export interface BeamParams {
   axis: THREE.Vector3;
   halfAngle: number;
@@ -37,6 +44,7 @@ export function tickSceneAnimations(params: {
   xbDiskGroup: THREE.Group | null;
   lightningMaterials: THREE.ShaderMaterial[];
   dysonShellMaterials: DysonShellMaterialEntry[];
+  topopolisMaterials: TopopolisMaterialEntry[];
   pulsarBeamGroup: THREE.Group | null;
   pulsarBeamAngle: number;
   pulsarBeamParams: BeamParams | null;
@@ -50,7 +58,7 @@ export function tickSceneAnimations(params: {
   const {
     entities, npcShips, collidables, camera,
     xRayTransferStreams, xbDiskGroup,
-    lightningMaterials, dysonShellMaterials,
+    lightningMaterials, dysonShellMaterials, topopolisMaterials,
     pulsarBeamGroup, pulsarBeamParams,
     mqJetGroup,
     battleProjectiles, battleExplosions,
@@ -81,6 +89,23 @@ export function tickSceneAnimations(params: {
     entry.weatherMat.uniforms.uLightPos.value.copy(_worldPos);
     entry.weatherMat.uniforms.uTime.value = time;
     entry.cityMat.uniforms.uLightPos.value.copy(_worldPos);
+  }
+
+  // Topopolis materials — lit by the star at origin
+  const starPos = new THREE.Vector3(0, 0, 0);
+  for (const entry of topopolisMaterials) {
+    for (const mat of entry.interiorMats) {
+      mat.uniforms.uLightPos.value.copy(starPos);
+    }
+    for (const mat of entry.cityMats) {
+      mat.uniforms.uLightPos.value.copy(starPos);
+    }
+    for (const mat of entry.cloudMats) {
+      mat.uniforms.uTime.value = time;
+    }
+    for (const mat of entry.lightningMats) {
+      mat.uniforms.uTime.value = time;
+    }
   }
 
   // Rotate pulsar beam group

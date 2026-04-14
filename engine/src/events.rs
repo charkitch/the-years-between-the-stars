@@ -16,6 +16,7 @@ pub enum EventPool {
     ProximityBase,
     PlanetLanding,
     DysonLanding,
+    TopopolisLanding,
 }
 
 pub const ALL_EVENT_POOLS: &[EventPool] = &[
@@ -29,6 +30,7 @@ pub const ALL_EVENT_POOLS: &[EventPool] = &[
     EventPool::ProximityBase,
     EventPool::PlanetLanding,
     EventPool::DysonLanding,
+    EventPool::TopopolisLanding,
 ];
 
 pub struct EventContext<'a> {
@@ -222,6 +224,7 @@ mod tests {
         assert!(content::events_for_pool(EventPool::MaximumSpace).len() >= 8);
         assert!(content::events_for_pool(EventPool::Triggered).len() >= 1);
         assert!(content::events_for_pool(EventPool::DysonLanding).len() >= 2);
+        assert!(content::events_for_pool(EventPool::TopopolisLanding).len() >= 2);
     }
 
     #[test]

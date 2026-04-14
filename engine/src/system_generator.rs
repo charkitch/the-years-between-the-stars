@@ -8,6 +8,7 @@ use crate::system_profiles::{
     generate_moon_clouds, generate_rocky_clouds, generate_great_spot,
 };
 use crate::dyson_generator::generate_dyson_shells;
+use crate::topopolis_generator::generate_topopolis;
 use std::collections::HashSet;
 use std::f64::consts::PI;
 
@@ -171,7 +172,7 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
 
     // Home system (id 0) now uses normal generation like every other system.
 
-    let profile = system_profile_for(star.star_type);
+    let profile = system_profile_for(star.star_type, star.special_kind);
 
     let inner_count = rng.int(profile.inner_count.0, profile.inner_count.1);
     let outer_count = rng.int(profile.outer_count.0, profile.outer_count.1);
@@ -386,6 +387,18 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
     let mut secret_bases: Vec<SecretBaseData> = Vec::new();
     let outer_edge = orbit_base;
 
+    // Crown system: guaranteed Oort cloud station
+    if star.special_kind == SpecialSystemKind::TheCrown {
+        secret_bases.push(SecretBaseData {
+            id: format!("{}-secret-oort", star.id),
+            name: "Crown's Edge Station".to_string(),
+            base_type: SecretBaseType::OortCloud,
+            orbit_radius: outer_edge + rng.float(6000.0, 9000.0),
+            orbit_phase: rng.float(0.0, PI * 2.0),
+            orbit_speed: rng.float(0.000003, 0.000006),
+        });
+    }
+
     // Asteroid belt base (~25% of systems with belts)
     if let Some(ref belt) = asteroid_belt {
         if rng.next() < 0.25 {
@@ -401,8 +414,8 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
         }
     }
 
-    // Oort cloud base (~15%)
-    if rng.next() < 0.15 {
+    // Oort cloud base (~15%) — skip if Crown already placed one
+    if star.special_kind != SpecialSystemKind::TheCrown && rng.next() < 0.15 {
         secret_bases.push(SecretBaseData {
             id: format!("{}-secret-oort", star.id),
             name: rng.pick(OORT_CLOUD_BASE_NAMES).to_string(),
@@ -432,6 +445,7 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
         .unwrap_or_default();
 
     let dyson_shells = generate_dyson_shells(star);
+    let topopolis_coils = generate_topopolis(star);
 
     SolarSystemData {
         star_type: star.star_type,
@@ -439,6 +453,7 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
         companion,
         planets,
         dyson_shells,
+        topopolis_coils,
         asteroid_belt,
         main_station_planet_id,
         secret_bases,
@@ -486,6 +501,7 @@ mod tests {
             x: 0.0,
             y: 0.0,
             star_type: StarType::XB,
+            special_kind: SpecialSystemKind::None,
             economy: EconomyType::Synthesis,
             tech_level: 5,
             population: 9,
@@ -512,6 +528,7 @@ mod tests {
             x: 0.0,
             y: 0.0,
             star_type: StarType::XBB,
+            special_kind: SpecialSystemKind::None,
             economy: EconomyType::Synthesis,
             tech_level: 5,
             population: 9,
@@ -544,6 +561,7 @@ mod tests {
             x: 0.0,
             y: 0.0,
             star_type: StarType::MQ,
+            special_kind: SpecialSystemKind::None,
             economy: EconomyType::Synthesis,
             tech_level: 5,
             population: 9,

@@ -47,8 +47,10 @@ export type DysonBiomeProfile = 'continental' | 'mixed' | 'desert' | 'arctic';
 
 export type GasGiantType = 'jovian' | 'saturnian' | 'neptunian' | 'inferno' | 'chromatic' | 'helium';
 export type ClimateState = 'stable' | 'ice_age' | 'warming' | 'nuclear_winter' | 'toxic_bloom';
-export type InteractionTopology = 'sphere' | 'shell_patch';
-export type InteractionProfile = 'rocky' | 'gas_giant' | 'dyson_shell';
+export type SpecialSystemKind = 'none' | 'iron_star' | 'the_crown';
+export type InteractionTopology = 'sphere' | 'shell_patch' | 'helix_tube';
+export type InteractionProfile = 'rocky' | 'gas_giant' | 'dyson_shell' | 'topopolis';
+export type TopopolisBiome = 'continental' | 'ocean' | 'desert' | 'alien' | 'forest' | 'ice';
 
 export interface InteractionFieldData {
   topology: InteractionTopology;
@@ -64,6 +66,7 @@ export interface StarSystemData {
   x: number;
   y: number;
   starType: StarType;
+  specialKind: SpecialSystemKind;
   economy: EconomyType;
   techLevel: number;
   population: number;
@@ -171,12 +174,28 @@ export interface BinaryCompanionData {
   orbitPhase: number;
 }
 
+export interface TopopolisCoilData {
+  id: string;
+  name: string;
+  orbitRadius: number;
+  coilCount: number;
+  tubeRadius: number;
+  helixPitch: number;
+  orbitSpeed: number;
+  orbitPhase: number;
+  color: number;
+  biomeSequence: TopopolisBiome[];
+  biomeSeed: number;
+  interactionField: InteractionFieldData;
+}
+
 export interface SolarSystemData {
   starType: StarType;
   starRadius: number;
   companion: BinaryCompanionData | null;
   planets: PlanetData[];
   dysonShells: DysonShellSegmentData[];
+  topopolisCoils: TopopolisCoilData[];
   asteroidBelt: AsteroidBeltData | null;
   mainStationPlanetId: string;
   secretBases: SecretBaseData[];
@@ -221,6 +240,7 @@ export interface ChoiceEffect {
   setsFlags: string[];
   fires: string[];
   setsGalacticFlags: string[];
+  galaxyYearsAdvance: number;
 }
 
 export interface EventMoment {
@@ -259,6 +279,7 @@ export interface ClusterSystemSummary {
   x: number;
   y: number;
   starType: StarType;
+  specialKind: SpecialSystemKind;
   politics: PoliticalType;
   economy: EconomyType;
   controllingFactionId: FactionId;
@@ -313,6 +334,7 @@ export type HazardType =
   | 'MoonCollision'
   | 'StationCollision'
   | 'DysonShellCollision'
+  | 'TopopolisCollision'
   | 'MicroquasarJet'
   | 'PulsarBeam'
   | 'BlackHole'
@@ -432,7 +454,7 @@ export function engineGetMarket(systemId: SystemId): MarketEntry[] {
 export function engineGetGameEvent(
   systemId: SystemId,
   options?: {
-    context?: 'landing' | 'system_entry' | 'proximity_star' | 'proximity_base' | 'planet_landing' | 'dyson_landing' | 'triggered';
+    context?: 'landing' | 'system_entry' | 'proximity_star' | 'proximity_base' | 'planet_landing' | 'dyson_landing' | 'topopolis_landing' | 'triggered';
     secretBaseId?: string;
     surface?: string;
     siteClass?: string;

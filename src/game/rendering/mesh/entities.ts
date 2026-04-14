@@ -521,6 +521,8 @@ export function makeLandingSiteMarker(classification: string): THREE.Group {
     shell_accessible: 0x8fd8ff,
     shell_weathered: 0xd6a6ff,
     shell_hazard: 0xff7fb2,
+    topopolis_entrance: 0xffdd44,
+    topopolis_interior: 0xff9944,
   };
   const color = colorByClass[classification] ?? 0xffffff;
   const material = new THREE.MeshBasicMaterial({ color });

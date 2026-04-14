@@ -65,7 +65,7 @@ export function getInteractionDistance(entityType?: string, collisionRadius = 0)
     const stationBonus = collisionRadius * INTERACTION_DISTANCE.stationCollisionScale;
     distance += Math.min(INTERACTION_DISTANCE.stationCollisionMaxBonus, stationBonus);
   }
-  if (entityType === 'dyson_shell') {
+  if (entityType === 'dyson_shell' || entityType === 'topopolis') {
     if (collisionRadius > INTERACTION_DISTANCE.largeBodyRadiusThreshold) {
       const radiusBonus = (collisionRadius - INTERACTION_DISTANCE.largeBodyRadiusThreshold) * INTERACTION_DISTANCE.largeBodyRadiusScale;
       distance += Math.min(INTERACTION_DISTANCE.largeBodyMaxBonus, radiusBonus);
@@ -286,7 +286,7 @@ export type GoodName = typeof GOODS[number];
 
 export const MARKET_GOODS: readonly GoodName[] = BUYABLE_GOODS;
 
-export const ECONOMY_TYPES = ['Remnant', 'Tithe', 'Extraction', 'Tributary', 'Resonance', 'Synthesis'] as const;
+export const ECONOMY_TYPES = ['Remnant', 'Tithe', 'Extraction', 'Tributary', 'Resonance', 'Synthesis', 'Everything'] as const;
 export type EconomyType = typeof ECONOMY_TYPES[number];
 
 export const MAX_CARGO = 20;
@@ -310,6 +310,7 @@ export const POLITICAL_TYPES = [
   'The Asking',
   'Arrival',
   'Drift Sovereignty',
+  'Crown Patchwork',
 ] as const;
 export type PoliticalType = typeof POLITICAL_TYPES[number];
 
@@ -326,6 +327,7 @@ export const POLITICAL_TYPE_DISPLAY: Record<string, string> = {
   TheAsking: 'The Asking',
   Arrival: 'Arrival',
   DriftSovereignty: 'Drift Sovereignty',
+  CrownPatchwork: 'Crown Patchwork',
 };
 
 export const POLITICAL_DESCRIPTIONS: Record<string, { desc: string }> = {
@@ -365,6 +367,9 @@ export const POLITICAL_DESCRIPTIONS: Record<string, { desc: string }> = {
   DriftSovereignty: {
     desc: "Each entity — person, ship, habitat — is a sovereign state unto itself. Alliances form and dissolve by the hour. No laws, only negotiations. The docks are beautiful chaos.",
   },
+  CrownPatchwork: {
+    desc: "The Crown doesn't have a government. Trillions of entities from billions of species. Making do. It ranges from humdrum authoritarians to anarchists to the strange. The flicker of a candle rules a hundred million souls benevolently. In Telecas, only those who have died may vote. An AU away, a single Kleshari — weighing more than some planets — awaits its mate.",
+  },
 };
 
 export const ECONOMY_DESCRIPTIONS: Record<string, { desc: string }> = {
@@ -385,6 +390,9 @@ export const ECONOMY_DESCRIPTIONS: Record<string, { desc: string }> = {
   },
   Synthesis: {
     desc: "Post-scarcity research economies. They engineer impossibilities — seeds that shouldn't grow, weather that shouldn't exist, backups of things that were never alive.",
+  },
+  Everything: {
+    desc: "Not an economy — a million economies. Every model ever attempted runs somewhere along the Crown. Scavengers next to post-scarcity communes next to feudal tithe-states next to things that don't translate. Prices vary wildly by region. The only constant is volume.",
   },
 };
 

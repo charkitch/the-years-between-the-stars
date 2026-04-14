@@ -32,6 +32,14 @@ fn generate_factions() -> Vec<Faction> {
         });
     }
 
+    // The Crown's own faction — not generated, hand-placed
+    factions.push(Faction {
+        id: "faction-crown".to_string(),
+        name: "The Crown Patchwork".to_string(),
+        color: 0xFFDD44,
+        political_affinity: vec![PoliticalType::CrownPatchwork],
+    });
+
     factions
 }
 
@@ -133,7 +141,7 @@ mod tests {
 
     #[test]
     fn six_factions() {
-        assert_eq!(all_factions().len(), 6);
+        assert_eq!(all_factions().len(), 7);
     }
 
     #[test]

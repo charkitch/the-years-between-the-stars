@@ -7,6 +7,7 @@ const _collisionVec = new THREE.Vector3();
 const _dysonLocalPos = new THREE.Vector3();
 const _dysonNormalWorld = new THREE.Vector3();
 const _dysonTargetWorld = new THREE.Vector3();
+const _topoVec = new THREE.Vector3();
 
 function angleDelta(a: number, b: number): number {
   return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -121,6 +122,84 @@ export class FlightModel {
       }
       if (body.type === 'dyson_shell') continue;
 
+      // Topopolis: hollow tube — collide at tube surface, allow fly-through.
+      // Find closest point on helix centerline, then check if ship is at tube wall.
+      // Skip collision near gate positions (openings in the tube).
+      if (body.type === 'topopolis' && body.collisionSamplesWorld && body.collisionSampleRadius) {
+        const tubeRadius = body.collisionSampleRadius;
+        const thickness = SHIP_RADIUS + 12;
+        const samples = body.collisionSamplesWorld;
+        const sampleCount = samples.length;
+
+        // Find nearest centerline sample
+        let nearest = Infinity;
+        let nearestIdx = -1;
+        for (let i = 0; i < sampleCount; i++) {
+          const d = _topoVec.copy(shipPos).sub(samples[i]).lengthSq();
+          if (d < nearest) { nearest = d; nearestIdx = i; }
+        }
+        if (nearestIdx < 0) { continue; }
+        nearest = Math.sqrt(nearest);
+
+        // Refine: project onto segment between nearest and its best neighbor
+        const prev = nearestIdx > 0 ? nearestIdx - 1 : nearestIdx;
+        const next = nearestIdx < sampleCount - 1 ? nearestIdx + 1 : nearestIdx;
+        const dPrev = _topoVec.copy(shipPos).sub(samples[prev]).lengthSq();
+        const dNext = _topoVec.copy(shipPos).sub(samples[next]).lengthSq();
+        const neighborIdx = dPrev < dNext ? prev : next;
+
+        const a = samples[nearestIdx];
+        const b = samples[neighborIdx];
+        const ab = _topoVec.copy(b).sub(a);
+        const abLenSq = ab.lengthSq();
+        if (abLenSq < 0.001) { continue; }
+
+        const segT = THREE.MathUtils.clamp(_collisionVec.copy(shipPos).sub(a).dot(ab) / abLenSq, 0, 1);
+        const closest = _collisionVec.copy(a).addScaledVector(ab, segT);
+        nearest = shipPos.distanceTo(closest);
+
+        // Refined curve t — sub-sample precision using the segment projection
+        const maxIdx = Math.max(1, sampleCount - 1);
+        const curveT = (nearestIdx + segT * (neighborIdx - nearestIdx)) / maxIdx;
+
+        // Skip collision at endpoints (entrance gates)
+        const endpointGap = Math.max(0.008, 3 / maxIdx);
+        if (curveT < endpointGap || curveT > 1 - endpointGap) { continue; }
+
+        // Skip collision at side gates — mirror the shader formula exactly.
+        // Shader: gates at UV.x = (fg + 0.5) / gatesPerWrap, offset within each wrap.
+        const gPerWrap = body.gatesPerWrap ?? 0;
+        const nCoils = body.coilCount ?? 0;
+        if (gPerWrap > 0 && nCoils > 0) {
+          const wrapFrac = curveT * nCoils;
+          const wrapUvX = wrapFrac - Math.floor(wrapFrac);
+          const gs = 1.0 / gPerWrap;
+          const gateOffset = gs * 0.5;
+          const nearestGateUvX = Math.round((wrapUvX - gateOffset) / gs) * gs + gateOffset;
+          const gateDist = Math.abs(wrapUvX - nearestGateUvX);
+          // Gate collision gap — slightly wider than the visual opening
+          if (gateDist < 0.008) { continue; }
+        }
+
+        const normal = _topoVec.copy(shipPos).sub(closest);
+        const normalLen = normal.length();
+        if (normalLen > 0.001) {
+          normal.divideScalar(normalLen);
+          const distFromSurface = Math.abs(nearest - tubeRadius);
+          if (distFromSurface < thickness) {
+            const side = nearest >= tubeRadius ? 1 : -1;
+            shipPos.copy(closest).addScaledVector(normal, tubeRadius + side * thickness);
+            const dot = this.velocity.dot(normal);
+            if (dot * side < 0) {
+              this.velocity.addScaledVector(normal, -dot * 1.5);
+              this.velocity.multiplyScalar(0.5);
+            }
+            hitEntity = body;
+          }
+        }
+        continue;
+      }
+
       if (body.collisionSamplesWorld && body.collisionSampleRadius) {
         const minDist = body.collisionSampleRadius + SHIP_RADIUS;
         for (const sample of body.collisionSamplesWorld) {
@@ -138,7 +217,11 @@ export class FlightModel {
             break;
           }
         }
-      } else {
+      }
+
+      // Central sphere — used alone for simple bodies, or as a hub fallback
+      // for stations that also have ring collision samples
+      if (!hitEntity || (body.type === 'station' && hitEntity.type === 'station')) {
         const diff = _collisionVec.copy(shipPos).sub(body.worldPos);
         const dist = diff.length();
         const minDist = body.collisionRadius;

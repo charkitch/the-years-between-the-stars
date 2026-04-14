@@ -1,0 +1,30 @@
+id: TOPOPOLIS_ENTRANCE_PROCESSING
+title: ENTRANCE PROCESSING
+requires:
+  - !HostTypeIs [topopolis]
+  - !SiteClassIs [topopolis_entrance]
+narrativeLines:
+  - >-
+    The approach gate is a cathedral of bureaucracy. Docking clamps take hold of your ship with gentle precision, and a walkway extends to meet your airlock before you've finished post-flight checks.
+  - >-
+    A uniformed clerk in a booth that looks older than most civilizations waves you forward.  "Topopolis Entry Regulations," they say, sliding a tablet across the counter. "Read and acknowledge. No open flames in forest biomes. No unlicensed geological sampling. No swimming in the desert aquifers — yes, there are desert aquifers. No, I will not explain."
+  - >-
+    Behind the processing office, a corridor opens onto a promenade. A holographic directory lists hundreds of thousands of habitat zones by name, scrolling too fast to read: the Tidewater Reaches, the Amber Shelf, the Midnight Canopy, the Glass Plains, on and on and on. This structure is AU after AU of habitable surface, coiled around a star, home to trillions. At the bottom of the directory, in letters that scroll slowly because even the summary is too long to display at once, it reads THE LONG BAZAAR — CONTINUOUS MARKET — APPROXIMATELY 0.4 AU.
+  - >-
+    A kiosk by the exit sells souvenirs. Miniature topopolis models that slowly rotate in their cases. Star charts printed on fabric. A rack of shirts that read I FLEW THROUGH THE CROWN AND ALL I GOT WAS THIS EXISTENTIAL CRISIS.
+choices:
+  - id: buy_souvenir
+    label: Buy a souvenir from the kiosk
+    description: "-30 credits, a memento"
+    effect:
+      credits: -30
+  - id: take_the_tour
+    label: Sign up for the guided tour
+    description: "-50 credits, +Reputation"
+    effect:
+      credits: -50
+      tradingReputation: 2
+  - id: skip_ahead
+    label: Skip the tourist traps and head for the Bazaar
+    description: No effect
+    effect: {}

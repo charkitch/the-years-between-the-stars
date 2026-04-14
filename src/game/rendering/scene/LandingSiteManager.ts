@@ -213,6 +213,98 @@ export class LandingSiteManager {
     }
   }
 
+  addTopopolisSites(params: {
+    hostId: string;
+    hostLabel: string;
+    hostGroup: THREE.Group;
+    curve: THREE.Curve<THREE.Vector3>;
+    tubeRadius: number;
+    field: InteractionFieldData;
+    biomeSequence: string[];
+  }): void {
+    const { hostId, hostLabel, hostGroup, curve, tubeRadius, biomeSequence } = params;
+
+    const addSite = (
+      pos: THREE.Vector3,
+      lookTarget: THREE.Vector3,
+      classification: string,
+      label: string,
+      biome?: string,
+    ) => {
+      const marker = makeLandingSiteMarker(classification);
+      marker.position.copy(pos);
+      marker.lookAt(lookTarget);
+      marker.visible = false;
+      hostGroup.add(marker);
+
+      const idx = ++this.counter;
+      const id = `site-${hostId}-${idx}`;
+      this.entities.set(id, {
+        id,
+        name: label,
+        group: marker,
+        orbitRadius: 0,
+        orbitSpeed: 0,
+        orbitPhase: 0,
+        type: 'landing_site',
+        worldPos: new THREE.Vector3(),
+        collisionRadius: 0,
+        siteLabel: label,
+        siteClassification: classification,
+        siteHostLabel: hostLabel,
+        siteHostId: hostId,
+        siteDiscovered: false,
+        siteBiome: biome,
+      });
+    };
+
+    // ── Entrance sites at each tube endpoint ────────────────────────────────
+    const entranceNames = ['APPROACH GATE', 'FAR GATE'];
+    [0, 1].forEach((endIdx) => {
+      const t = endIdx === 0 ? 0.01 : 0.99;
+      const center = curve.getPoint(t);
+      const tangent = curve.getTangent(t).normalize();
+      // Position just inside the tube opening
+      const pos = center.clone().add(tangent.clone().multiplyScalar(endIdx === 0 ? tubeRadius * 0.3 : -tubeRadius * 0.3));
+      const lookTarget = center.clone().add(tangent.clone().multiplyScalar(endIdx === 0 ? tubeRadius : -tubeRadius));
+      addSite(pos, lookTarget, 'topopolis_entrance', `${hostLabel} ${entranceNames[endIdx]}`, 'entrance');
+    });
+
+    // ── Interior habitat sites along the tube ───────────────────────────────
+    const siteRng = PRNG.fromIndex(CLUSTER_SEED ^ 0xC011_51E7, hashString32(hostId));
+    const desired = 3;
+    let created = 0;
+
+    while (created < desired) {
+      // Place interior sites in the middle 80% of the tube (avoid endpoints)
+      const u = 0.1 + siteRng.next() * 0.8;
+      const circumAngle = siteRng.next() * Math.PI * 2;
+
+      // Look up biome at this position along the tube
+      const biomeIdx = Math.min(
+        biomeSequence.length - 1,
+        Math.floor(u * biomeSequence.length),
+      );
+      const biome = biomeSequence[biomeIdx] ?? 'continental';
+      const biomeLabel = biome.toUpperCase().replace('_', ' ');
+
+      const centerPoint = curve.getPoint(u);
+      const tangent = curve.getTangent(u).normalize();
+      const up = Math.abs(tangent.y) < 0.9
+        ? new THREE.Vector3(0, 1, 0)
+        : new THREE.Vector3(1, 0, 0);
+      const radial1 = new THREE.Vector3().crossVectors(tangent, up).normalize();
+      const radial2 = new THREE.Vector3().crossVectors(tangent, radial1).normalize();
+      const offset = radial1.clone().multiplyScalar(Math.cos(circumAngle))
+        .add(radial2.clone().multiplyScalar(Math.sin(circumAngle)))
+        .multiplyScalar(tubeRadius * 0.92);
+      const pos = centerPoint.clone().add(offset);
+
+      addSite(pos, centerPoint, 'topopolis_interior', `THE LONG BAZAAR · ${biomeLabel} ${['PORT', 'MARKET', 'EXCHANGE'][created]}`, biome);
+      created++;
+    }
+  }
+
   getStatsForHost(hostId: string): { total: number; discovered: number } {
     let total = 0;
     let discovered = 0;

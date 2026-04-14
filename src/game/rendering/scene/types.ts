@@ -13,7 +13,7 @@ export interface SceneEntity {
   shellArcWidth?: number;
   shellArcHeight?: number;
   parentId?: string;
-  type: 'planet' | 'station' | 'star' | 'moon' | 'npc_ship' | 'fleet_ship' | 'dyson_shell' | 'landing_site';
+  type: 'planet' | 'station' | 'star' | 'moon' | 'npc_ship' | 'fleet_ship' | 'dyson_shell' | 'topopolis' | 'landing_site';
   worldPos: THREE.Vector3;
   collisionRadius: number;
   interactionRadius?: number;
@@ -28,6 +28,12 @@ export interface SceneEntity {
   siteHostLabel?: string;
   siteHostId?: string;
   siteDiscovered?: boolean;
+  /** Biome at this landing site's position (topopolis interior sites). */
+  siteBiome?: string;
+  /** Number of coil wraps in the topopolis helix. */
+  coilCount?: number;
+  /** Number of flyable gates per wrap (shader-aligned). */
+  gatesPerWrap?: number;
   /** Set after first dock/land — revisits skip events and go straight to market. */
   visited?: boolean;
 }

@@ -1,0 +1,28 @@
+id: TOPOPOLIS_LONG_BAZAAR_PORT
+title: THE LONG BAZAAR
+requires:
+  - !HostTypeIs [topopolis]
+  - !SiteClassIs [topopolis_interior]
+narrativeLines:
+  - >-
+    The Long Bazaar is not a market. It is a continent of markets. Nearly 40 million miles of stalls and warehouses and floating auction houses and tea rooms and arguments about provenance, wound along a fraction of the topopolis interior like a river of commerce that never reaches a sea. The topopolis itself goes on for AU after AU beyond the Bazaar in both directions. Trillions live here. The Bazaar is just the part where they shop.
+  - >-
+    You have landed at a port section where the Bazaar curves through a continental biome. The stalls here are semi-permanent, built from local timber and imported alloy. Merchants from a dozen star systems have set up shop alongside locals who have never left the tube.
+  - >-
+    A dealer in rare minerals beckons you over. She has things you cannot get at any station — crystallized atmosphere from gas giant deep-dives, pressed soil samples from worlds that no longer exist, a jar of dust labeled simply "old." Behind her, a man is selling maps of the Bazaar itself. They are out of date by the time he finishes drawing them.
+choices:
+  - id: trade_minerals
+    label: Browse the rare mineral collection
+    description: "-80 credits, acquire rare goods"
+    effect:
+      credits: -80
+  - id: buy_a_map
+    label: Buy a map of the Bazaar
+    description: "-20 credits, +Reputation"
+    effect:
+      credits: -20
+      tradingReputation: 1
+  - id: keep_walking
+    label: Keep walking — the Bazaar is long
+    description: No effect
+    effect: {}

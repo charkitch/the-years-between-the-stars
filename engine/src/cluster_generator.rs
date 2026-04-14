@@ -70,6 +70,7 @@ pub fn generate_cluster() -> Vec<StarSystemData> {
             x,
             y,
             star_type,
+            special_kind: SpecialSystemKind::None,
             economy,
             tech_level,
             population: sys_rng.int(10, 10000),
@@ -81,31 +82,47 @@ pub fn generate_cluster() -> Vec<StarSystemData> {
         systems[0].star_type = StarType::G;
     }
 
-    // Hand-place the iron star near origin so it's reachable early.
-    if systems.len() > 1 {
-        let origin = &systems[0];
-        let mut nearest_reachable_idx: Option<usize> = None;
-        let mut nearest_reachable_dist = f64::MAX;
-        let mut nearest_non_origin_idx = 1usize;
-        let mut nearest_non_origin_dist = f64::MAX;
+    // Place IRON and Crown.
+    // Production: far from origin in opposite directions (endgame content).
+    // Dev: near origin so they're reachable immediately for testing.
+    if systems.len() > 2 {
+        let origin_x = systems[0].x;
+        let origin_y = systems[0].y;
 
-        for (idx, sys) in systems.iter().enumerate().skip(1) {
-            let dx = sys.x - origin.x;
-            let dy = sys.y - origin.y;
-            let dist = (dx * dx + dy * dy).sqrt();
+        let mut ranked: Vec<(usize, f64)> = systems.iter().enumerate().skip(1)
+            .map(|(i, s)| {
+                let dx = s.x - origin_x;
+                let dy = s.y - origin_y;
+                (i, (dx * dx + dy * dy).sqrt())
+            })
+            .collect();
 
-            if dist < nearest_non_origin_dist {
-                nearest_non_origin_dist = dist;
-                nearest_non_origin_idx = idx;
-            }
-            if dist <= HYPERSPACE_MAX_RANGE && dist < nearest_reachable_dist {
-                nearest_reachable_dist = dist;
-                nearest_reachable_idx = Some(idx);
-            }
-        }
+        #[cfg(feature = "dev-placement")]
+        ranked.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap()); // nearest first
+        #[cfg(not(feature = "dev-placement"))]
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap()); // farthest first
 
-        let iron_idx = nearest_reachable_idx.unwrap_or(nearest_non_origin_idx);
+        let iron_idx = ranked[0].0;
         systems[iron_idx].star_type = StarType::Iron;
+        systems[iron_idx].special_kind = SpecialSystemKind::IronStar;
+
+        // Crown: farthest system from origin that's also far from IRON
+        // (roughly opposite direction). Score = distance_from_origin + distance_from_iron.
+        let iron_x = systems[iron_idx].x;
+        let iron_y = systems[iron_idx].y;
+
+        let non_iron: Vec<(usize, f64)> = ranked.iter()
+            .filter(|(i, _)| *i != iron_idx)
+            .copied()
+            .collect();
+        // In dev, ranked is nearest-first so [0] is close; in prod, farthest-first.
+        let crown_idx = non_iron.first().map(|(i, _)| *i).unwrap_or(2);
+
+        if crown_idx < systems.len() {
+            systems[crown_idx].star_type = StarType::G;
+            systems[crown_idx].special_kind = SpecialSystemKind::TheCrown;
+            systems[crown_idx].name = "The Crown".to_string();
+        }
     }
 
     systems
@@ -152,25 +169,18 @@ mod tests {
     }
 
     #[test]
-    fn iron_star_is_reachable_from_origin() {
+    fn iron_star_placement() {
         let cluster = generate_cluster();
         let origin = &cluster[0];
-
-        let iron_systems: Vec<&StarSystemData> = cluster
-            .iter()
-            .filter(|s| s.star_type == StarType::Iron)
-            .collect();
-        assert_eq!(iron_systems.len(), 1, "Expected exactly one iron star");
-
-        let iron = iron_systems[0];
+        let iron = cluster.iter().find(|s| s.star_type == StarType::Iron).unwrap();
         let dx = iron.x - origin.x;
         let dy = iron.y - origin.y;
         let dist = (dx * dx + dy * dy).sqrt();
-        assert!(
-            dist <= HYPERSPACE_MAX_RANGE,
-            "Iron star is out of one-jump range from origin: {}",
-            dist
-        );
+        if cfg!(feature = "dev-placement") {
+            assert!(dist <= HYPERSPACE_MAX_RANGE, "Iron should be near origin in dev, got {}", dist);
+        } else {
+            assert!(dist > HYPERSPACE_MAX_RANGE, "Iron should be far from origin in prod, got {}", dist);
+        }
     }
 
     #[test]
@@ -200,5 +210,69 @@ mod tests {
         assert_eq!(a_iron.id, b_iron.id);
         assert_eq!(a_iron.x, b_iron.x);
         assert_eq!(a_iron.y, b_iron.y);
+    }
+
+    #[test]
+    fn iron_star_has_special_kind() {
+        let cluster = generate_cluster();
+        let iron = cluster.iter().find(|s| s.star_type == StarType::Iron).unwrap();
+        assert_eq!(iron.special_kind, SpecialSystemKind::IronStar);
+    }
+
+    #[test]
+    fn exactly_one_crown_system() {
+        let cluster = generate_cluster();
+        let crowns: Vec<&StarSystemData> = cluster
+            .iter()
+            .filter(|s| s.special_kind == SpecialSystemKind::TheCrown)
+            .collect();
+        assert_eq!(crowns.len(), 1, "Expected exactly one Crown system");
+    }
+
+    #[test]
+    fn crown_system_properties() {
+        let cluster = generate_cluster();
+        let crown = cluster.iter()
+            .find(|s| s.special_kind == SpecialSystemKind::TheCrown)
+            .expect("Missing Crown system");
+        assert_eq!(crown.star_type, StarType::G);
+        assert_eq!(crown.name, "The Crown");
+    }
+
+    #[test]
+    fn crown_placement() {
+        let cluster = generate_cluster();
+        let origin = &cluster[0];
+        let crown = cluster.iter()
+            .find(|s| s.special_kind == SpecialSystemKind::TheCrown)
+            .unwrap();
+        let dx = crown.x - origin.x;
+        let dy = crown.y - origin.y;
+        let dist = (dx * dx + dy * dy).sqrt();
+        if cfg!(feature = "dev-placement") {
+            assert!(dist <= HYPERSPACE_MAX_RANGE, "Crown should be near origin in dev, got {}", dist);
+        } else {
+            assert!(dist > HYPERSPACE_MAX_RANGE, "Crown should be far from origin in prod, got {}", dist);
+        }
+    }
+
+    #[test]
+    fn deterministic_crown_placement() {
+        let a = generate_cluster();
+        let b = generate_cluster();
+        let a_crown = a.iter().find(|s| s.special_kind == SpecialSystemKind::TheCrown).unwrap();
+        let b_crown = b.iter().find(|s| s.special_kind == SpecialSystemKind::TheCrown).unwrap();
+        assert_eq!(a_crown.id, b_crown.id);
+        assert_eq!(a_crown.x, b_crown.x);
+        assert_eq!(a_crown.y, b_crown.y);
+    }
+
+    #[test]
+    fn non_special_systems_have_none_kind() {
+        let cluster = generate_cluster();
+        let non_special: Vec<&StarSystemData> = cluster.iter()
+            .filter(|s| s.special_kind == SpecialSystemKind::None)
+            .collect();
+        assert_eq!(non_special.len(), 28, "Expected 28 non-special systems (30 - iron - crown)");
     }
 }

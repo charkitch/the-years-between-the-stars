@@ -14,6 +14,16 @@ pub enum ClimateState {
     ToxicBloom,
 }
 
+// ─── Special System Kinds ───────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SpecialSystemKind {
+    None,
+    IronStar,
+    TheCrown,
+}
+
 // ─── Star / Planet Enums ─────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -143,6 +153,7 @@ pub enum DysonInteractionMode {
 pub enum InteractionTopology {
     Sphere,
     ShellPatch,
+    HelixTube,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -151,6 +162,7 @@ pub enum InteractionProfile {
     Rocky,
     GasGiant,
     DysonShell,
+    Topopolis,
 }
 
 // ─── World Data Structs ──────────────────────────────────────────────────────
@@ -173,6 +185,7 @@ pub struct StarSystemData {
     pub x: f64,
     pub y: f64,
     pub star_type: StarType,
+    pub special_kind: SpecialSystemKind,
     pub economy: EconomyType,
     pub tech_level: i32,
     pub population: i32,
@@ -281,6 +294,49 @@ pub struct DysonShellSegmentData {
     pub interaction_field: InteractionFieldData,
 }
 
+// ─── Topopolis Data ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TopopolisBiome {
+    Continental,
+    Ocean,
+    Desert,
+    Alien,
+    Forest,
+    Ice,
+}
+
+impl TopopolisBiome {
+    pub const ALL: &'static [TopopolisBiome] = &[
+        TopopolisBiome::Continental,
+        TopopolisBiome::Ocean,
+        TopopolisBiome::Desert,
+        TopopolisBiome::Alien,
+        TopopolisBiome::Forest,
+        TopopolisBiome::Ice,
+    ];
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TopopolisCoilData {
+    pub id: String,
+    pub name: String,
+    pub orbit_radius: f64,
+    pub coil_count: u32,
+    pub tube_radius: f64,
+    pub helix_pitch: f64,
+    pub orbit_speed: f64,
+    pub orbit_phase: f64,
+    pub color: u32,
+    pub biome_sequence: Vec<TopopolisBiome>,
+    pub biome_seed: f64,
+    pub interaction_field: InteractionFieldData,
+}
+
+// ─── Binary Companion ───────────────────────────────────────────────────────
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BinaryCompanionData {
@@ -300,6 +356,7 @@ pub struct SolarSystemData {
     pub companion: Option<BinaryCompanionData>,
     pub planets: Vec<PlanetData>,
     pub dyson_shells: Vec<DysonShellSegmentData>,
+    pub topopolis_coils: Vec<TopopolisCoilData>,
     pub asteroid_belt: Option<AsteroidBeltData>,
     pub main_station_planet_id: String,
     pub secret_bases: Vec<SecretBaseData>,

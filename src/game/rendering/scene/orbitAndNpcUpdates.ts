@@ -106,6 +106,17 @@ export function updateOrbitalEntities(entities: Map<string, SceneEntity>, time: 
       orientDysonShell(entity);
       continue;
     }
+    if (entity.type === 'topopolis') {
+      // Rotate the entire helix group around Y axis
+      entity.group.rotation.y = angle;
+      updateCollisionSamples(entity);
+      // Set worldPos to a point on the actual tube (not origin) so distance
+      // checks in scanning/HUD work against the structure, not the star.
+      if (entity.collisionSamplesWorld?.length) {
+        entity.worldPos.copy(entity.collisionSamplesWorld[0]);
+      }
+      continue;
+    }
     updateCollisionSamples(entity);
   }
 

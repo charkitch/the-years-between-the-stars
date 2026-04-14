@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "wasm:build": "cd engine && wasm-pack build --target web --out-dir pkg",
-    "wasm:build:dev": "cd engine && wasm-pack build --target web --out-dir pkg --dev",
+    "wasm:build:dev": "cd engine && wasm-pack build --target web --out-dir pkg -- --features dev-placement",
     "dev": "vite",
     "build": "npm run wasm:build && tsc && vite build",
     "preview": "vite preview",

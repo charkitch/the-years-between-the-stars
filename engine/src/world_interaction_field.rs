@@ -215,3 +215,28 @@ pub fn build_dyson_shell_interaction_field(
         values: dyson_field_values(star_id, band_index, segment_index, profile),
     }
 }
+
+const TOPOPOLIS_FIELD_WIDTH: u16 = 128;
+const TOPOPOLIS_FIELD_HEIGHT: u16 = 32;
+
+pub fn build_topopolis_interaction_field(star_id: u32, coil_index: u32) -> InteractionFieldData {
+    let seed = star_id.wrapping_mul(7919).wrapping_add(coil_index * 2903);
+    let mut rng = PRNG::from_index(0xC011_0001, seed);
+
+    // U = along tube length, V = around tube circumference.
+    // Inner surface of the tube is habitable; mark landing sites along the interior.
+    let values = build_values(TOPOPOLIS_FIELD_WIDTH, TOPOPOLIS_FIELD_HEIGHT, |u, _v| {
+        let section_noise = ((u * 17.3 + rng.next() * 0.1).sin() * 0.5 + 0.5) * 0.6;
+        let detail = ((u * 43.7).sin() * 0.15 + (u * 91.1).cos() * 0.08) * 0.5 + 0.5;
+        let base = section_noise * 0.7 + detail * 0.3;
+        if base > 0.55 { 200.0 } else if base > 0.35 { 120.0 } else { 40.0 }
+    });
+
+    InteractionFieldData {
+        topology: InteractionTopology::HelixTube,
+        profile: InteractionProfile::Topopolis,
+        width: TOPOPOLIS_FIELD_WIDTH,
+        height: TOPOPOLIS_FIELD_HEIGHT,
+        values,
+    }
+}

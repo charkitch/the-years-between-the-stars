@@ -56,7 +56,9 @@ export type InteractionClass =
   | 'gas_storm'
   | 'shell_accessible'
   | 'shell_weathered'
-  | 'shell_hazard';
+  | 'shell_hazard'
+  | 'topopolis_entrance'
+  | 'topopolis_interior';
 
 function classifyRocky(value: number): InteractionClass {
   return value >= 0.48 ? 'rocky_landable' : 'rocky_water';
@@ -74,6 +76,11 @@ function classifyDyson(value: number): InteractionClass {
   return 'shell_accessible';
 }
 
+function classifyTopopolis(value: number): InteractionClass {
+  if (value >= 0.55) return 'topopolis_interior';
+  return 'topopolis_interior';
+}
+
 export function classifyInteractionValue(
   profile: InteractionProfile,
   value: number,
@@ -85,6 +92,8 @@ export function classifyInteractionValue(
       return classifyGas(value);
     case 'dyson_shell':
       return classifyDyson(value);
+    case 'topopolis':
+      return classifyTopopolis(value);
   }
 }
 

@@ -1,0 +1,94 @@
+id: TOPOPOLIS_FIFTEEN_YEARS
+title: STAYING A WHILE
+requires:
+  - !HostTypeIs [topopolis]
+  - !SiteClassIs [topopolis_interior]
+repeatability: unique
+narrativeLines:
+  - >-
+    You land at a port district where the Long Bazaar thins out into residential terraces. You came to refuel and check the hull. You are not planning to stay.
+  - >-
+    The mechanic who inspects your ship says the refit will take three days. She recommends a place to wait — her cousin runs a bakery with a room upstairs. The rent is nothing. The bread, she says, is the point.
+choices:
+  - id: take_the_room
+    label: Take the room above the bakery
+    description: "Wait for the refit"
+    effect: {}
+    nextMoment:
+      narrativeLines:
+        - >-
+          The bakery is in a habitat zone where it rains every afternoon and the evenings smell like wet stone and bread. You sleep with the window open. The rain sounds different inside a tube — it falls in curves.
+        - >-
+          On the third day, the mechanic sends word that your ship is ready. You go to collect it, but on the way back through the bakery, the owner's husband mentions that someone has been stealing water from the desert aquifers — thousands of miles deeper along the tube — and that the theft has been going on for longer than most of the local governments have existed. She says it the way people mention weather.
+      choices:
+        - id: stay_and_investigate
+          label: That sounds like something worth looking into
+          description: "Stay longer"
+          effect: {}
+          nextMoment:
+            narrativeLines:
+              - >-
+                You find the aquifer thieves. They are not thieves. They are an engineering guild maintaining a cooling system that predates the current civilizations by an order of magnitude. They did not steal the water. They put it there. Everyone else arrived later and assumed it was natural.
+              - >-
+                Resolving the misunderstanding takes two years. Not because it is complicated, but because the tube is long and the relevant bureaucracies are separated by biome transitions that take weeks to cross by ferry.
+              - >-
+                When it is over, the guild offers you a meal. They cook with water that is older than most of the stars you have visited. It tastes like nothing at all, which they consider the highest compliment.
+            choices:
+              - id: keep_exploring
+                label: You have a taste for this kind of thing now
+                description: "Keep going"
+                effect:
+                  galaxyYearsAdvance: 3
+                nextMoment:
+                  narrativeLines:
+                    - >-
+                      A cartographer hires you to help map a section of the tube where the interior lights have failed. In the dark stretch — two hundred miles of it — a civilization has adapted to perpetual night. They navigate by echolocation and bioluminescent tattoos. They are not primitive. They have universities. They chose this.
+                    - >-
+                      You spend a year among them. You learn to read by the light of your own skin. You attend a lecture on stellar navigation delivered entirely in sound. The professor has never seen a star. Her model of the galaxy is more accurate than yours.
+                  choices:
+                    - id: one_more
+                      label: There is always one more thing
+                      description: "Stay longer"
+                      effect:
+                        galaxyYearsAdvance: 2
+                      nextMoment:
+                        narrativeLines:
+                          - >-
+                            There is a war, briefly, between two agricultural zones arguing over pollination rights across a biome boundary. You mediate. It takes six months. The stakes are incomprehensible to anyone who has not lived inside a tube for a decade — which you now have.
+                          - >-
+                            Then there is the matter of the missing conductor. A ferry operator who has been running the same route for forty years vanishes between stops. You find her living under an assumed name in an ocean biome, running a bookshop. She is not hiding. She simply wanted to stop moving and could not think of another way to do it. You understand this completely.
+                          - >-
+                            Fifteen years. You have a favourite bench. A library card. Opinions about Long Bazaar coffee. A friend who has never left the tube and does not understand why anyone would want to. You are not the same person who landed. You are starting to wonder if the ship remembers you.
+                        choices:
+                          - id: return_to_ship
+                            label: The ship remembers. Go back.
+                            description: "15 years pass total"
+                            effect:
+                              galaxyYearsAdvance: 10
+                              tradingReputation: 4
+                          - id: stay_decade_more
+                            label: The bench is comfortable. The coffee is good.
+                            description: "25 years pass total, +Reputation"
+                            effect:
+                              galaxyYearsAdvance: 20
+                              tradingReputation: 6
+                    - id: return_early_2
+                      label: Head back to the ship
+                      description: "5 years pass"
+                      effect:
+                        galaxyYearsAdvance: 5
+                        tradingReputation: 3
+              - id: return_early_1
+                label: Head back to the ship
+                description: "3 years pass"
+                effect:
+                  galaxyYearsAdvance: 3
+                  tradingReputation: 2
+        - id: collect_ship
+          label: Collect the ship and go
+          description: "No effect"
+          effect: {}
+  - id: leave_immediately
+    label: Wait at the port — you have seen bakeries
+    description: "No effect"
+    effect: {}

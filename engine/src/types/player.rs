@@ -115,6 +115,8 @@ pub struct ChoiceEffect {
     pub fires: Vec<String>,
     #[serde(default)]
     pub sets_galactic_flags: Vec<String>,
+    #[serde(default)]
+    pub galaxy_years_advance: u32,
 }
 
 fn default_price_mod() -> f64 { 1.0 }

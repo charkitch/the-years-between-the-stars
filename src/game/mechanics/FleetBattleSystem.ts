@@ -227,6 +227,11 @@ export function generateFleetBattle(
     return null;
   }
 
+  // No fleet battles in topopolis systems — The Crown is peaceful
+  if (systemData.topopolisCoils.length > 0) {
+    return null;
+  }
+
   const era = Math.floor(galaxyYear / ERA_LENGTH);
   const rng = PRNG.fromIndex(
     (CLUSTER_SEED ^ (systemId * 0x9E3779B9) ^ (era * 0x517CC1B7 + 0xBA77)) >>> 0,

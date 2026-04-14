@@ -11,6 +11,7 @@ export const ALL_FACTIONS: readonly Faction[] = [
   { id: 'faction-3', name: 'Draimar', color: 0xAA44FF },
   { id: 'faction-4', name: 'Solossa', color: 0x44DDAA },
   { id: 'faction-5', name: 'Nyxenth', color: 0xFFCC22 },
+  { id: 'faction-crown', name: 'The Crown Patchwork', color: 0xFFDD44 },
 ];
 
 export function getFaction(id: string): Faction | undefined {

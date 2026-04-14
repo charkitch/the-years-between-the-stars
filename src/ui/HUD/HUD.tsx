@@ -134,7 +134,7 @@ export function HUD({
     ? (
       targetEntity.type === 'landing_site'
         ? targetEntity.siteHostId ?? null
-        : targetEntity.type === 'planet' || targetEntity.type === 'dyson_shell'
+        : targetEntity.type === 'planet' || targetEntity.type === 'dyson_shell' || targetEntity.type === 'topopolis'
           ? targetEntity.id
           : null
     ) as ScannableBodyId | null
@@ -311,6 +311,8 @@ export function HUD({
                 <div style={{ fontSize: '10px', opacity: 0.6 }}>
                   TYPE: {targetEntity.type === 'dyson_shell'
                     ? 'DYSON SHELL'
+                    : targetEntity.type === 'topopolis'
+                    ? 'TOPOPOLIS'
                     : targetEntity.type === 'landing_site'
                       ? `SITE · ${(targetEntity.siteClassification ?? 'unknown').split('_').join(' ').toUpperCase()}`
                       : targetEntity.type.toUpperCase()}
@@ -320,7 +322,7 @@ export function HUD({
                     HOST: {targetEntity.siteHostLabel.toUpperCase()}
                   </div>
                 )}
-                {(targetEntity.type === 'planet' || targetEntity.type === 'dyson_shell' || targetEntity.type === 'landing_site') && (
+                {(targetEntity.type === 'planet' || targetEntity.type === 'dyson_shell' || targetEntity.type === 'topopolis' || targetEntity.type === 'landing_site') && (
                   <div style={{ fontSize: '10px', opacity: 0.75 }}>
                     SCAN: {targetIsScanned ? 'SCANNED' : 'UNSCANNED'}
                     {targetIsScanned ? ` · SITES ${targetSiteDiscovered}/${targetSiteTotal}` : ''}

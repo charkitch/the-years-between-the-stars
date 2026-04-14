@@ -70,6 +70,7 @@ fn allowed_economies(politics: PoliticalType) -> &'static [EconomyType] {
         PoliticalType::TheAsking => &[EconomyType::Tributary, EconomyType::Synthesis, EconomyType::Resonance],
         PoliticalType::Arrival => &[EconomyType::Resonance, EconomyType::Synthesis, EconomyType::Tributary],
         PoliticalType::DriftSovereignty => &[EconomyType::Remnant, EconomyType::Tributary, EconomyType::Tithe, EconomyType::Extraction],
+        PoliticalType::CrownPatchwork => &[EconomyType::Synthesis, EconomyType::Resonance, EconomyType::Tributary, EconomyType::Tithe],
     }
 }
 

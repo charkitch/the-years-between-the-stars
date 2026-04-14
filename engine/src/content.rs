@@ -129,6 +129,10 @@ pub fn iron_star_arrival_dialog() -> SystemEntryDialog {
     dialog_by_label("dialogs/iron_star_arrival.yaml")
 }
 
+pub fn the_crown_arrival_dialog() -> SystemEntryDialog {
+    dialog_by_label("dialogs/the_crown_arrival.yaml")
+}
+
 #[cfg(test)]
 mod tests {
     use serde::de::DeserializeOwned;
@@ -183,6 +187,7 @@ mod tests {
         assert_sorted(generated_content_registry::PROXIMITY_BASE_EVENT_FILES);
         assert_sorted(generated_content_registry::PLANET_LANDING_EVENT_FILES);
         assert_sorted(generated_content_registry::DYSON_LANDING_EVENT_FILES);
+        assert_sorted(generated_content_registry::TOPOPOLIS_LANDING_EVENT_FILES);
         assert_sorted(generated_content_registry::TRIGGER_FILES);
         assert_sorted(generated_content_registry::DIALOG_FILES);
     }
@@ -228,6 +233,10 @@ mod tests {
         assert_eq!(
             generated_content_registry::event_entries_for_pool(EventPool::DysonLanding),
             generated_content_registry::DYSON_LANDING_EVENT_FILES
+        );
+        assert_eq!(
+            generated_content_registry::event_entries_for_pool(EventPool::TopopolisLanding),
+            generated_content_registry::TOPOPOLIS_LANDING_EVENT_FILES
         );
     }
 

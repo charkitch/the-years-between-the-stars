@@ -1,0 +1,27 @@
+id: TOPOPOLIS_LONG_BAZAAR_EXCHANGE
+title: THE LONG BAZAAR — DEEP EXCHANGE
+requires:
+  - !HostTypeIs [topopolis]
+  - !SiteClassIs [topopolis_interior]
+narrativeLines:
+  - >-
+    This section of the Bazaar passes through an alien biome — the air tastes of copper and the light comes from bioluminescent growths on the tube walls rather than from the star. The merchants here are quieter. The goods are stranger.
+  - >-
+    An antiquities dealer has a table of artifacts from civilizations you have visited. You recognize a navigation compass from a system you passed through decades ago. The price tag is astonishing. You were there when these were common.
+  - >-
+    Next door, a food stall serves something that smells like home. Not your home specifically. Just the concept of home, distilled into a broth. The cook says the recipe has been passed along the Bazaar for longer than anyone can trace. It has been modified at every stop. It is nearly 40 million miles of cooking.
+choices:
+  - id: sell_story
+    label: Tell the antiquities dealer what the compass was actually worth
+    description: "+Reputation"
+    effect:
+      tradingReputation: 2
+  - id: try_the_broth
+    label: Try the forty-two-thousand-mile broth
+    description: "-15 credits"
+    effect:
+      credits: -15
+  - id: browse_further
+    label: Continue deeper into the exchange
+    description: No effect
+    effect: {}

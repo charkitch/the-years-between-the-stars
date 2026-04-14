@@ -233,6 +233,14 @@ pub fn legality_for_good(politics: PoliticalType, good: GoodName) -> MarketLegal
                 MarketLegality::Legal
             }
         }
+        PoliticalType::CrownPatchwork => {
+            // The Crown's patchwork of micro-governments: almost everything is legal
+            if matches!(good, GoodName::SurrenderCodes) {
+                MarketLegality::Licensed
+            } else {
+                MarketLegality::Legal
+            }
+        }
     }
 }
 

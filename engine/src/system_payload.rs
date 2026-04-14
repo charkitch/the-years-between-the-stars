@@ -8,7 +8,11 @@ use crate::content;
 
 pub fn build_cluster_summary(cluster: &[StarSystemData], galaxy_year: u32) -> Vec<ClusterSystemSummary> {
     cluster.iter().map(|star| {
-        let civ = get_civ_state(star.id, galaxy_year, star.economy);
+        let mut civ = get_civ_state(star.id, galaxy_year, star.economy);
+        if star.special_kind == SpecialSystemKind::TheCrown {
+            civ.politics = PoliticalType::CrownPatchwork;
+            civ.economy = EconomyType::Everything;
+        }
         let faction = get_system_faction_state(star.id, galaxy_year, civ.politics);
         ClusterSystemSummary {
             id: star.id,
@@ -16,6 +20,7 @@ pub fn build_cluster_summary(cluster: &[StarSystemData], galaxy_year: u32) -> Ve
             x: star.x,
             y: star.y,
             star_type: star.star_type,
+            special_kind: star.special_kind,
             politics: civ.politics,
             economy: civ.economy,
             controlling_faction_id: faction.controlling_faction_id,
@@ -144,7 +149,11 @@ pub fn build_system_payload(
         });
     });
 
-    let civ_state = get_civ_state(star.id, galaxy_year, star.economy);
+    let mut civ_state = get_civ_state(star.id, galaxy_year, star.economy);
+    if star.special_kind == SpecialSystemKind::TheCrown {
+        civ_state.politics = PoliticalType::CrownPatchwork;
+        civ_state.economy = EconomyType::Everything;
+    }
     let faction_state = get_system_faction_state(star.id, galaxy_year, civ_state.politics);
 
     let system_choices = player_state.player_choices.get(&star.id);
@@ -241,11 +250,15 @@ pub fn build_system_payload(
         }
     }
 
-    // Iron star arrival dialog — shown only once per save
-    let system_entry_dialog = if star.star_type == StarType::Iron
+    // Special system arrival dialogs — shown only once per save
+    let system_entry_dialog = if star.special_kind == SpecialSystemKind::IronStar
         && !player_state.seen_system_dialog_ids.iter().any(|id| id == "iron_star_arrival")
     {
         Some(content::iron_star_arrival_dialog())
+    } else if star.special_kind == SpecialSystemKind::TheCrown
+        && !player_state.seen_system_dialog_ids.iter().any(|id| id == "the_crown_arrival")
+    {
+        Some(content::the_crown_arrival_dialog())
     } else {
         None
     };

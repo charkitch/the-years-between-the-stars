@@ -1,0 +1,25 @@
+id: CROWNS_EDGE_STATION
+title: CROWN'S EDGE STATION
+narrativeLines:
+  - >-
+    The station is small. Absurdly small. A handful of docking bays, a canteen, a fuel depot, and a gift shop selling topopolis postcards. The staff are three people and a maintenance drone that seems to be in charge.
+  - >-
+    "Welcome to the largest station for light years in any direction," says the dock officer, gesturing at a sign that says exactly that. She pauses. "In any other direction. If you go that direction" — she points toward the star — "there's a megastructure measured in AU with a population in the trillions. But out here? Largest station. By far."
+  - >-
+    The canteen serves surprisingly good coffee. The fuel is reasonably priced. The gift shop has a snow globe with a tiny topopolis inside that coils around a tiny star. You shake it and glitter falls on the tiny civilizations within. The price tag says "perspective."
+choices:
+  - id: buy_perspective
+    label: Buy the snow globe
+    description: "-40 credits, perspective"
+    effect:
+      credits: -40
+  - id: refuel_cheap
+    label: Top off the tank at Oort prices
+    description: "+2 fuel"
+    effect:
+      fuelReward: 2.0
+  - id: just_coffee
+    label: Just have the coffee
+    description: "+Reputation (the barista remembers kindness)"
+    effect:
+      tradingReputation: 1

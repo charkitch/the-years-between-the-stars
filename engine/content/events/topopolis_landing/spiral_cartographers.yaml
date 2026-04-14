@@ -1,0 +1,20 @@
+id: TOPOPOLIS_SPIRAL_CARTOGRAPHERS
+title: THE SPIRAL CARTOGRAPHERS
+requires:
+  - !HostTypeIs [topopolis]
+narrativeLines:
+  - >-
+    A cartographers' guild maintains a station here, mapping the slow drift of the topopolis interior. The structure breathes, they explain, expanding and contracting on cycles longer than most civilizations last.
+  - >-
+    Their maps are layered in centuries. The current coastline is drawn in fresh ink over older shores now buried under desert or drowned beneath new seas. They offer you a copy, more art than navigation.
+choices:
+  - id: accept_charts
+    label: Accept the layered charts
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1
+  - id: commission_survey
+    label: Commission a survey of your flight path
+    description: "-50 credits"
+    effect:
+      credits: -50

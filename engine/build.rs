@@ -23,6 +23,7 @@ const EVENT_POOLS: &[EventPoolSpec] = &[
     EventPoolSpec { dir: "proximity_base", variant: "ProximityBase" },
     EventPoolSpec { dir: "planet_landing", variant: "PlanetLanding" },
     EventPoolSpec { dir: "dyson_landing", variant: "DysonLanding" },
+    EventPoolSpec { dir: "topopolis_landing", variant: "TopopolisLanding" },
 ];
 
 fn walk_yaml_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {

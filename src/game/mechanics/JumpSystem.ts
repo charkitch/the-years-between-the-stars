@@ -157,6 +157,7 @@ export class JumpSystem {
       const starData = state.cluster[targetId];
 
       state.setCurrentSystemPayload(targetId, payload);
+      state.addKnownFaction(payload.factionState.controllingFactionId);
 
       this.sceneRenderer.loadSystem(
         systemData,

@@ -50,7 +50,7 @@ export class InteractionSystem {
     if (!site || site.type !== 'landing_site' || !site.siteDiscovered) return false;
     const hostId = site.siteHostId;
     const host = hostId ? this.sceneRenderer.getEntity(hostId) : null;
-    if (!host || (host.type !== 'planet' && host.type !== 'dyson_shell')) return false;
+    if (!host || (host.type !== 'planet' && host.type !== 'dyson_shell' && host.type !== 'topopolis')) return false;
     const shipPos = this.sceneRenderer.shipGroup.position;
     const dist = shipPos.distanceTo(site.worldPos);
     const required = getInteractionDistance(host.type, host.collisionRadius);
@@ -98,7 +98,7 @@ export class InteractionSystem {
     }
     const hostId = site.siteHostId;
     const host = hostId ? this.sceneRenderer.getEntity(hostId) : null;
-    if (!host || (host.type !== 'planet' && host.type !== 'dyson_shell')) {
+    if (!host || (host.type !== 'planet' && host.type !== 'dyson_shell' && host.type !== 'topopolis')) {
       state.setAlert('INVALID LANDING TARGET');
       setTimeout(() => useGameState.getState().setAlert(null), 1600);
       return;
@@ -130,6 +130,18 @@ export class InteractionSystem {
           surface: planet?.surfaceType,
           siteClass: site.siteClassification,
           hostType: 'planet',
+        });
+      } else if (host.type === 'topopolis') {
+        // Map topopolis biome to SurfaceType so events can use SurfaceIs conditions
+        const biomeToSurface: Record<string, string> = {
+          continental: 'continental', ocean: 'ocean', desert: 'desert',
+          ice: 'ice', forest: 'forest_moon', alien: 'volcanic',
+        };
+        event = engineGetGameEvent(state.currentSystemId, {
+          context: 'topopolis_landing',
+          surface: site.siteBiome ? biomeToSurface[site.siteBiome] : undefined,
+          siteClass: site.siteClassification,
+          hostType: 'topopolis',
         });
       } else {
         event = engineGetGameEvent(state.currentSystemId, {

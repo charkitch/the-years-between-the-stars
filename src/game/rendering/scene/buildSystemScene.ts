@@ -14,6 +14,7 @@ import {
   makeRingSystem,
   addCityLights, addSunAtmosphere, addLightning, addCloudLayer,
   makeDysonShellSegment, addDysonWeatherLayer, makeDysonMiniStar, addDysonCityLights,
+  makeTopopolisCoil,
 } from '../meshFactory';
 import { selectSkin } from '../planetSkins';
 import type { MoonData, SolarSystemData, SystemFactionState } from '../../engine';
@@ -30,7 +31,7 @@ import type { SceneEntity, XRayTransferStream } from './types';
 import { createXRayTransferStream, updateXRayTransferStreams } from './xrayStreams';
 import type { RuntimeProfile } from '../../../runtime/runtimeProfile';
 import { LandingSiteManager } from './LandingSiteManager';
-import type { DysonShellMaterialEntry, BeamParams } from './tickSceneAnimations';
+import type { DysonShellMaterialEntry, TopopolisMaterialEntry, BeamParams } from './tickSceneAnimations';
 
 const PLANET_COLLISION_SCALE = 1.04;
 
@@ -220,6 +221,7 @@ export interface SystemSceneState {
   systemObjects: THREE.Object3D[];
   lightningMaterials: THREE.ShaderMaterial[];
   dysonShellMaterials: DysonShellMaterialEntry[];
+  topopolisMaterials: TopopolisMaterialEntry[];
   xRayTransferStreams: XRayTransferStream[];
   xbDiskGroup: THREE.Group | null;
   mqJetParams: BeamParams | null;
@@ -265,6 +267,7 @@ export function buildSystemScene(params: {
   const systemObjects: THREE.Object3D[] = [];
   const lightningMaterials: THREE.ShaderMaterial[] = [];
   const dysonShellMaterials: DysonShellMaterialEntry[] = [];
+  const topopolisMaterials: TopopolisMaterialEntry[] = [];
   const xRayTransferStreams: XRayTransferStream[] = [];
   let xbDiskGroup: THREE.Group | null = null;
   let mqJetParams: BeamParams | null = null;
@@ -618,7 +621,7 @@ export function buildSystemScene(params: {
       const stationArchetype = planet.stationArchetype ?? 'trade_hub';
       const stationScale = stationArchetype === 'alien_graveloom' ? 1.35 : stationArchetype.startsWith('alien_') ? 1.15 : 1.0;
       const stationSize = 60 * stationScale;
-      const stationCollisionRadius = stationSize * 0.38;
+      const stationCollisionRadius = stationSize * 0.55;
       const ringCollision = computeStationCollisionSamples(stationArchetype, stationSize);
       const stationGroup = makeStation({
         size: stationSize,
@@ -738,6 +741,72 @@ export function buildSystemScene(params: {
       arcWidth: shell.arcWidth,
       arcHeight: shell.arcHeight,
       field: shell.interactionField,
+    });
+  }
+
+  // Topopolis coils
+  const qualityTier = _runtimeProfile?.qualityTier ?? 'high';
+  for (const coil of data.topopolisCoils) {
+    const coilSeed = rng.next() * 100;
+    const result = makeTopopolisCoil(
+      coil.orbitRadius,
+      coil.coilCount,
+      coil.tubeRadius,
+      coil.helixPitch,
+      coil.color,
+      coil.biomeSequence,
+      coil.biomeSeed,
+      qualityTier,
+      coilSeed,
+      coil.interactionField,
+    );
+
+    // Add per-wrap groups to scene
+    const coilParent = new THREE.Group();
+    for (const group of result.groups) {
+      coilParent.add(group);
+    }
+    scene.add(coilParent);
+    systemObjects.push(coilParent);
+
+    topopolisMaterials.push({
+      interiorMats: result.interiorMaterials,
+      cityMats: result.cityLightMaterials,
+      cloudMats: result.cloudMaterials,
+      lightningMats: result.lightningMaterials,
+    });
+
+    // Create collision samples from helix centerline.
+    // collisionSampleRadius = actual tube radius (FlightModel uses this
+    // to detect the tube surface for the hollow-tube collision).
+    const collisionSamples = result.helixSamples;
+
+    // Landing sites on the inner tube surface
+    landingSites.addTopopolisSites({
+      hostId: coil.id,
+      hostLabel: coil.name,
+      hostGroup: coilParent,
+      curve: result.curve,
+      tubeRadius: result.tubeRadius,
+      field: coil.interactionField,
+      biomeSequence: coil.biomeSequence,
+    });
+
+    entities.set(coil.id, {
+      id: coil.id,
+      name: coil.name,
+      group: coilParent,
+      orbitRadius: 0,
+      orbitSpeed: coil.orbitSpeed,
+      orbitPhase: coil.orbitPhase,
+      type: 'topopolis',
+      worldPos: new THREE.Vector3(),
+      collisionRadius: result.tubeRadius,
+      collisionSampleRadius: result.tubeRadius,
+      collisionSamplesLocal: collisionSamples,
+      collisionSamplesWorld: collisionSamples.map(() => new THREE.Vector3()),
+      coilCount: result.coilCount,
+      gatesPerWrap: result.gatesPerWrap,
     });
   }
 
@@ -977,6 +1046,7 @@ export function buildSystemScene(params: {
     systemObjects,
     lightningMaterials,
     dysonShellMaterials,
+    topopolisMaterials,
     xRayTransferStreams,
     xbDiskGroup,
     mqJetParams,

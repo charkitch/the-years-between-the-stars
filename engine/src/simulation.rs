@@ -99,6 +99,7 @@ pub fn simulate_galaxy(
                 EconomyType::Tributary | EconomyType::Extraction => 0.01,
                 EconomyType::Tithe => 0.0,
                 EconomyType::Remnant => -0.02,
+                EconomyType::Everything => 0.05,
             };
 
             // Stability feeds prosperity
@@ -189,6 +190,7 @@ pub fn init_galaxy_state(cluster: &[StarSystemData], galaxy_year: u32) -> Galaxy
                 EconomyType::Tributary | EconomyType::Extraction => 0.5,
                 EconomyType::Tithe => 0.4,
                 EconomyType::Remnant => 0.3,
+                EconomyType::Everything => 0.8,
             },
             faction_strength,
             recent_events: vec![],

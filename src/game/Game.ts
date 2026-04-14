@@ -37,6 +37,8 @@ function collisionDeathMessage(type: SceneEntity['type']): string[] {
       return ['STATION COLLISION', 'Hull breached on impact with orbital structure.', 'Station authorities notified.'];
     case 'dyson_shell':
       return ['SHELL IMPACT', 'Ship destroyed on collision with Dyson shell.', 'Wreckage embedded in superstructure.'];
+    case 'topopolis':
+      return ['TOPOPOLIS IMPACT', 'Ship destroyed on collision with topopolis hull.', 'Wreckage scattered across habitat surface.'];
     default:
       return ['SHIP DESTROYED', 'Impact with stellar body.'];
   }
@@ -124,6 +126,7 @@ export class Game {
     const systemData = result.systemPayload.system;
     state.setCurrentSystemPayload(state.currentSystemId, result.systemPayload);
     state.markVisited(state.currentSystemId);
+    state.addKnownFaction(result.systemPayload.factionState.controllingFactionId);
     state.setSystemEntryLines(result.systemPayload.systemEntryLines);
 
     const starData = result.cluster[state.currentSystemId];
@@ -259,7 +262,7 @@ export class Game {
     // Collision avoidance — push ship out of celestial bodies
     const collidables = this.sceneRenderer.getCollidables();
     const hitEntity = this.flightModel.resolveCollisions(this.sceneRenderer.shipGroup, collidables);
-    if (hitEntity && !this.isDead) {
+    if (hitEntity && hitEntity.type !== 'station' && !this.isDead) {
       this.triggerDeath(collisionDeathMessage(hitEntity.type));
       return;
     }

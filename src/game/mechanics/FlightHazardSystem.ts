@@ -46,6 +46,7 @@ const DEATH_MESSAGES: Partial<Record<HazardType, string[]>> = {
   MoonCollision: ['LUNAR IMPACT', 'Collision with lunar surface at terminal velocity.', 'Debris field detected in low orbit.'],
   StationCollision: ['STATION COLLISION', 'Hull breached on impact with orbital structure.', 'Station authorities notified.'],
   DysonShellCollision: ['SHELL IMPACT', 'Ship destroyed on collision with Dyson shell.', 'Wreckage embedded in superstructure.'],
+  TopopolisCollision: ['TOPOPOLIS IMPACT', 'Ship destroyed on collision with topopolis hull.', 'Wreckage scattered across habitat surface.'],
 };
 
 /** Pick the highest-priority hazard (the one that has shield damage, or first lethal). */
@@ -56,10 +57,13 @@ function pickActiveHazard(effects: HazardEffect[]): HazardType {
   return 'None';
 }
 
+const _vec = new THREE.Vector3();
+
 export class FlightHazardSystem {
   private scoopingFuel = false;
   private gasGiantScoopingFuel = false;
   private harvestingFuel = false;
+  private insideTopopolis = false;
   combatIntelTimer = 0;
   private jetHarvestTimer = 0;
   private pulsarInZone = false;
@@ -172,6 +176,30 @@ export class FlightHazardSystem {
         state.setAlert(null);
       }
       this.harvestingFuel = harvesting;
+    }
+
+    // ── Topopolis interior — passive fuel regeneration ──
+    let topopolisRegenRate = 0;
+    {
+      let inside = false;
+      for (const [, entity] of this.sceneRenderer.getAllEntities()) {
+        if (entity.type !== 'topopolis' || !entity.collisionSamplesWorld?.length) continue;
+        const tubeR = entity.collisionSampleRadius ?? 0;
+        if (tubeR <= 0) continue;
+        let nearestDistSq = Infinity;
+        for (const sample of entity.collisionSamplesWorld) {
+          const d = _vec.copy(pos).sub(sample).lengthSq();
+          if (d < nearestDistSq) nearestDistSq = d;
+        }
+        if (Math.sqrt(nearestDistSq) < tubeR * 0.9) {
+          inside = true;
+          break;
+        }
+      }
+      if (inside) {
+        topopolisRegenRate = 0.15;
+      }
+      this.insideTopopolis = inside;
     }
 
     // ── Hazard checks ──
@@ -296,7 +324,7 @@ export class FlightHazardSystem {
     const heatRate = effects.reduce((sum, e) => sum + e.heatRate, 0);
     const shieldDamageRate = effects.reduce((sum, e) => sum + e.shieldDamageRate, 0);
     const fuelRate = effects.reduce((sum, e) => sum + e.fuelRate, 0)
-      + starScoopRate + gasGiantScoopRate + baseHarvestRate
+      + starScoopRate + gasGiantScoopRate + baseHarvestRate + topopolisRegenRate
       - boostFuelConsumed / Math.max(dt, 0.001);
     const coolingActive = heatRate === 0 && !isScooping;
     const activeHazard = pickActiveHazard(effects);

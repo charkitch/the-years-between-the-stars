@@ -28,6 +28,8 @@ function proximityAlertLabel(entity: SceneEntity): string {
       return 'LANDING SITE IN RANGE';
     case 'dyson_shell':
       return 'PROXIMITY ALERT: DYSON SHELL';
+    case 'topopolis':
+      return 'PROXIMITY ALERT: TOPOPOLIS';
     case 'station':
       return 'PROXIMITY ALERT: STATION';
     case 'npc_ship':
