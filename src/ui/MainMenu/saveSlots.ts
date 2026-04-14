@@ -2,6 +2,8 @@ import type { SaveData } from '../../game/GameState';
 import type { GameStateData } from '../../game/GameState';
 
 export const SLOT_COUNT = 5;
+const AUTOSAVE_FILENAME = 'save-autosave.json';
+const SESSION_ID = crypto.randomUUID();
 
 export interface SlotMeta {
   systemName: string;
@@ -14,6 +16,10 @@ export interface SlotMeta {
 interface SlotEntry {
   meta: SlotMeta;
   data: SaveData;
+}
+
+interface AutosaveEntry extends SlotEntry {
+  sessionId: string;
 }
 
 let cachedDir: FileSystemDirectoryHandle | null = null;
@@ -86,6 +92,42 @@ export function buildSlotMeta(state: GameStateData): SlotMeta {
     systemsVisited: state.visitedSystems.size,
     savedAt: new Date().toISOString(),
   };
+}
+
+export async function saveAutosave(data: SaveData, meta: SlotMeta): Promise<void> {
+  try {
+    const dir = await getSlotDir();
+    const handle = await dir.getFileHandle(AUTOSAVE_FILENAME, { create: true });
+    const writable = await handle.createWritable();
+    const entry: AutosaveEntry = { meta, data, sessionId: SESSION_ID };
+    await writable.write(JSON.stringify(entry));
+    await writable.close();
+  } catch {
+    // FileSystem API unavailable — autosave silently skipped
+  }
+}
+
+async function readAutosaveEntry(): Promise<AutosaveEntry | null> {
+  try {
+    const dir = await getSlotDir();
+    const handle = await dir.getFileHandle(AUTOSAVE_FILENAME);
+    const file = await handle.getFile();
+    return JSON.parse(await file.text()) as AutosaveEntry;
+  } catch {
+    return null;
+  }
+}
+
+export async function readAutosaveMeta(): Promise<SlotMeta | null> {
+  return (await readAutosaveEntry())?.meta ?? null;
+}
+
+export async function loadAutosave(): Promise<SaveData | null> {
+  return (await readAutosaveEntry())?.data ?? null;
+}
+
+export async function isAutosaveFromCurrentSession(): Promise<boolean> {
+  return (await readAutosaveEntry())?.sessionId === SESSION_ID;
 }
 
 export function formatTimeAgo(iso: string): string {

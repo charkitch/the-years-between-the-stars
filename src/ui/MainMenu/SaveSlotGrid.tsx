@@ -6,12 +6,14 @@ import styles from './SaveSlotGrid.module.css';
 interface SaveSlotGridProps {
   mode: 'save' | 'load';
   slots: (SlotMeta | null)[];
+  autosave: SlotMeta | null;
   isSafari: boolean;
   onSlotClick: (index: number) => void;
+  onLoadAutosave: () => void;
   onBack: () => void;
 }
 
-export function SaveSlotGrid({ mode, slots, isSafari, onSlotClick, onBack }: SaveSlotGridProps) {
+export function SaveSlotGrid({ mode, slots, autosave, isSafari, onSlotClick, onLoadAutosave, onBack }: SaveSlotGridProps) {
   const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
   const confirmTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -53,6 +55,25 @@ export function SaveSlotGrid({ mode, slots, isSafari, onSlotClick, onBack }: Sav
       </div>
 
       <div className={styles.slotList}>
+        {mode === 'load' && (
+          <button
+            className={`${styles.slot} ${!autosave ? styles.slotDisabled : ''}`}
+            onClick={() => autosave && onLoadAutosave()}
+            disabled={!autosave}
+          >
+            <span className={styles.slotIndex}>AUTO</span>
+            {!autosave ? (
+              <span className={styles.slotEmpty}>-- NO AUTOSAVE --</span>
+            ) : (
+              <span className={styles.slotInfo}>
+                <span className={styles.slotSystem}>AUTOSAVE — {autosave.systemName}</span>
+                <span className={styles.slotDetails}>
+                  CR {autosave.credits.toLocaleString()} · GY {autosave.galaxyYear} · {autosave.systemsVisited} systems · {formatTimeAgo(autosave.savedAt)}
+                </span>
+              </span>
+            )}
+          </button>
+        )}
         {slots.map((slot, i) => {
           const isEmpty = !slot;
           const disabled = mode === 'load' && isEmpty;

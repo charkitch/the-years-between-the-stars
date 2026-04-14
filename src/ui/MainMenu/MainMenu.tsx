@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { TRAVEL_TERMS } from '../../game/constants';
 import type { SlotMeta } from './saveSlots';
-import { readAllSlotMetas } from './saveSlots';
+import { readAllSlotMetas, readAutosaveMeta } from './saveSlots';
 import { SaveSlotGrid } from './SaveSlotGrid';
 import styles from './MainMenu.module.css';
 
@@ -15,16 +15,18 @@ interface MainMenuProps {
   onResume: () => void;
   onSaveToSlot: (index: number) => Promise<void>;
   onLoadFromSlot: (index: number) => Promise<void>;
+  onLoadAutosave: () => Promise<void>;
   invertControls: boolean;
   onToggleInvertControls: () => void;
   buildLabel: string;
 }
 
-export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, invertControls, onToggleInvertControls, buildLabel }: MainMenuProps) {
+export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, onLoadAutosave, invertControls, onToggleInvertControls, buildLabel }: MainMenuProps) {
   const [view, setView] = useState<'main' | 'controls' | 'fullscreen' | 'save' | 'load'>('main');
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installMessage, setInstallMessage] = useState<string>('');
   const [slots, setSlots] = useState<(SlotMeta | null)[]>(Array(5).fill(null));
+  const [autosaveMeta, setAutosaveMeta] = useState<SlotMeta | null>(null);
 
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
   const ua = window.navigator.userAgent.toLowerCase();
@@ -35,7 +37,9 @@ export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, in
   const isMobile = isIOS || isAndroid;
 
   const refreshSlots = useCallback(async () => {
-    setSlots(await readAllSlotMetas());
+    const [slotMetas, autoMeta] = await Promise.all([readAllSlotMetas(), readAutosaveMeta()]);
+    setSlots(slotMetas);
+    setAutosaveMeta(autoMeta);
   }, []);
 
   useEffect(() => {
@@ -90,8 +94,10 @@ export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, in
           <SaveSlotGrid
             mode="save"
             slots={slots}
+            autosave={autosaveMeta}
             isSafari={isSafari}
             onSlotClick={handleSaveSlotClick}
+            onLoadAutosave={onLoadAutosave}
             onBack={() => setView('main')}
           />
         </div>
@@ -106,8 +112,10 @@ export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, in
           <SaveSlotGrid
             mode="load"
             slots={slots}
+            autosave={autosaveMeta}
             isSafari={isSafari}
             onSlotClick={handleLoadSlotClick}
+            onLoadAutosave={onLoadAutosave}
             onBack={() => setView('main')}
           />
         </div>

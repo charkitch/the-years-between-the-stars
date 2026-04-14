@@ -14,6 +14,7 @@ import type {
   JumpLogEntry,
 } from './engine';
 import { STARTING_CREDITS, STARTING_FUEL, STARTING_SYSTEM_ID, HYPERSPACE, GALAXY_YEAR_START, type GoodName } from './constants';
+import { saveAutosave, buildSlotMeta } from '../ui/MainMenu/saveSlots';
 import type { NPCCargoEntry } from './mechanics/NPCSystem';
 import type { NPCShipArchetype } from './archetypes';
 import type { SystemId, GalaxyYear, ScannableBodyId, FactionId } from './types';
@@ -39,6 +40,7 @@ export interface PendingCommContext {
 export interface PlayerState {
   position: { x: number; y: number; z: number };
   velocity: { x: number; y: number; z: number };
+  quaternion: { x: number; y: number; z: number; w: number };
   shields: number;       // 0–100
   fuel: number;          // 0–7
   heat: number;          // 0–100
@@ -136,6 +138,7 @@ export interface GameActions {
   setInvertControls: (invert: boolean) => void;
   setPlayerPosition: (pos: { x: number; y: number; z: number }) => void;
   setPlayerVelocity: (vel: { x: number; y: number; z: number }) => void;
+  setPlayerQuaternion: (q: { x: number; y: number; z: number; w: number }) => void;
   setPlayerSpeed: (speed: number) => void;
   setShields: (v: number) => void;
   setFuel: (v: number) => void;
@@ -196,6 +199,7 @@ let CLUSTER: StarSystemData[] = [];
 const DEFAULT_PLAYER: PlayerState = {
   position: { x: 0, y: 0, z: 2000 },
   velocity: { x: 0, y: 0, z: 0 },
+  quaternion: { x: 0, y: 0, z: 0, w: 1 },
   shields: 100,
   fuel: STARTING_FUEL,
   heat: 0,
@@ -228,7 +232,6 @@ export interface SaveData {
     completedEvents?: Record<string, { systemId: SystemId; galaxyYear: GalaxyYear }>;
     galacticFlags?: string[];
   };
-  // Ship spatial state (slot saves only — auto-save respawns at station)
   shipPosition?: { x: number; y: number; z: number };
   shipQuaternion?: { x: number; y: number; z: number; w: number };
   shipVelocity?: { x: number; y: number; z: number };
@@ -306,6 +309,9 @@ export function buildSaveData(s: GameStateData): SaveData {
     chainTargets: s.chainTargets,
     scannedBodies: s.scannedBodies,
     playerHistory: s.playerHistory,
+    shipPosition: s.player.position,
+    shipQuaternion: s.player.quaternion,
+    shipVelocity: s.player.velocity,
   };
 }
 
@@ -318,6 +324,9 @@ function applySaveFields(saved: Partial<SaveData>): Partial<GameStateData> {
       cargoCostBasis: migrateLegacyGoodKeys(saved.cargoCostBasis) ?? DEFAULT_PLAYER.cargoCostBasis,
       fuel: saved.fuel ?? DEFAULT_PLAYER.fuel,
       shields: saved.shields ?? DEFAULT_PLAYER.shields,
+      position: saved.shipPosition ?? DEFAULT_PLAYER.position,
+      velocity: saved.shipVelocity ?? DEFAULT_PLAYER.velocity,
+      quaternion: saved.shipQuaternion ?? DEFAULT_PLAYER.quaternion,
     },
     invertControls: saved.invertControls ?? false,
     currentSystemId: saved.currentSystemId ?? STARTING_SYSTEM_ID,
@@ -409,6 +418,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
   },
   setPlayerPosition: (pos) => set(s => ({ player: { ...s.player, position: pos } })),
   setPlayerVelocity: (vel) => set(s => ({ player: { ...s.player, velocity: vel } })),
+  setPlayerQuaternion: (q) => set(s => ({ player: { ...s.player, quaternion: q } })),
   setPlayerSpeed: (speed) => set(s => ({ player: { ...s.player, speed } })),
   setShields: (v) => set(s => ({ player: { ...s.player, shields: Math.max(0, Math.min(100, v)) } })),
   setFuel: (v) => set(s => ({ player: { ...s.player, fuel: Math.max(0, Math.min(HYPERSPACE.tankSize, v)) } })),
@@ -644,7 +654,10 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
   },
 
   saveGame: () => {
-    const data = buildSaveData(get());
+    const s = get();
+    const data = buildSaveData(s);
     localStorage.setItem('space-game-save', JSON.stringify(data));
+    const meta = buildSlotMeta(s);
+    saveAutosave(data, meta);
   },
 }));

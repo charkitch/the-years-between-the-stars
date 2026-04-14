@@ -13,7 +13,7 @@ import { SystemEntryDialog } from './SystemEntryDialog/SystemEntryDialog';
 import { CommDialog } from './CommDialog/CommDialog';
 import type { SceneEntity } from '../game/rendering/SceneRenderer';
 import { TRAVEL_TERMS, type GoodName } from '../game/constants';
-import { saveToSlot, loadFromSlot, buildSlotMeta } from './MainMenu/saveSlots';
+import { saveToSlot, loadFromSlot, loadAutosave, buildSlotMeta } from './MainMenu/saveSlots';
 import { detectRuntimeProfile, type RuntimeProfile } from '../runtime/runtimeProfile';
 import * as THREE from 'three';
 
@@ -190,18 +190,19 @@ export function App() {
   const handleSaveToSlot = async (index: number) => {
     const state = useGameState.getState();
     const data = buildSaveData(state);
-    const spatial = gameRef.current?.getShipSpatialState();
-    if (spatial) {
-      data.shipPosition = spatial.position;
-      data.shipQuaternion = spatial.quaternion;
-      data.shipVelocity = spatial.velocity;
-    }
     const meta = buildSlotMeta(state);
     await saveToSlot(index, data, meta);
   };
 
   const handleLoadFromSlot = async (index: number) => {
     const data = await loadFromSlot(index);
+    if (!data) return;
+    loadingSlotRef.current = true;
+    gameRef.current?.loadSlotSave(data);
+  };
+
+  const handleLoadAutosave = async () => {
+    const data = await loadAutosave();
     if (!data) return;
     loadingSlotRef.current = true;
     gameRef.current?.loadSlotSave(data);
@@ -353,6 +354,7 @@ export function App() {
           onResume={handleResume}
           onSaveToSlot={handleSaveToSlot}
           onLoadFromSlot={handleLoadFromSlot}
+          onLoadAutosave={handleLoadAutosave}
           invertControls={invertControls}
           onToggleInvertControls={handleToggleInvertControls}
           buildLabel={BUILD_TAG_LABEL}

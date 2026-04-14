@@ -17,6 +17,7 @@ import {
   type GameEvent,
 } from './engine';
 import { buildWasmPlayerState, placeShipNearMainStation } from './systems/systemLoad';
+import { isAutosaveFromCurrentSession, loadAutosave } from '../ui/MainMenu/saveSlots';
 import type { RuntimeProfile } from '../runtime/runtimeProfile';
 
 const INFINITE_FUEL_DEV = import.meta.env.DEV;
@@ -24,6 +25,18 @@ const FIRST_SYSTEM_ID = 0;
 const PROXIMITY_EVENT_CHANCE = 0.08;
 const PROXIMITY_EVENT_COOLDOWN_HIT = 20;
 const PROXIMITY_EVENT_COOLDOWN_MISS = 8;
+
+type ShipSpatial = {
+  position: { x: number; y: number; z: number };
+  quaternion: { x: number; y: number; z: number; w: number };
+  velocity: { x: number; y: number; z: number };
+};
+
+function shipSpatialFromSave(data: SaveData): ShipSpatial | undefined {
+  return data.shipPosition && data.shipQuaternion && data.shipVelocity
+    ? { position: data.shipPosition, quaternion: data.shipQuaternion, velocity: data.shipVelocity }
+    : undefined;
+}
 
 function collisionDeathMessage(type: SceneEntity['type']): string[] {
   switch (type) {
@@ -102,16 +115,12 @@ export class Game {
     // Load save, then initialize engine and first system
     const state = useGameState.getState();
     state.loadSave();
-    this.initFromEngine(state);
+    this.tryLoadAutosaveOrInit(state);
   }
 
   private async initFromEngine(
     state: ReturnType<typeof useGameState.getState>,
-    shipSpatial?: {
-      position: { x: number; y: number; z: number };
-      quaternion: { x: number; y: number; z: number; w: number };
-      velocity: { x: number; y: number; z: number };
-    },
+    shipSpatial?: ShipSpatial,
   ): Promise<void> {
     await initEngine();
     const wasmState = buildWasmPlayerState(state);
@@ -153,6 +162,19 @@ export class Game {
     }
 
     state.setUIMode('flight');
+  }
+
+  private async tryLoadAutosaveOrInit(state: ReturnType<typeof useGameState.getState>): Promise<void> {
+    if (await isAutosaveFromCurrentSession()) {
+      const data = await loadAutosave();
+      if (data) {
+        state.applySaveData(data);
+        const shipSpatial = shipSpatialFromSave(data);
+        this.initFromEngine(useGameState.getState(), shipSpatial);
+        return;
+      }
+    }
+    this.initFromEngine(state);
   }
 
   // loadCurrentSystem removed — initialization now handled by initFromEngine
@@ -268,7 +290,11 @@ export class Game {
     }
 
     const pos = this.sceneRenderer.shipGroup.position;
+    const quat = this.sceneRenderer.shipGroup.quaternion;
+    const vel = this.flightModel.getVelocity();
     state.setPlayerPosition({ x: pos.x, y: pos.y, z: pos.z });
+    state.setPlayerVelocity({ x: vel.x, y: vel.y, z: vel.z });
+    state.setPlayerQuaternion({ x: quat.x, y: quat.y, z: quat.z, w: quat.w });
     state.setPlayerSpeed(speed);
     state.setCanDockNow(this.interaction.canDockNow(speed));
     state.setCanLandNow(this.interaction.canLandNow(speed));
@@ -372,21 +398,6 @@ export class Game {
     state.setUIMode('dead');
   }
 
-  getShipSpatialState(): {
-    position: { x: number; y: number; z: number };
-    quaternion: { x: number; y: number; z: number; w: number };
-    velocity: { x: number; y: number; z: number };
-  } {
-    const pos = this.sceneRenderer.shipGroup.position;
-    const quat = this.sceneRenderer.shipGroup.quaternion;
-    const vel = this.flightModel.getVelocity();
-    return {
-      position: { x: pos.x, y: pos.y, z: pos.z },
-      quaternion: { x: quat.x, y: quat.y, z: quat.z, w: quat.w },
-      velocity: { x: vel.x, y: vel.y, z: vel.z },
-    };
-  }
-
   loadSlotSave(data: SaveData): void {
     const state = useGameState.getState();
     state.applySaveData(data);
@@ -397,10 +408,7 @@ export class Game {
     this.jump.resetOnNewGame();
     this.sceneRenderer.stopHyperspace();
 
-    // Restore exact ship placement if the save includes spatial data
-    const shipSpatial = data.shipPosition && data.shipQuaternion && data.shipVelocity
-      ? { position: data.shipPosition, quaternion: data.shipQuaternion, velocity: data.shipVelocity }
-      : undefined;
+    const shipSpatial = shipSpatialFromSave(data);
 
     // initFromEngine is async — sets UIMode to 'flight' when the scene is ready
     this.initFromEngine(useGameState.getState(), shipSpatial);
