@@ -262,8 +262,8 @@ export class LandingSiteManager {
     const entranceNames = ['APPROACH GATE', 'FAR GATE'];
     [0, 1].forEach((endIdx) => {
       const t = endIdx === 0 ? 0.01 : 0.99;
-      const center = curve.getPoint(t);
-      const tangent = curve.getTangent(t).normalize();
+      const center = curve.getPointAt(t);
+      const tangent = curve.getTangentAt(t).normalize();
       // Position just inside the tube opening
       const pos = center.clone().add(tangent.clone().multiplyScalar(endIdx === 0 ? tubeRadius * 0.3 : -tubeRadius * 0.3));
       const lookTarget = center.clone().add(tangent.clone().multiplyScalar(endIdx === 0 ? tubeRadius : -tubeRadius));
@@ -288,8 +288,8 @@ export class LandingSiteManager {
       const biome = biomeSequence[biomeIdx] ?? 'continental';
       const biomeLabel = biome.toUpperCase().replace('_', ' ');
 
-      const centerPoint = curve.getPoint(u);
-      const tangent = curve.getTangent(u).normalize();
+      const centerPoint = curve.getPointAt(u);
+      const tangent = curve.getTangentAt(u).normalize();
       const up = Math.abs(tangent.y) < 0.9
         ? new THREE.Vector3(0, 1, 0)
         : new THREE.Vector3(1, 0, 0);

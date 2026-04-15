@@ -1,3 +1,4 @@
+mod noise;
 mod prng;
 mod types;
 mod cluster_generator;

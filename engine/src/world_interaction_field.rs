@@ -216,26 +216,58 @@ pub fn build_dyson_shell_interaction_field(
     }
 }
 
-const TOPOPOLIS_FIELD_WIDTH: u16 = 128;
-const TOPOPOLIS_FIELD_HEIGHT: u16 = 32;
+const TOPOPOLIS_FIELD_HEIGHT: u16 = 64;
 
-pub fn build_topopolis_interaction_field(star_id: u32, coil_index: u32) -> InteractionFieldData {
+/// Build an interaction field for one topopolis wrap.
+/// `wrap_aspect` is the ratio of wrap path length to tube circumference,
+/// used to scale U frequencies so features appear circular in world space.
+pub fn build_topopolis_interaction_field(
+    star_id: u32,
+    coil_index: u32,
+    wrap_aspect: f64,
+) -> InteractionFieldData {
+    // Scale field width so texels are roughly square in world space (capped at 512).
+    let field_width = (TOPOPOLIS_FIELD_HEIGHT as f64 * wrap_aspect).round().clamp(64.0, 512.0) as u16;
+
     let seed = star_id.wrapping_mul(7919).wrapping_add(coil_index * 2903);
     let mut rng = PRNG::from_index(0xC011_0001, seed);
 
+    let phase_u0 = rng.float(0.0, TAU);
+    let phase_u1 = rng.float(0.0, TAU);
+    let phase_u2 = rng.float(0.0, TAU);
+    let phase_v0 = rng.float(0.0, TAU);
+    let phase_v1 = rng.float(0.0, TAU);
+    let phase_mix = rng.float(0.0, TAU);
+    let freq0 = rng.float(1.2, 2.3);
+    let freq1 = rng.float(2.4, 4.1);
+    let freq2 = rng.float(1.0, 2.2);
+    let freq3 = rng.float(2.2, 4.2);
+    let seam_break = rng.float(0.6, 1.4);
+
     // U = along tube length, V = around tube circumference.
-    // Inner surface of the tube is habitable; mark landing sites along the interior.
-    let values = build_values(TOPOPOLIS_FIELD_WIDTH, TOPOPOLIS_FIELD_HEIGHT, |u, _v| {
-        let section_noise = ((u * 17.3 + rng.next() * 0.1).sin() * 0.5 + 0.5) * 0.6;
-        let detail = ((u * 43.7).sin() * 0.15 + (u * 91.1).cos() * 0.08) * 0.5 + 0.5;
-        let base = section_noise * 0.7 + detail * 0.3;
-        if base > 0.55 { 200.0 } else if base > 0.35 { 120.0 } else { 40.0 }
+    // Field width is already aspect-scaled (line 230), so texels are square in world
+    // space. Noise operates in texel-normalized coords where u and v are balanced.
+    let values = build_values(field_width, TOPOPOLIS_FIELD_HEIGHT, |u, v| {
+        let lon = u * TAU;
+        let ring = v * TAU;
+
+        let continental = (lon * freq0 + phase_u0).sin() * 0.22
+            + (lon * freq1 + phase_u1).cos() * 0.16
+            + ((lon * 1.3 + ring * 1.1 + phase_mix).sin()) * 0.14;
+        let circum = (ring * freq2 + phase_v0).cos() * 0.20
+            + (ring * freq3 + phase_v1).sin() * 0.16;
+        let warp = ((lon * 2.1 + ring * seam_break + phase_u2).sin()
+            * (lon * 0.8 - ring * 1.4 + phase_mix * 0.6).cos())
+            * 0.14;
+        let ridges = ((lon * 3.2 + ring * 2.5 + phase_u2).sin().abs() - 0.5) * 0.08;
+
+        0.5 + continental + circum + warp + ridges
     });
 
     InteractionFieldData {
         topology: InteractionTopology::HelixTube,
         profile: InteractionProfile::Topopolis,
-        width: TOPOPOLIS_FIELD_WIDTH,
+        width: field_width,
         height: TOPOPOLIS_FIELD_HEIGHT,
         values,
     }

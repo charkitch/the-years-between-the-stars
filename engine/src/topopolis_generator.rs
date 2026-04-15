@@ -28,7 +28,12 @@ pub fn generate_topopolis(star: &StarSystemData) -> Vec<TopopolisCoilData> {
         .map(|_| *rng.pick(TopopolisBiome::ALL))
         .collect();
 
-    let interaction_field = build_topopolis_interaction_field(star.id, 0);
+    let wrap_path_length =
+        ((2.0 * std::f64::consts::PI * orbit_radius).powi(2) + helix_pitch.powi(2)).sqrt();
+    let tube_circumference = 2.0 * std::f64::consts::PI * tube_radius;
+    let wrap_aspect = wrap_path_length / tube_circumference;
+
+    let interaction_field = build_topopolis_interaction_field(star.id, 0, wrap_aspect);
 
     vec![TopopolisCoilData {
         id: format!("{}-topopolis-0", star.id),

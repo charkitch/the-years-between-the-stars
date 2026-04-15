@@ -168,13 +168,15 @@ export function makeTopopolisCoil(
   biomeSequence.forEach((biome, i) => {
     if (i < 10) biomeIndices[i] = BIOME_INDEX[biome];
   });
+  const biomeCount = Math.max(1, biomeSequence.length);
 
   const interactionTex = makeInteractionFieldTexture(interactionField);
-  const interactionFieldBlend = interactionField ? 0.14 : 0.0;
+  const interactionFieldBlend = interactionField ? 0.25 : 0.0;
 
   const wrapPathLength = Math.sqrt((2 * Math.PI * orbitRadius) ** 2 + helixPitch ** 2);
   const tubeCircumference = 2 * Math.PI * strandTubeRadius;
   const uvAspect = wrapPathLength / tubeCircumference;
+  const noiseScale = (2 * Math.PI) / tubeCircumference * 2.5;
 
   // Flyable gate openings — shader holes + collision gaps at same positions.
   // Only 2 per wrap are real gates; the rest of the 12 collars are decorative.
@@ -215,8 +217,10 @@ export function makeTopopolisCoil(
           biomeSeed: { value: biomeSeed },
           interactionFieldTex: { value: interactionTex },
           interactionFieldBlend: { value: interactionFieldBlend },
-          biomeCount: { value: biomeSequence.length },
+          biomeCount: { value: biomeCount },
           biomeIndices: { value: biomeIndices },
+          uAspect: { value: uvAspect },
+          uNoiseScale: { value: noiseScale },
           gatesPerWrap: { value: flyableGatesPerWrap },
           gateRadius: { value: gateOpeningRadius },
           gateAspect: { value: uvAspect },
@@ -274,17 +278,23 @@ export function makeTopopolisCoil(
           side: THREE.BackSide,
           uniforms: {
             seed: { value: strandSeed + wrap * 19.7 },
+            biomeSeed: { value: biomeSeed },
             windowsPerWrap: { value: flyableGatesPerWrap },
             windowRadius: { value: gateShaderRadius },
-          gateRadius: { value: gateOpeningRadius },
-          gateAspect: { value: uvAspect },
-          uLightPhase: { value: 0.0 },
-          uLightPos: { value: new THREE.Vector3() },
-          uAspect: { value: uvAspect },
-        },
-        vertexShader: planetVertex,
-        fragmentShader: topopolisCityLightsFrag,
-      });
+            gateRadius: { value: gateOpeningRadius },
+            gateAspect: { value: uvAspect },
+            uLightPhase: { value: 0.0 },
+            uLightPos: { value: new THREE.Vector3() },
+            uAspect: { value: uvAspect },
+            uNoiseScale: { value: noiseScale },
+            interactionFieldTex: { value: interactionTex },
+            interactionFieldBlend: { value: interactionFieldBlend },
+            biomeCount: { value: biomeCount },
+            biomeIndices: { value: biomeIndices },
+          },
+          vertexShader: planetVertex,
+          fragmentShader: topopolisCityLightsFrag,
+        });
         const cityGeo = new THREE.TubeGeometry(
           wrapCurve,
           lod.tubularSegments,
@@ -302,17 +312,23 @@ export function makeTopopolisCoil(
           side: THREE.BackSide,
           uniforms: {
             seed: { value: strandSeed + wrap * 31.3 },
+            biomeSeed: { value: biomeSeed },
             windowsPerWrap: { value: flyableGatesPerWrap },
             windowRadius: { value: gateShaderRadius },
-          gateRadius: { value: gateOpeningRadius },
-          gateAspect: { value: uvAspect },
-          density: { value: 0.45 },
-          uAspect: { value: uvAspect },
-          uTime: { value: 0.0 },
-        },
-        vertexShader: planetVertex,
-        fragmentShader: topopolisCloudsFrag,
-      });
+            gateRadius: { value: gateOpeningRadius },
+            gateAspect: { value: uvAspect },
+            density: { value: 0.45 },
+            uAspect: { value: uvAspect },
+            uNoiseScale: { value: noiseScale },
+            uTime: { value: 0.0 },
+            interactionFieldTex: { value: interactionTex },
+            interactionFieldBlend: { value: interactionFieldBlend },
+            biomeCount: { value: biomeCount },
+            biomeIndices: { value: biomeIndices },
+          },
+          vertexShader: planetVertex,
+          fragmentShader: topopolisCloudsFrag,
+        });
         const cloudGeo = new THREE.TubeGeometry(
           wrapCurve, lod.tubularSegments, strandTubeRadius * 0.985, lod.radialSegments, false,
         );
@@ -446,14 +462,8 @@ export function makeTopopolisCoil(
   for (const strandCurve of strandCurves) {
     [0, 1].forEach((endIdx) => {
       const t = endIdx === 0 ? 0 : 1;
-      const center = strandCurve.getPoint(t);
-      const delta = 0.001;
-      const tNear = endIdx === 0 ? t + delta : t - delta;
-      const nearby = strandCurve.getPoint(tNear);
-      const tangent = new THREE.Vector3().subVectors(
-        endIdx === 0 ? nearby : center,
-        endIdx === 0 ? center : nearby,
-      ).normalize();
+      const center = strandCurve.getPointAt(t);
+      const tangent = strandCurve.getTangentAt(t).normalize();
 
       const outerR = strandTubeRadius;
       const innerR = strandTubeRadius * 0.65;
