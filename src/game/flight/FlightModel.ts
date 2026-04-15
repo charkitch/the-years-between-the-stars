@@ -162,23 +162,17 @@ export class FlightModel {
         const maxIdx = Math.max(1, sampleCount - 1);
         const curveT = (nearestIdx + segT * (neighborIdx - nearestIdx)) / maxIdx;
 
-        // Skip collision at endpoints (entrance gates)
-        const endpointGap = Math.max(0.008, 3 / maxIdx);
-        if (curveT < endpointGap || curveT > 1 - endpointGap) { continue; }
-
-        // Skip collision at side gates — mirror the shader formula exactly.
-        // Shader: gates at UV.x = (fg + 0.5) / gatesPerWrap, offset within each wrap.
-        const gPerWrap = body.gatesPerWrap ?? 0;
-        const nCoils = body.coilCount ?? 0;
-        if (gPerWrap > 0 && nCoils > 0) {
-          const wrapFrac = curveT * nCoils;
-          const wrapUvX = wrapFrac - Math.floor(wrapFrac);
-          const gs = 1.0 / gPerWrap;
-          const gateOffset = gs * 0.5;
-          const nearestGateUvX = Math.round((wrapUvX - gateOffset) / gs) * gs + gateOffset;
-          const gateDist = Math.abs(wrapUvX - nearestGateUvX);
-          // Gate collision gap — slightly wider than the visual opening
-          if (gateDist < 0.008) { continue; }
+        // Skip collision if ship is near a gate opening (3D distance check).
+        // Gate surface positions are on the outward tube surface where gates are,
+        // so only ships approaching the correct side will be close enough.
+        const gateSurfaces = body.gateSurfaceWorld;
+        if (gateSurfaces) {
+          const gateThreshold = tubeRadius * 1.2;
+          const gateThresholdSq = gateThreshold * gateThreshold;
+          const nearGate = gateSurfaces.some(gp =>
+            shipPos.distanceToSquared(gp) < gateThresholdSq,
+          );
+          if (nearGate) { continue; }
         }
 
         const normal = _topoVec.copy(shipPos).sub(closest);

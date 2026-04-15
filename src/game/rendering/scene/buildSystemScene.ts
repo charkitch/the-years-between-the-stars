@@ -805,8 +805,8 @@ export function buildSystemScene(params: {
       collisionSampleRadius: result.tubeRadius,
       collisionSamplesLocal: collisionSamples,
       collisionSamplesWorld: collisionSamples.map(() => new THREE.Vector3()),
-      coilCount: result.coilCount,
-      gatesPerWrap: result.gatesPerWrap,
+      gateSurfaceLocal: result.gateSurfacePositions,
+      gateSurfaceWorld: result.gateSurfacePositions.map(() => new THREE.Vector3()),
     });
   }
 

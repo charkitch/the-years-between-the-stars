@@ -30,10 +30,10 @@ export interface SceneEntity {
   siteDiscovered?: boolean;
   /** Biome at this landing site's position (topopolis interior sites). */
   siteBiome?: string;
-  /** Number of coil wraps in the topopolis helix. */
-  coilCount?: number;
-  /** Number of flyable gates per wrap (shader-aligned). */
-  gatesPerWrap?: number;
+  /** Gate surface positions in local space — skip collision near these. */
+  gateSurfaceLocal?: THREE.Vector3[];
+  /** Gate surface positions in world space (updated each frame). */
+  gateSurfaceWorld?: THREE.Vector3[];
   /** Set after first dock/land — revisits skip events and go straight to market. */
   visited?: boolean;
 }

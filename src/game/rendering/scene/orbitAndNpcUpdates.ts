@@ -110,6 +110,14 @@ export function updateOrbitalEntities(entities: Map<string, SceneEntity>, time: 
       // Rotate the entire helix group around Y axis
       entity.group.rotation.y = angle;
       updateCollisionSamples(entity);
+      // Transform gate surface positions to world space
+      if (entity.gateSurfaceLocal && entity.gateSurfaceWorld) {
+        const count = Math.min(entity.gateSurfaceLocal.length, entity.gateSurfaceWorld.length);
+        for (let i = 0; i < count; i++) {
+          entity.gateSurfaceWorld[i].copy(entity.gateSurfaceLocal[i]);
+          entity.group.localToWorld(entity.gateSurfaceWorld[i]);
+        }
+      }
       // Set worldPos to a point on the actual tube (not origin) so distance
       // checks in scanning/HUD work against the structure, not the star.
       if (entity.collisionSamplesWorld?.length) {

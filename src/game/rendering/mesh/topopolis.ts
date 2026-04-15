@@ -106,6 +106,8 @@ export interface TopopolisCoilMeshResult {
   tubeRadius: number;
   coilCount: number;
   gatesPerWrap: number;
+  /** Gate opening positions on the outward tube surface (local space). */
+  gateSurfacePositions: THREE.Vector3[];
 }
 
 /**
@@ -415,8 +417,30 @@ export function makeTopopolisCoil(
     }
   }
 
-  // Gate visual framing is handled in the shader via gateEdgeBlend —
-  // no floating meshes needed.
+  // Compute gate surface positions — the point on the outward tube surface
+  // where each gate opening is. Used for 3D distance collision checks.
+  const gateSurfacePositions: THREE.Vector3[] = [];
+  for (let wrap = 0; wrap < coilCount; wrap++) {
+    const tStart = wrap / coilCount;
+    const tEnd = (wrap + 1) / coilCount;
+    const wrapCurve = new HelixCurveSegment(primaryCurve, tStart, tEnd);
+    for (let fg = 0; fg < flyableGatesPerWrap; fg++) {
+      const uvX = (fg + 0.5) / flyableGatesPerWrap;
+      const center = wrapCurve.getPointAt(uvX);
+      const tangent = wrapCurve.getTangentAt(uvX).normalize();
+      // Outward direction — away from star, perpendicular to tube tangent
+      const toStar = center.clone().normalize().negate();
+      const outward = new THREE.Vector3()
+        .crossVectors(tangent, toStar).cross(tangent).normalize();
+      // Position on the tube surface at the gate opening
+      gateSurfacePositions.push(center.add(outward.multiplyScalar(strandTubeRadius)));
+    }
+  }
+  // Endpoint entrance gates — at tube ends, centered (no outward offset needed)
+  gateSurfacePositions.push(
+    primaryCurve.getPointAt(0),
+    primaryCurve.getPointAt(1),
+  );
 
   // Entrance panels at each end of each strand
   for (const strandCurve of strandCurves) {
@@ -455,7 +479,7 @@ export function makeTopopolisCoil(
 
   groups[0]?.add(entranceGroup);
 
-  return { groups, interiorMaterials, cityLightMaterials, cloudMaterials, lightningMaterials, helixSamples, curve: primaryCurve, tubeRadius: strandTubeRadius, coilCount, gatesPerWrap: flyableGatesPerWrap };
+  return { groups, interiorMaterials, cityLightMaterials, cloudMaterials, lightningMaterials, helixSamples, curve: primaryCurve, tubeRadius: strandTubeRadius, coilCount, gatesPerWrap: flyableGatesPerWrap, gateSurfacePositions };
 }
 
 /**
