@@ -19,6 +19,17 @@ import type { SystemId } from '../types';
 const FIRST_SYSTEM_ID = STARTING_SYSTEM_ID;
 const LAND_MAX_SPEED = 55;
 
+let alertTimer: ReturnType<typeof setTimeout> | null = null;
+
+function setTimedAlert(message: string, durationMs = 1600): void {
+  if (alertTimer) clearTimeout(alertTimer);
+  useGameState.getState().setAlert(message);
+  alertTimer = setTimeout(() => {
+    useGameState.getState().setAlert(null);
+    alertTimer = null;
+  }, durationMs);
+}
+
 export class InteractionSystem {
   private lastLandedSiteId: string | null = null;
   private dockedStationId: string | null = null;
@@ -86,21 +97,18 @@ export class InteractionSystem {
 
     const targetId = state.player.targetId;
     if (!targetId) {
-      state.setAlert('NO TARGET TO LAND');
-      setTimeout(() => useGameState.getState().setAlert(null), 1400);
+      setTimedAlert('NO TARGET TO LAND', 1400);
       return;
     }
     const site = this.sceneRenderer.getEntity(targetId);
     if (!site || site.type !== 'landing_site' || !site.siteDiscovered) {
-      state.setAlert('TARGET A SCANNED LANDING SITE');
-      setTimeout(() => useGameState.getState().setAlert(null), 1800);
+      setTimedAlert('TARGET A SCANNED LANDING SITE', 1800);
       return;
     }
     const hostId = site.siteHostId;
     const host = hostId ? this.sceneRenderer.getEntity(hostId) : null;
     if (!host || (host.type !== 'planet' && host.type !== 'dyson_shell' && host.type !== 'topopolis')) {
-      state.setAlert('INVALID LANDING TARGET');
-      setTimeout(() => useGameState.getState().setAlert(null), 1600);
+      setTimedAlert('INVALID LANDING TARGET');
       return;
     }
 
@@ -108,13 +116,11 @@ export class InteractionSystem {
     const dist = shipPos.distanceTo(site.worldPos);
     const required = getInteractionDistance(host.type, host.collisionRadius);
     if (dist > required) {
-      state.setAlert('TOO FAR TO LAND');
-      setTimeout(() => useGameState.getState().setAlert(null), 1600);
+      setTimedAlert('TOO FAR TO LAND');
       return;
     }
     if (state.player.speed > LAND_MAX_SPEED) {
-      state.setAlert('SPEED TOO HIGH TO LAND');
-      setTimeout(() => useGameState.getState().setAlert(null), 1600);
+      setTimedAlert('SPEED TOO HIGH TO LAND');
       return;
     }
 
@@ -317,8 +323,7 @@ export class InteractionSystem {
     const nearest = this.docking.findNearestStation(pos, entities);
 
     if (!nearest) {
-      state.setAlert('No station nearby');
-      setTimeout(() => useGameState.getState().setAlert(null), 2000);
+      setTimedAlert('No station nearby', 2000);
       return;
     }
 
@@ -336,8 +341,7 @@ export class InteractionSystem {
     } else {
       const dockingDistance = this.docking.getDockingDistance(nearest.interactionRadius);
       const reason = nearest.dist > dockingDistance ? 'TOO FAR FROM STATION' : 'SPEED TOO HIGH';
-      state.setAlert(reason);
-      setTimeout(() => useGameState.getState().setAlert(null), 2000);
+      setTimedAlert(reason, 2000);
     }
   }
 
