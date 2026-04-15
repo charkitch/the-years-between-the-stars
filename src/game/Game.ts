@@ -69,6 +69,7 @@ export class Game {
   private jump: JumpSystem;
   private rafId = 0;
   private lastTime = 0;
+  private lastAutosaveTime = 0;
   private isDead = false;
   private engineReady = false;
   private proximityEventCooldown = 0;
@@ -114,8 +115,8 @@ export class Game {
 
     // Load save, then initialize engine and first system
     const state = useGameState.getState();
-    state.loadSave();
-    this.tryLoadAutosaveOrInit(state);
+    const localSave = state.loadSave();
+    this.tryLoadAutosaveOrInit(localSave);
   }
 
   private async initFromEngine(
@@ -164,17 +165,17 @@ export class Game {
     state.setUIMode('flight');
   }
 
-  private async tryLoadAutosaveOrInit(state: ReturnType<typeof useGameState.getState>): Promise<void> {
-    if (await isAutosaveFromCurrentSession()) {
-      const data = await loadAutosave();
-      if (data) {
-        state.applySaveData(data);
-        const shipSpatial = shipSpatialFromSave(data);
-        this.initFromEngine(useGameState.getState(), shipSpatial);
-        return;
-      }
+  private async tryLoadAutosaveOrInit(localSave: Partial<SaveData>): Promise<void> {
+    // Prefer autosave from current session (page refresh / context restore)
+    const autosave = await loadAutosave();
+    if (autosave && await isAutosaveFromCurrentSession()) {
+      const state = useGameState.getState();
+      state.applySaveData(autosave);
+      this.initFromEngine(useGameState.getState(), shipSpatialFromSave(autosave));
+      return;
     }
-    this.initFromEngine(state);
+    // Fall back to localStorage save — restore spatial data if present
+    this.initFromEngine(useGameState.getState(), shipSpatialFromSave(localSave as SaveData));
   }
 
   // loadCurrentSystem removed — initialization now handled by initFromEngine
@@ -262,6 +263,11 @@ export class Game {
     if (uiMode === 'docked' || uiMode === 'landing') {
       this.interaction.trackDockedStation();
     }
+    if (now - this.lastAutosaveTime > 60_000 && uiMode === 'flight') {
+      this.lastAutosaveTime = now;
+      state.saveGame();
+    }
+
     state.tickTime(dt);
 
     this.sceneRenderer.render();
@@ -396,6 +402,17 @@ export class Game {
     state.setDeathMessage(deathMessage);
     this.flightModel.reset(this.sceneRenderer.shipGroup.position);
     state.setUIMode('dead');
+  }
+
+  getShipSpatialState(): ShipSpatial {
+    const pos = this.sceneRenderer.shipGroup.position;
+    const quat = this.sceneRenderer.shipGroup.quaternion;
+    const vel = this.flightModel.getVelocity();
+    return {
+      position: { x: pos.x, y: pos.y, z: pos.z },
+      quaternion: { x: quat.x, y: quat.y, z: quat.z, w: quat.w },
+      velocity: { x: vel.x, y: vel.y, z: vel.z },
+    };
   }
 
   loadSlotSave(data: SaveData): void {

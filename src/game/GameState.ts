@@ -162,7 +162,7 @@ export interface GameActions {
   setCargoFromEngine: (cargo: Partial<Record<GoodName, number>>) => void;
   markVisited: (id: SystemId) => void;
   tickTime: (dt: number) => void;
-  loadSave: () => void;
+  loadSave: () => Partial<SaveData>;
   applySaveData: (data: Partial<SaveData>) => void;
   saveGame: () => void;
   resetGame: () => void;
@@ -645,8 +645,9 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
 
   loadSave: () => {
     const saved = loadFromStorage();
-    if (Object.keys(saved).length === 0) return;
+    if (Object.keys(saved).length === 0) return saved;
     set(() => applySaveFields(saved));
+    return saved;
   },
 
   applySaveData: (data) => {

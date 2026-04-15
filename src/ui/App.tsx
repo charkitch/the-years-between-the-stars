@@ -190,6 +190,12 @@ export function App() {
   const handleSaveToSlot = async (index: number) => {
     const state = useGameState.getState();
     const data = buildSaveData(state);
+    const spatial = gameRef.current?.getShipSpatialState();
+    if (spatial) {
+      data.shipPosition = spatial.position;
+      data.shipQuaternion = spatial.quaternion;
+      data.shipVelocity = spatial.velocity;
+    }
     const meta = buildSlotMeta(state);
     await saveToSlot(index, data, meta);
   };
