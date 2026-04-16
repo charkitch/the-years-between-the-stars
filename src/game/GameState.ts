@@ -1,425 +1,43 @@
 import { create } from 'zustand';
+import type { StarSystemData } from './engine';
+import { HYPERSPACE, type GoodName } from './constants';
+import { saveAutosave, buildSlotMeta } from '../ui/MainMenu/saveSlots';
+import type { SystemId, GalaxyYear } from './types';
 import type {
-  StarSystemData,
-  SolarSystemData,
-  CivilizationState,
-  GameEvent,
-  SystemSimState,
-  ClusterSystemSummary,
-  SystemPayload,
-  MarketEntry,
-  SystemEntryDialog,
-  ChainTarget,
-  WasmPlayerState,
-  JumpLogEntry,
-} from './engine';
-import { STARTING_CREDITS, STARTING_FUEL, STARTING_SYSTEM_ID, HYPERSPACE, GALAXY_YEAR_START, type GoodName } from './constants';
-import { saveAutosave, buildSlotMeta, type AutosaveKind } from '../ui/MainMenu/saveSlots';
-import type { NPCCargoEntry } from './mechanics/NPCSystem';
-import type { NPCShipArchetype } from './archetypes';
-import type { SystemId, GalaxyYear, ScannableBodyId, FactionId } from './types';
+  SystemChoices,
+  FactionMemoryEntry,
+  GameStateData,
+  GameActions,
+} from './GameStateTypes';
+import {
+  buildInitialState,
+  normalizeSystemChoicesMap,
+  buildSaveData,
+  applySaveFields,
+  loadFromStorage,
+} from './gameStatePersistence';
 
-export type UIMode = 'loading' | 'flight' | 'cluster_map' | 'system_map' | 'docked' | 'hyperspace' | 'landing' | 'comms' | 'dead' | 'menu';
-
-export interface PendingCommContext {
-  npcId: string;
-  npcName: string;
-  originSystemName: string;
-  npcArchetype: NPCShipArchetype;
-  commLines: [string, string];
-  cargo: NPCCargoEntry[];
-  factionTag: string | null;
-  inTradeRange: boolean;
-  bonusDemand: {
-    good: GoodName;
-    sellPrice: number;
-    label: string;
-  } | null;
-}
-
-export interface PlayerState {
-  position: { x: number; y: number; z: number };
-  velocity: { x: number; y: number; z: number };
-  quaternion: { x: number; y: number; z: number; w: number };
-  shields: number;       // 0–100
-  fuel: number;          // 0–7
-  heat: number;          // 0–100
-  credits: number;
-  cargo: Partial<Record<GoodName, number>>;
-  cargoCostBasis: Partial<Record<GoodName, number>>; // weighted avg purchase price
-  speed: number;
-  targetId: string | null;
-}
-
+// Re-export types and persistence for external consumers
+export type {
+  UIMode,
+  PlayerState,
+  SystemChoices,
+  PendingGameEventContext,
+  PendingCommContext,
+  FactionMemoryEntry,
+  GameStateData,
+  GameActions,
+  SaveData,
+} from './GameStateTypes';
 export type { JumpLogEntry } from './engine';
-
-export interface SystemChoices {
-  tradingReputation: number;    // accumulated; affects sell price
-  bannedGoods: GoodName[];
-  priceModifier: number;        // accumulated multiplier
-  factionTag: string | null;
-  completedEventIds: string[];
-  flags: string[];
-  firedTriggers: string[];
-}
-
-export interface PendingGameEventContext {
-  systemId: SystemId;
-  civState: CivilizationState;
-  event: GameEvent | null;
-  rootEventId: string | null;
-  yearsSinceLastVisit: number | null;
-  returnMode: UIMode;
-  landingSiteLabel?: string | null;
-  landingHostLabel?: string | null;
-  visited?: boolean;
-}
-
-export interface FactionMemoryEntry {
-  factionId: FactionId;
-  contestingFactionId: FactionId | null;
-  galaxyYear: GalaxyYear;
-}
-
-export interface GameStateData {
-  invertControls: boolean;
-  player: PlayerState;
-  currentSystemId: SystemId;
-  currentSystem: SolarSystemData | null;
-  currentSystemPayload: SystemPayload | null;
-  cluster: StarSystemData[];
-  clusterSummary: ClusterSystemSummary[];
-  visitedSystems: Set<SystemId>;
-  ui: {
-    mode: UIMode;
-    alertMessage: string | null;
-    scanLabel: string | null;
-    scanProgress: number;
-    hyperspaceTarget: SystemId | null;
-    hyperspaceCountdown: number;
-    deathMessage: string[] | null;
-    canDockNow: boolean;
-    canLandNow: boolean;
-    canScanNow: boolean;
-    canHailNow: boolean;
-  };
-  time: number; // game time in seconds
-
-  // ── New relativistic time fields ──────────────────────────────────────────
-  galaxyYear: GalaxyYear;
-  jumpLog: JumpLogEntry[];                            // last 20
-  playerChoices: Record<SystemId, SystemChoices>;
-  lastVisitYear: Record<SystemId, GalaxyYear>;
-  pendingGameEvent: PendingGameEventContext | null;
-  pendingCommContext: PendingCommContext | null;
-
-  // ── Faction tracking ──────────────────────────────────────────────────────
-  knownFactions: Set<string>;
-  factionMemory: Record<SystemId, FactionMemoryEntry>;
-  systemEntryLines: string[] | null;
-  pendingSystemEntryDialog: SystemEntryDialog | null;
-  seenSystemDialogIds: string[];
-
-  // ── Galaxy simulation state (from Rust) ─────────────────────────────────
-  galaxySimState: SystemSimState[] | null;
-
-  // ── Story chain targets ────────────────────────────────────────────────
-  chainTargets: ChainTarget[];
-  scannedBodies: Record<SystemId, Record<ScannableBodyId, GalaxyYear>>;
-
-  // ── Global player history (cross-system) ──────────────────────────────
-  playerHistory: {
-    completedEvents: Record<string, { systemId: SystemId; galaxyYear: GalaxyYear }>;
-    galacticFlags: string[];
-  };
-}
-
-export interface GameActions {
-  setInvertControls: (invert: boolean) => void;
-  setPlayerPosition: (pos: Vec3) => void;
-  setPlayerVelocity: (vel: Vec3) => void;
-  setPlayerQuaternion: (q: Quat) => void;
-  setPlayerSpatial: (pos: Vec3, vel: Vec3, q: Quat) => void;
-  setPlayerSpeed: (speed: number) => void;
-  setShields: (v: number) => void;
-  setFuel: (v: number) => void;
-  setHeat: (v: number) => void;
-  setUIMode: (mode: UIMode) => void;
-  setCurrentSystemPayload: (id: SystemId, payload: SystemPayload) => void;
-  setCurrentSystemMarket: (market: MarketEntry[]) => void;
-  setTarget: (id: string | null) => void;
-  setAlert: (msg: string | null) => void;
-  setScanProgress: (progress: number, label?: string | null) => void;
-  setHyperspaceTarget: (id: SystemId | null) => void;
-  setHyperspaceCountdown: (n: number) => void;
-  setDeathMessage: (lines: string[] | null) => void;
-  setCanDockNow: (canDockNow: boolean) => void;
-  setCanLandNow: (canLandNow: boolean) => void;
-  setCanScanNow: (canScanNow: boolean) => void;
-  setCanHailNow: (canHailNow: boolean) => void;
-  addCredits: (delta: number) => void;
-  addCargo: (good: GoodName, qty: number, purchasePrice?: number) => void;
-  removeCargo: (good: GoodName, qty: number) => void;
-  setCargoFromEngine: (cargo: Partial<Record<GoodName, number>>) => void;
-  markVisited: (id: SystemId) => void;
-  tickTime: (dt: number) => void;
-  loadSave: () => Partial<SaveData>;
-  applySaveData: (data: Partial<SaveData>) => void;
-  saveGame: () => void;
-  saveAutosave: (kind: AutosaveKind) => void;
-  resetGame: () => void;
-
-  // ── New relativistic time actions ────────────────────────────────────────
-  advanceGalaxyYear: (years: number) => void;
-  addJumpLogEntry: (entry: JumpLogEntry) => void;
-  recordPlayerChoice: (systemId: SystemId, eventId: string, effect: Partial<SystemChoices>) => void;
-  setPendingGameEvent: (ctx: PendingGameEventContext | null) => void;
-  setPendingCommContext: (ctx: PendingCommContext | null) => void;
-  recordVisitYear: (systemId: SystemId, year: GalaxyYear) => void;
-
-  // ── Faction tracking actions ────────────────────────────────────────────
-  addKnownFaction: (id: string) => void;
-  setFactionMemory: (systemId: SystemId, data: FactionMemoryEntry) => void;
-  setSystemEntryLines: (lines: string[] | null) => void;
-  setPendingSystemEntryDialog: (dialog: SystemEntryDialog | null) => void;
-  markSystemDialogSeen: (id: string) => void;
-
-  // ── Engine integration actions ────────────────────────────────────────
-  syncPlayerStateFromEngine: (ps: WasmPlayerState) => void;
-  setCluster: (cluster: StarSystemData[]) => void;
-  setClusterSummary: (summary: ClusterSystemSummary[]) => void;
-  setGalaxySimState: (simState: SystemSimState[] | null) => void;
-  setChainTargets: (targets: ChainTarget[]) => void;
-  markBodyScanned: (systemId: SystemId, bodyId: ScannableBodyId, galaxyYear: GalaxyYear) => void;
-  recordGlobalEventCompletion: (eventId: string, systemId: SystemId, galaxyYear: GalaxyYear) => void;
-  addGalacticFlag: (flag: string) => void;
-}
+export { buildSaveData } from './gameStatePersistence';
 
 // Cluster is set from Rust engine init — starts empty, populated by Game.constructor
 let CLUSTER: StarSystemData[] = [];
 
-const DEFAULT_PLAYER: PlayerState = {
-  position: { x: 0, y: 0, z: 8000 },
-  velocity: { x: 0, y: 0, z: 0 },
-  quaternion: { x: 0, y: 0, z: 0, w: 1 },
-  shields: 100,
-  fuel: STARTING_FUEL,
-  heat: 0,
-  credits: STARTING_CREDITS,
-  cargo: {},
-  cargoCostBasis: {},
-  speed: 0,
-  targetId: null,
-};
-
-export interface SaveData {
-  invertControls?: boolean;
-  credits: number;
-  cargo: Partial<Record<GoodName, number>>;
-  cargoCostBasis: Partial<Record<GoodName, number>>;
-  fuel: number;
-  shields: number;
-  currentSystemId: SystemId;
-  visitedSystems: SystemId[];
-  galaxyYear: GalaxyYear;
-  jumpLog: JumpLogEntry[];
-  playerChoices: Record<SystemId, SystemChoices>;
-  lastVisitYear: Record<SystemId, GalaxyYear>;
-  knownFactions: string[];
-  factionMemory: Record<SystemId, FactionMemoryEntry>;
-  seenSystemDialogIds: string[];
-  chainTargets: ChainTarget[];
-  scannedBodies?: Record<SystemId, Record<ScannableBodyId, GalaxyYear>>;
-  playerHistory?: {
-    completedEvents?: Record<string, { systemId: SystemId; galaxyYear: GalaxyYear }>;
-    galacticFlags?: string[];
-  };
-  shipPosition?: { x: number; y: number; z: number };
-  shipQuaternion?: { x: number; y: number; z: number; w: number };
-  shipVelocity?: { x: number; y: number; z: number };
-}
-
-function migrateLegacyGoodKeys<T>(record: Partial<Record<GoodName, T>> | undefined): Partial<Record<GoodName, T>> | undefined {
-  if (!record) return record;
-  const migrated = { ...record } as Partial<Record<GoodName, T>> & {
-    Slaves?: T;
-    'Enslaved People'?: T;
-    Food?: T;
-    Textiles?: T;
-    Radioactives?: T;
-    Liquor?: T;
-    Luxuries?: T;
-    Narcotics?: T;
-    Computers?: T;
-  };
-  const legacyMap: Array<[keyof typeof migrated, GoodName]> = [
-    ['Food', 'Starwind Rations'],
-    ['Textiles', 'Hullskin Lace'],
-    ['Radioactives', 'Reactor Salt'],
-    ['Liquor', 'Dream Resin'],
-    ['Luxuries', 'Embassy Masks'],
-    ['Narcotics', 'Silence Vials'],
-    ['Computers', 'Ancestral Backups'],
-  ];
-  for (const [oldKey, newKey] of legacyMap) {
-    if (migrated[oldKey] !== undefined && migrated[newKey] === undefined) {
-      migrated[newKey] = migrated[oldKey];
-    }
-    delete migrated[oldKey];
-  }
-  delete migrated.Slaves;
-  delete migrated['Enslaved People'];
-  return migrated;
-}
-
-function normalizeSystemChoicesMap(
-  map: Record<SystemId, SystemChoices> | undefined,
-): Record<SystemId, SystemChoices> {
-  if (!map) return {};
-  const out: Record<SystemId, SystemChoices> = {};
-  for (const [k, v] of Object.entries(map)) {
-    out[Number(k) as SystemId] = {
-      tradingReputation: v.tradingReputation ?? 0,
-      bannedGoods: v.bannedGoods ?? [],
-      priceModifier: v.priceModifier ?? 1.0,
-      factionTag: v.factionTag ?? null,
-      completedEventIds: v.completedEventIds ?? [],
-      flags: v.flags ?? [],
-      firedTriggers: v.firedTriggers ?? [],
-    };
-  }
-  return out;
-}
-
-import { isFiniteVec3, isFiniteQuat, isOriginVec3, type Vec3, type Quat } from './spatialValidation';
-
-export function buildSaveData(s: GameStateData): SaveData {
-  const hasValidSpatial = isFiniteVec3(s.player.position)
-    && !isOriginVec3(s.player.position)
-    && isFiniteQuat(s.player.quaternion)
-    && isFiniteVec3(s.player.velocity);
-
-  return {
-    invertControls: s.invertControls,
-    credits: s.player.credits,
-    cargo: s.player.cargo,
-    cargoCostBasis: s.player.cargoCostBasis,
-    fuel: s.player.fuel,
-    shields: s.player.shields,
-    currentSystemId: s.currentSystemId,
-    visitedSystems: Array.from(s.visitedSystems),
-    galaxyYear: s.galaxyYear,
-    jumpLog: s.jumpLog,
-    playerChoices: s.playerChoices,
-    lastVisitYear: s.lastVisitYear,
-    knownFactions: Array.from(s.knownFactions),
-    factionMemory: s.factionMemory,
-    seenSystemDialogIds: s.seenSystemDialogIds,
-    chainTargets: s.chainTargets,
-    scannedBodies: s.scannedBodies,
-    playerHistory: s.playerHistory,
-    shipPosition: hasValidSpatial ? s.player.position : undefined,
-    shipQuaternion: hasValidSpatial ? s.player.quaternion : undefined,
-    shipVelocity: hasValidSpatial ? s.player.velocity : undefined,
-  };
-}
-
-function applySaveFields(saved: Partial<SaveData>): Partial<GameStateData> {
-  return {
-    player: {
-      ...DEFAULT_PLAYER,
-      credits: saved.credits ?? DEFAULT_PLAYER.credits,
-      cargo: migrateLegacyGoodKeys(saved.cargo) ?? DEFAULT_PLAYER.cargo,
-      cargoCostBasis: migrateLegacyGoodKeys(saved.cargoCostBasis) ?? DEFAULT_PLAYER.cargoCostBasis,
-      fuel: saved.fuel ?? DEFAULT_PLAYER.fuel,
-      shields: saved.shields ?? DEFAULT_PLAYER.shields,
-      position: saved.shipPosition ?? DEFAULT_PLAYER.position,
-      velocity: saved.shipVelocity ?? DEFAULT_PLAYER.velocity,
-      quaternion: saved.shipQuaternion ?? DEFAULT_PLAYER.quaternion,
-    },
-    invertControls: saved.invertControls ?? false,
-    currentSystemId: saved.currentSystemId ?? STARTING_SYSTEM_ID,
-    currentSystem: null,
-    currentSystemPayload: null,
-    visitedSystems: new Set(saved.visitedSystems ?? []),
-    galaxyYear: saved.galaxyYear ?? GALAXY_YEAR_START,
-    jumpLog: saved.jumpLog ?? [],
-    playerChoices: normalizeSystemChoicesMap(saved.playerChoices),
-    lastVisitYear: saved.lastVisitYear ?? {},
-    knownFactions: new Set(saved.knownFactions ?? []),
-    factionMemory: saved.factionMemory ?? {},
-    seenSystemDialogIds: saved.seenSystemDialogIds ?? [],
-    chainTargets: saved.chainTargets ?? [],
-    scannedBodies: saved.scannedBodies ?? {},
-    playerHistory: {
-      completedEvents: saved.playerHistory?.completedEvents ?? {},
-      galacticFlags: saved.playerHistory?.galacticFlags ?? [],
-    },
-    // Clear transient state so nothing leaks from the previous session
-    pendingGameEvent: null,
-    pendingCommContext: null,
-    systemEntryLines: null,
-    pendingSystemEntryDialog: null,
-    time: 0,
-  };
-}
-
-function loadFromStorage(): Partial<SaveData> {
-  try {
-    const raw = localStorage.getItem('space-game-save');
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return {};
-}
-
 export const useGameState = create<GameStateData & GameActions>((set, get) => ({
-  invertControls: false,
-  player: { ...DEFAULT_PLAYER },
-  currentSystemId: STARTING_SYSTEM_ID,
-  currentSystem: null,
-  currentSystemPayload: null,
+  ...buildInitialState('loading'),
   cluster: CLUSTER,
-  clusterSummary: [],
-  visitedSystems: new Set(),
-  ui: {
-    mode: 'loading',
-    alertMessage: null,
-    scanLabel: null,
-    scanProgress: 0,
-    hyperspaceTarget: null,
-    hyperspaceCountdown: 0,
-    deathMessage: null,
-    canDockNow: false,
-    canLandNow: false,
-    canScanNow: false,
-    canHailNow: false,
-  },
-  time: 0,
-
-  // New relativistic time state
-  galaxyYear: GALAXY_YEAR_START,
-  jumpLog: [],
-  playerChoices: {},
-  lastVisitYear: {},
-  pendingGameEvent: null,
-  pendingCommContext: null,
-
-  // Faction tracking state
-  knownFactions: new Set(),
-  factionMemory: {},
-  systemEntryLines: null,
-  pendingSystemEntryDialog: null,
-  seenSystemDialogIds: [],
-
-  // Galaxy simulation state
-  galaxySimState: null,
-
-  // Story chain targets
-  chainTargets: [],
-  scannedBodies: {},
-
-  // Global player history
-  playerHistory: { completedEvents: {}, galacticFlags: [] },
 
   setInvertControls: (invert) => {
     set({ invertControls: invert });
@@ -613,44 +231,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
 
   resetGame: () => {
     localStorage.removeItem('space-game-save');
-    set({
-      player: { ...DEFAULT_PLAYER },
-      invertControls: false,
-      currentSystemId: STARTING_SYSTEM_ID,
-      currentSystem: null,
-      currentSystemPayload: null,
-      visitedSystems: new Set(),
-      clusterSummary: [],
-      time: 0,
-      galaxyYear: GALAXY_YEAR_START,
-      jumpLog: [],
-      playerChoices: {},
-      lastVisitYear: {},
-      pendingGameEvent: null,
-      pendingCommContext: null,
-      knownFactions: new Set(),
-      factionMemory: {},
-      systemEntryLines: null,
-      pendingSystemEntryDialog: null,
-      seenSystemDialogIds: [],
-      galaxySimState: null,
-      chainTargets: [],
-      scannedBodies: {},
-      playerHistory: { completedEvents: {}, galacticFlags: [] },
-      ui: {
-        mode: 'flight',
-        alertMessage: null,
-        scanLabel: null,
-        scanProgress: 0,
-        hyperspaceTarget: null,
-        hyperspaceCountdown: 0,
-        deathMessage: null,
-        canDockNow: false,
-        canLandNow: false,
-        canScanNow: false,
-        canHailNow: false,
-      },
-    });
+    set(buildInitialState('flight'));
   },
 
   loadSave: () => {
