@@ -1,3 +1,4 @@
+#[cfg(test)]
 mod noise;
 mod prng;
 mod types;
@@ -6,6 +7,8 @@ mod star_properties;
 mod system_profiles;
 mod dyson_generator;
 mod topopolis_generator;
+mod climate;
+mod station_archetypes;
 mod system_generator;
 mod civilization;
 mod factions;

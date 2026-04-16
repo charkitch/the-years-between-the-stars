@@ -1,8 +1,6 @@
 use crate::prng::PRNG;
 use crate::types::*;
 
-const HYPERSPACE_MAX_RANGE: f64 = 25.0;
-
 const SYLLABLES_START: &[&str] = &[
     "Ac", "Be", "Ce", "Di", "En", "Fe", "Ge", "Hi", "Is", "Jo", "Ka", "La", "Me",
     "No", "Or", "Pa", "Qu", "Re", "Si", "Te", "Ul", "Ve", "Wo", "Xe", "Za",
@@ -98,9 +96,9 @@ pub fn generate_cluster() -> Vec<StarSystemData> {
             .collect();
 
         #[cfg(feature = "dev-placement")]
-        ranked.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap()); // nearest first
+        ranked.sort_by(|a, b| a.1.total_cmp(&b.1)); // nearest first
         #[cfg(not(feature = "dev-placement"))]
-        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap()); // farthest first
+        ranked.sort_by(|a, b| b.1.total_cmp(&a.1)); // farthest first
 
         let iron_idx = ranked[0].0;
         systems[iron_idx].star_type = StarType::Iron;
@@ -108,9 +106,6 @@ pub fn generate_cluster() -> Vec<StarSystemData> {
 
         // Crown: farthest system from origin that's also far from IRON
         // (roughly opposite direction). Score = distance_from_origin + distance_from_iron.
-        let iron_x = systems[iron_idx].x;
-        let iron_y = systems[iron_idx].y;
-
         let non_iron: Vec<(usize, f64)> = ranked.iter()
             .filter(|(i, _)| *i != iron_idx)
             .copied()
@@ -131,6 +126,10 @@ pub fn generate_cluster() -> Vec<StarSystemData> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Threshold for asserting Iron/Crown placement is beyond hyperspace range.
+    /// Mirrors the runtime constant in the TS-side `HYPERSPACE.maxRange`.
+    const HYPERSPACE_MAX_RANGE: f64 = 25.0;
 
     #[test]
     fn generates_30_systems() {

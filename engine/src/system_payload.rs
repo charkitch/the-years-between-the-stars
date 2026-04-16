@@ -1,5 +1,6 @@
 use crate::types::*;
-use crate::system_generator::{generate_solar_system, derive_climate};
+use crate::system_generator::generate_solar_system;
+use crate::climate::{derive_climate, BodyIndex};
 use crate::civilization::get_civ_state;
 use crate::factions::{get_faction, get_system_faction_state};
 use crate::trading::get_market;
@@ -128,20 +129,19 @@ pub fn build_system_payload(
     // Apply dynamic climate state to each planet and its moons
     // Home planet (system 0, planet 0) stays cap-free — it's the first thing the player sees.
     system.planets.iter_mut().enumerate().for_each(|(pi, planet)| {
+        let pi = pi as u32;
         if planet.planet_type == PlanetType::Rocky && !(star.id == 0 && pi == 0) {
             let (climate, intensity, cap) = derive_climate(
-                star.id, pi as u32, galaxy_year, planet.surface_type, system_flags,
-                &format!("p{}_", pi),
+                star.id, BodyIndex::Planet(pi), galaxy_year, planet.surface_type, system_flags,
             );
             planet.climate_state = climate;
             planet.climate_intensity = intensity;
             planet.polar_cap_size = cap;
         }
         planet.moons.iter_mut().enumerate().for_each(|(mi, moon)| {
-            let seed = (pi as u32) * 100 + mi as u32;
             let (climate, intensity, cap) = derive_climate(
-                star.id, seed, galaxy_year, moon.surface_type, system_flags,
-                &format!("m{}_{}_", pi, mi),
+                star.id, BodyIndex::Moon { planet: pi, moon: mi as u32 },
+                galaxy_year, moon.surface_type, system_flags,
             );
             moon.climate_state = climate;
             moon.climate_intensity = intensity;
