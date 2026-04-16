@@ -1,112 +1,17 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useGameState } from '../../game/GameState';
 import { canJump as checkCanJump, jumpCost as calcJumpCost, getReachableSystems } from '../../game/mechanics/hyperspaceCalc';
 import { jumpYearsElapsed } from '../../game/mechanics/RelativisticTime';
-import type { StarSystemData, ClusterSystemSummary } from '../../game/engine';
-import { HYPERSPACE, POLITICAL_TYPE_DISPLAY } from '../../game/constants';
+import type { StarSystemData, ClusterSystemSummary, SystemSimState } from '../../game/engine';
+import type { SystemId } from '../../game/types';
+import { POLITICAL_TYPE_DISPLAY } from '../../game/constants';
 import { getFaction } from '../../game/data/factions';
 import styles from './ClusterMap.module.css';
-
-const MAP_W = 520;
-const MAP_H = 420;
-const MOBILE_BREAKPOINT = 820;
-const MOBILE_CLUSTER_ZOOM = 2.8;
-
-interface MapViewport {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-  zoom: number;
-}
-
-interface OffscreenIndicator {
-  id: string;
-  x: number;
-  y: number;
-  color: string;
-  label: string;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function clampMobileCenter(x: number, y: number): { x: number; y: number } {
-  const spanX = 100 / MOBILE_CLUSTER_ZOOM;
-  const spanY = 100 / MOBILE_CLUSTER_ZOOM;
-  const halfX = spanX / 2;
-  const halfY = spanY / 2;
-  return {
-    x: clamp(x, halfX, 100 - halfX),
-    y: clamp(y, halfY, 100 - halfY),
-  };
-}
-
-function getViewport(centerX: number, centerY: number, isMobile: boolean): MapViewport {
-  if (!isMobile) {
-    return { minX: 0, maxX: 100, minY: 0, maxY: 100, zoom: 1 };
-  }
-
-  const { x, y } = clampMobileCenter(centerX, centerY);
-  const spanX = 100 / MOBILE_CLUSTER_ZOOM;
-  const spanY = 100 / MOBILE_CLUSTER_ZOOM;
-  const halfX = spanX / 2;
-  const halfY = spanY / 2;
-
-  return {
-    minX: x - halfX,
-    maxX: x + halfX,
-    minY: y - halfY,
-    maxY: y + halfY,
-    zoom: MOBILE_CLUSTER_ZOOM,
-  };
-}
-
-function toCanvas(x: number, y: number, viewport: MapViewport): [number, number] {
-  const nx = (x - viewport.minX) / (viewport.maxX - viewport.minX);
-  const ny = (y - viewport.minY) / (viewport.maxY - viewport.minY);
-  return [nx * MAP_W, ny * MAP_H];
-}
-
-function toWorld(px: number, py: number, viewport: MapViewport): [number, number] {
-  return [
-    viewport.minX + px * (viewport.maxX - viewport.minX),
-    viewport.minY + py * (viewport.maxY - viewport.minY),
-  ];
-}
-
-function isOnCanvas(x: number, y: number, pad = 10): boolean {
-  return x >= pad && x <= MAP_W - pad && y >= pad && y <= MAP_H - pad;
-}
-
-function edgePointForOffscreen(x: number, y: number, pad = 16): [number, number] {
-  const cx = MAP_W / 2;
-  const cy = MAP_H / 2;
-  const dx = x - cx;
-  const dy = y - cy;
-
-  if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) {
-    return [cx, cy];
-  }
-
-  const tx = dx > 0 ? (MAP_W - pad - cx) / dx : (pad - cx) / dx;
-  const ty = dy > 0 ? (MAP_H - pad - cy) / dy : (pad - cy) / dy;
-  const t = Math.min(Math.abs(tx), Math.abs(ty));
-
-  return [cx + dx * t, cy + dy * t];
-}
-
-const STAR_TYPE_COLOR: Record<string, string> = {
-  G: '#FFEE88', K: '#FFAA44', M: '#FF6633', F: '#FFFFFF', A: '#AABBFF',
-  WD: '#F0F0FF', HE: '#88CCAA', NS: '#CCDDFF', PU: '#44AAFF', XB: '#FF6688',
-  MG: '#DD44FF', BH: '#220022', XBB: '#FF4466', MQ: '#67D8FF', SGR: '#FFAA22',
-};
-
-function applyAlpha(hex: string, alpha: number): string {
-  const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
-  return `${hex}${a}`;
-}
+import {
+  MAP_W, MAP_H, MOBILE_BREAKPOINT,
+  getViewport, toWorld, clampMobileCenter,
+} from './ClusterMapViewport';
+import { drawClusterMap } from './ClusterMapRendering';
 
 interface ClusterMapProps {
   onClose: () => void;
@@ -135,10 +40,19 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
   const chainTargets = useGameState(s => s.chainTargets);
 
   const currentSys = cluster[currentSystemId];
-  const reachable = getReachableSystems(currentSys, cluster);
-  const reachableIds = new Set(reachable.map(s => s.id));
-  const clusterSummaryById = new Map<number, ClusterSystemSummary>(
-    clusterSummary.map(summary => [summary.id, summary]),
+  const reachableIds = useMemo(
+    () => new Set(getReachableSystems(currentSys, cluster).map(s => s.id)),
+    [currentSys, cluster],
+  );
+  const clusterSummaryById = useMemo(
+    () => new Map<SystemId, ClusterSystemSummary>(
+      clusterSummary.map(summary => [summary.id, summary]),
+    ),
+    [clusterSummary],
+  );
+  const simStateById = useMemo(
+    () => new Map<SystemId, SystemSimState>((galaxySimState ?? []).map(s => [s.systemId, s])),
+    [galaxySimState],
   );
 
   const [hovered, setHovered] = useState<StarSystemData | null>(null);
@@ -182,267 +96,12 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
       ? getViewport(mobileCenter.x, mobileCenter.y, true)
       : getViewport(currentSys.x, currentSys.y, false);
 
-    ctx.clearRect(0, 0, MAP_W, MAP_H);
-    ctx.fillStyle = '#010206';
-    ctx.fillRect(0, 0, MAP_W, MAP_H);
-
-    // Range ring
-    const [cx, cy] = toCanvas(currentSys.x, currentSys.y, viewport);
-    const rangePixels = (HYPERSPACE.maxRange / (viewport.maxX - viewport.minX)) * MAP_W;
-
-    // Soft outer glow pass so the range ring stays readable against dense stars/lines.
-    ctx.strokeStyle = 'rgba(68, 220, 255, 0.22)';
-    ctx.lineWidth = 7;
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.arc(cx, cy, rangePixels, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Crisp primary ring pass with a higher-contrast dash pattern.
-    ctx.strokeStyle = 'rgba(102, 255, 204, 0.82)';
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([10, 4]);
-    ctx.beginPath();
-    ctx.arc(cx, cy, rangePixels, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Systems
-    for (const sys of cluster) {
-      const [sx, sy] = toCanvas(sys.x, sys.y, viewport);
-      if (sx < -30 || sx > MAP_W + 30 || sy < -30 || sy > MAP_H + 30) continue;
-      const isReachable = reachableIds.has(sys.id);
-      const isCurrent = sys.id === currentSystemId;
-      const isTarget = sys.id === hyperspaceTarget;
-      const isVisited = visitedSystems.has(sys.id);
-      const summary = clusterSummaryById.get(sys.id);
-
-      // Line to reachable
-      if (isReachable) {
-        ctx.strokeStyle = 'rgba(51,255,136,0.15)';
-        ctx.lineWidth = 0.5;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(sx, sy);
-        ctx.stroke();
-      }
-
-      const color = STAR_TYPE_COLOR[sys.starType] ?? '#FFFFFF';
-      const r = isCurrent ? 7 : isTarget ? 6 : 4;
-
-      // Glow for target
-      if (isTarget) {
-        const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, 20);
-        grad.addColorStop(0, 'rgba(68,204,255,0.5)');
-        grad.addColorStop(1, 'rgba(68,204,255,0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(sx, sy, 20, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Glow for hovered
-      if (hovered?.id === sys.id && !isTarget && !isCurrent) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(sx, sy, r + 3, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // Staleness: visited stars dim over centuries
-      let starFill: string;
-      if (isCurrent) {
-        starFill = '#33FF88';
-      } else if (isTarget) {
-        starFill = '#44CCFF';
-      } else if (isVisited) {
-        const yearsSince = galaxyYear - (lastVisitYear[sys.id] ?? galaxyYear);
-        const staleness = Math.max(0.3, 1 - yearsSince / 1000);
-        starFill = applyAlpha(color, staleness);
-      } else {
-        starFill = `${color}66`;
-      }
-
-      ctx.beginPath();
-      ctx.arc(sx, sy, r, 0, Math.PI * 2);
-      ctx.fillStyle = starFill;
-      ctx.fill();
-
-      if (!isVisited && !isReachable && !isCurrent) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      // Accretion ring indicator for black holes
-      if (sys.starType === 'BH') {
-        ctx.strokeStyle = 'rgba(255,102,34,0.7)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(sx, sy, r + 3, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // Faction color pips from Rust cluster summary
-      if (summary) {
-        const faction = getFaction(summary.controllingFactionId);
-        if (faction && knownFactions.has(faction.id)) {
-          const fc = `#${faction.color.toString(16).padStart(6, '0')}`;
-          ctx.beginPath();
-          ctx.arc(sx + r + 4, sy - r + 2, 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = fc;
-          ctx.fill();
-
-          if (summary.contestingFactionId) {
-            const cf = getFaction(summary.contestingFactionId);
-            if (cf && knownFactions.has(cf.id)) {
-              const cc = `#${cf.color.toString(16).padStart(6, '0')}`;
-              ctx.beginPath();
-              ctx.arc(sx + r + 4, sy - r + 8, 2.5, 0, Math.PI * 2);
-              ctx.fillStyle = cc;
-              ctx.fill();
-            }
-          }
-        }
-      }
-
-      // Simulation indicators (stability/prosperity)
-      if (galaxySimState) {
-        const simState = galaxySimState.find(s => s.systemId === sys.id);
-        if (simState) {
-          const ix = sx - r - 5;
-          const iy = sy + r + 2;
-
-          // Prosperity indicator: green up-arrow or red down-arrow
-          if (simState.prosperity > 0.7) {
-            ctx.fillStyle = '#44FF88';
-            ctx.beginPath();
-            ctx.moveTo(ix, iy + 4);
-            ctx.lineTo(ix + 2, iy);
-            ctx.lineTo(ix + 4, iy + 4);
-            ctx.closePath();
-            ctx.fill();
-          } else if (simState.prosperity < 0.3) {
-            ctx.fillStyle = '#FF4444';
-            ctx.beginPath();
-            ctx.moveTo(ix, iy);
-            ctx.lineTo(ix + 2, iy + 4);
-            ctx.lineTo(ix + 4, iy);
-            ctx.closePath();
-            ctx.fill();
-          }
-
-          // Stability indicator: small dot (green = stable, orange = shaky, red = chaos)
-          if (simState.stability < 0.3) {
-            ctx.fillStyle = '#FF4444';
-            ctx.beginPath();
-            ctx.arc(ix + 7, iy + 2, 1.5, 0, Math.PI * 2);
-            ctx.fill();
-          } else if (simState.stability < 0.5) {
-            ctx.fillStyle = '#FFAA44';
-            ctx.beginPath();
-            ctx.arc(ix + 7, iy + 2, 1.5, 0, Math.PI * 2);
-            ctx.fill();
-          }
-
-          // Crisis/golden age marker from recent events
-          const lastEvent = simState.recentEvents[simState.recentEvents.length - 1];
-          if (lastEvent) {
-            if (lastEvent.includes('Crisis')) {
-              ctx.fillStyle = 'rgba(255,68,68,0.6)';
-              ctx.font = '7px Courier New';
-              ctx.fillText('!', sx + r + 2, sy + r + 5);
-            } else if (lastEvent.includes('Golden')) {
-              ctx.fillStyle = 'rgba(255,215,0,0.6)';
-              ctx.font = '7px Courier New';
-              ctx.fillText('★', sx + r + 2, sy + r + 5);
-            }
-          }
-        }
-      }
-
-      // Chain target indicator — small pulsing diamond
-      if (chainTargets.some(ct => ct.targetSystemId === sys.id)) {
-        const dx = 3;
-        const ix = sx - r - 8;
-        const iy = sy - r + 1;
-        ctx.fillStyle = 'rgba(255, 200, 80, 0.85)';
-        ctx.beginPath();
-        ctx.moveTo(ix, iy - dx);
-        ctx.lineTo(ix + dx, iy);
-        ctx.lineTo(ix, iy + dx);
-        ctx.lineTo(ix - dx, iy);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // Name label
-      ctx.fillStyle = isCurrent
-        ? '#33FF88'
-        : isTarget
-          ? '#44CCFF'
-          : hovered?.id === sys.id
-            ? '#FFFFFF'
-            : 'rgba(140, 210, 190, 0.78)';
-      ctx.font = '9px Courier New';
-      ctx.fillText(sys.name.toUpperCase(), sx + 8, sy + 4);
-    }
-
-    // Direction indicators for off-map targets in the current viewport.
-    const indicators: OffscreenIndicator[] = [];
-    const selectedTarget = hyperspaceTarget !== null ? cluster[hyperspaceTarget] : null;
-    if (selectedTarget) {
-      const [tx, ty] = toCanvas(selectedTarget.x, selectedTarget.y, viewport);
-      if (!isOnCanvas(tx, ty)) {
-        const [ix, iy] = edgePointForOffscreen(tx, ty);
-        indicators.push({ id: `jump-${selectedTarget.id}`, x: ix, y: iy, color: '#44CCFF', label: 'TARGET' });
-      }
-    }
-
-    const chainTargetIds = new Set(chainTargets.map(ct => ct.targetSystemId));
-    for (const targetId of chainTargetIds) {
-      if (selectedTarget && selectedTarget.id === targetId) continue;
-      const sys = cluster[targetId];
-      if (!sys) continue;
-      const [tx, ty] = toCanvas(sys.x, sys.y, viewport);
-      if (!isOnCanvas(tx, ty)) {
-        const [ix, iy] = edgePointForOffscreen(tx, ty);
-        indicators.push({ id: `chain-${targetId}`, x: ix, y: iy, color: 'rgba(255, 200, 80, 0.95)', label: 'CHAIN' });
-      }
-    }
-
-    for (const indicator of indicators) {
-      const cx2 = MAP_W / 2;
-      const cy2 = MAP_H / 2;
-      const angle = Math.atan2(indicator.y - cy2, indicator.x - cx2);
-      const tipX = indicator.x;
-      const tipY = indicator.y;
-      const baseDist = 8;
-      const wing = 5;
-      const backX = tipX - Math.cos(angle) * baseDist;
-      const backY = tipY - Math.sin(angle) * baseDist;
-      const leftX = backX + Math.cos(angle + Math.PI / 2) * wing;
-      const leftY = backY + Math.sin(angle + Math.PI / 2) * wing;
-      const rightX = backX + Math.cos(angle - Math.PI / 2) * wing;
-      const rightY = backY + Math.sin(angle - Math.PI / 2) * wing;
-
-      ctx.fillStyle = indicator.color;
-      ctx.beginPath();
-      ctx.moveTo(tipX, tipY);
-      ctx.lineTo(leftX, leftY);
-      ctx.lineTo(rightX, rightY);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.font = '8px Courier New';
-      ctx.fillStyle = indicator.color;
-      ctx.fillText(indicator.label, tipX + 6, tipY - 4);
-    }
+    drawClusterMap({
+      ctx, viewport, cluster, currentSystemId, currentSys,
+      visitedSystems, hyperspaceTarget, reachableIds, hovered,
+      knownFactions, lastVisitYear, galaxyYear, galaxySimState,
+      clusterSummaryById, chainTargets,
+    });
   }, [cluster, currentSystemId, visitedSystems, hyperspaceTarget, reachableIds, hovered, currentSys, knownFactions, lastVisitYear, galaxyYear, galaxySimState, clusterSummaryById, chainTargets, isMobile, mobileCenter.x, mobileCenter.y]);
 
   useEffect(() => { draw(); }, [draw]);
@@ -612,8 +271,8 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
                   })()}
                   <br />
                   TECH LV: {selectedSummary?.techLevel ?? selectedSys.techLevel} · {selectedSummary?.economy ?? selectedSys.economy}
-                  {galaxySimState && (() => {
-                    const sim = galaxySimState.find(s => s.systemId === selectedSys.id);
+                  {(() => {
+                    const sim = simStateById.get(selectedSys.id);
                     if (!sim) return null;
                     const stabilityLabel = sim.stability > 0.7 ? 'STABLE' : sim.stability > 0.4 ? 'UNSETTLED' : 'CHAOS';
                     const prosperityLabel = sim.prosperity > 0.7 ? 'BOOMING' : sim.prosperity > 0.4 ? 'MODERATE' : 'DEPRESSED';
