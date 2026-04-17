@@ -11,6 +11,7 @@
 }
 
 .panel {
+  position: relative;
   background: var(--hud-bg-panel);
   border: var(--hud-border);
   padding: 12px;
@@ -22,6 +23,33 @@
   gap: 10px;
   overflow: hidden;
   min-height: 0;
+}
+
+.closeBtn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(2, 4, 8, 0.6);
+  border: 1px solid rgba(51, 255, 136, 0.3);
+  color: var(--color-hud);
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  z-index: 1;
+}
+
+.closeBtn:hover,
+.closeBtn:active {
+  opacity: 1;
+  border-color: rgba(51, 255, 136, 0.6);
 }
 
 .title {
@@ -132,14 +160,21 @@
   .canvas {
     width: 100%;
     height: auto;
-    max-height: min(34dvh, 220px);
-    min-height: 150px;
-    flex: 0 0 auto;
+    max-height: min(50dvh, 340px);
+    max-width: none;
+    min-height: 160px;
+    flex: 0 1 auto;
+    border: none;
   }
 
   .canvasViewport {
     min-height: 0;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+  }
+
+  .closeBtn {
+    top: calc(4px + env(safe-area-inset-top));
+    right: calc(4px + env(safe-area-inset-right));
   }
 
   .info {

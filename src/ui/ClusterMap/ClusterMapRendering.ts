@@ -38,13 +38,22 @@ export function drawClusterMap(params: DrawClusterMapParams): void {
   ctx.fillStyle = '#010206';
   ctx.fillRect(0, 0, MAP_W, MAP_H);
 
+  const fontScale = Math.min(viewport.zoom, 2);
+
+  // Cluster boundary
+  const [bx0, by0] = toCanvas(0, 0, viewport);
+  const [bx1, by1] = toCanvas(100, 100, viewport);
+  ctx.strokeStyle = 'rgba(51, 255, 136, 0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(bx0, by0, bx1 - bx0, by1 - by0);
+
   // Range ring
   const [cx, cy] = toCanvas(currentSys.x, currentSys.y, viewport);
   const rangePixels = (HYPERSPACE.maxRange / (viewport.maxX - viewport.minX)) * MAP_W;
 
   drawRangeRing(ctx, cx, cy, rangePixels);
-  drawSystems(ctx, viewport, cx, cy, params, chainTargetIds, simStateById);
-  drawOffscreenIndicators(ctx, viewport, cluster, hyperspaceTarget, chainTargetIds);
+  drawSystems(ctx, viewport, cx, cy, params, chainTargetIds, simStateById, fontScale);
+  drawOffscreenIndicators(ctx, viewport, cluster, hyperspaceTarget, chainTargetIds, fontScale);
 }
 
 function drawRangeRing(ctx: CanvasRenderingContext2D, cx: number, cy: number, rangePixels: number): void {
@@ -74,6 +83,7 @@ function drawSystems(
   params: DrawClusterMapParams,
   chainTargetIds: Set<SystemId>,
   simStateById: Map<SystemId, SystemSimState>,
+  fontScale: number,
 ): void {
   const {
     cluster, currentSystemId, visitedSystems, hyperspaceTarget, reachableIds,
@@ -221,12 +231,12 @@ function drawSystems(
         if (lastEvent) {
           if (lastEvent.includes('Crisis')) {
             ctx.fillStyle = 'rgba(255,68,68,0.6)';
-            ctx.font = '7px Courier New';
-            ctx.fillText('!', sx + r + 2, sy + r + 5);
+            ctx.font = `${Math.round(7 * fontScale)}px Courier New`;
+            ctx.fillText('!', sx + r + Math.round(2 * fontScale), sy + r + Math.round(5 * fontScale));
           } else if (lastEvent.includes('Golden')) {
             ctx.fillStyle = 'rgba(255,215,0,0.6)';
-            ctx.font = '7px Courier New';
-            ctx.fillText('★', sx + r + 2, sy + r + 5);
+            ctx.font = `${Math.round(7 * fontScale)}px Courier New`;
+            ctx.fillText('★', sx + r + Math.round(2 * fontScale), sy + r + Math.round(5 * fontScale));
           }
         }
       }
@@ -255,8 +265,8 @@ function drawSystems(
         : hovered?.id === sys.id
           ? '#FFFFFF'
           : 'rgba(140, 210, 190, 0.78)';
-    ctx.font = '9px Courier New';
-    ctx.fillText(sys.name.toUpperCase(), sx + 8, sy + 4);
+    ctx.font = `${Math.round(9 * fontScale)}px Courier New`;
+    ctx.fillText(sys.name.toUpperCase(), sx + Math.round(8 * fontScale), sy + Math.round(4 * fontScale));
   }
 }
 
@@ -266,6 +276,7 @@ function drawOffscreenIndicators(
   cluster: StarSystemData[],
   hyperspaceTarget: SystemId | null,
   chainTargetIds: Set<SystemId>,
+  fontScale: number,
 ): void {
   const indicators: OffscreenIndicator[] = [];
   const selectedTarget = hyperspaceTarget !== null ? cluster[hyperspaceTarget] : null;
@@ -315,8 +326,8 @@ function drawOffscreenIndicators(
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    ctx.font = '8px Courier New';
+    ctx.font = `${Math.round(8 * fontScale)}px Courier New`;
     ctx.fillStyle = indicator.color;
-    ctx.fillText(indicator.label, tipX + 6, tipY - 4);
+    ctx.fillText(indicator.label, tipX + Math.round(6 * fontScale), tipY - Math.round(4 * fontScale));
   }
 }

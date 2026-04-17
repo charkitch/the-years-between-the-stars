@@ -234,6 +234,7 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
   return (
     <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={styles.panel}>
+        <button className={styles.closeBtn} onClick={onClose} aria-label="Close">&times;</button>
         <div className={styles.title}>
           CLUSTER CHART
           <span style={{ fontSize: '11px', letterSpacing: '2px', color: 'var(--color-hud-dim)', marginLeft: '16px' }}>
@@ -354,9 +355,8 @@ export function ClusterMap({ onClose, onJump }: ClusterMapProps) {
                 </div>
               )}
               <div className={styles.hint} style={{ marginTop: recentJumps.length > 0 ? '8px' : 0 }}>
-                {isMobile ? 'Drag to pan local stars' : 'Tap to select target'}<br />
-                Use close button to return<br />
-                Tap JUMP to initiate
+                {isMobile ? 'Drag to pan local stars' : 'Click to select target'}<br />
+                {isMobile ? 'Tap JUMP to initiate' : 'Click outside or ✕ to close'}
               </div>
             </div>
           </div>
