@@ -1,4 +1,5 @@
 import { useGameState } from '../../game/GameState';
+import { useShallow } from 'zustand/react/shallow';
 import { StatusBars, MobileStatusBars } from './StatusBars';
 import { TargetIndicator } from './TargetIndicator';
 import { SystemInfoPanel } from './SystemInfoPanel';
@@ -46,27 +47,45 @@ export function HUD({
   onSystemMap,
   onMenu,
 }: HUDProps) {
-  const player = useGameState(s => s.player);
+  // Per-frame: only the player fields this component reads
+  const { targetId, credits, speed } = useGameState(
+    useShallow(s => ({
+      targetId: s.player.targetId,
+      credits: s.player.credits,
+      speed: s.player.speed,
+    })),
+  );
+
+  // Per-jump: stable within a system visit
   const cluster = useGameState(s => s.cluster);
-  const currentSystemId = useGameState(s => s.currentSystemId);
-  const alert = useGameState(s => s.ui.alertMessage);
-  const hyperspaceTarget = useGameState(s => s.ui.hyperspaceTarget);
-  const scanProgress = useGameState(s => s.ui.scanProgress);
-  const scanLabel = useGameState(s => s.ui.scanLabel);
-  const uiMode = useGameState(s => s.ui.mode);
-  const canDockNow = useGameState(s => s.ui.canDockNow);
-  const canLandNow = useGameState(s => s.ui.canLandNow);
-  const canScanNow = useGameState(s => s.ui.canScanNow);
-  const canHailNow = useGameState(s => s.ui.canHailNow);
-  const galaxyYear = useGameState(s => s.galaxyYear);
-  const knownFactions = useGameState(s => s.knownFactions);
-  const currentSystemPayload = useGameState(s => s.currentSystemPayload);
-  const scannedBodies = useGameState(s => s.scannedBodies);
+  const currentSystem = useGameState(s => s.currentSystem);
+  const { currentSystemId, galaxyYear, knownFactions, currentSystemPayload, scannedBodies } = useGameState(
+    useShallow(s => ({
+      currentSystemId: s.currentSystemId,
+      galaxyYear: s.galaxyYear,
+      knownFactions: s.knownFactions,
+      currentSystemPayload: s.currentSystemPayload,
+      scannedBodies: s.scannedBodies,
+    })),
+  );
+
+  // UI state: changes during flight
+  const { alert, scanProgress, scanLabel, uiMode, hyperspaceTarget, canDockNow, canLandNow, canScanNow, canHailNow } = useGameState(
+    useShallow(s => ({
+      alert: s.ui.alertMessage,
+      scanProgress: s.ui.scanProgress,
+      scanLabel: s.ui.scanLabel,
+      uiMode: s.ui.mode,
+      hyperspaceTarget: s.ui.hyperspaceTarget,
+      canDockNow: s.ui.canDockNow,
+      canLandNow: s.ui.canLandNow,
+      canScanNow: s.ui.canScanNow,
+      canHailNow: s.ui.canHailNow,
+    })),
+  );
 
   const currentStar = cluster[currentSystemId];
   const targetStar = hyperspaceTarget !== null ? cluster[hyperspaceTarget] : null;
-
-  const currentSystem = useGameState(s => s.currentSystem);
   const currentFaction = currentSystemPayload
     ? getFaction(currentSystemPayload.factionState.controllingFactionId)
     : undefined;
@@ -74,7 +93,7 @@ export function HUD({
 
   // Target info
   const entities = getEntities();
-  const targetEntity = player.targetId ? entities.get(player.targetId) : null;
+  const targetEntity = targetId ? entities.get(targetId) : null;
   let targetDist = 0;
   if (targetEntity) {
     const sp = getShipPos();
@@ -100,12 +119,12 @@ export function HUD({
     targetSiteDiscovered = sites.filter(e => e.siteDiscovered).length;
   }
 
-  const targetSecretBase = player.targetId && currentSystem
-    ? currentSystem.secretBases.find(b => b.id === player.targetId)
+  const targetSecretBase = targetId && currentSystem
+    ? currentSystem.secretBases.find(b => b.id === targetId)
     : undefined;
   const isMobileHUD = Boolean(runtimeProfile?.isMobile);
   const touchFlightEnabled = isMobileHUD && isLandscapePlayable && uiMode === 'flight';
-  const isInMotion = player.speed > 1;
+  const isInMotion = speed > 1;
   const isLandingIntelAlert = Boolean(alert?.startsWith('LANDING SITES MAPPED:'));
 
   return (
@@ -134,7 +153,7 @@ export function HUD({
         targetStar={targetStar}
         currentFaction={currentFaction}
         currentFactionKnown={Boolean(currentFactionKnown)}
-        credits={player.credits}
+        credits={credits}
         isMobileHUD={isMobileHUD}
       />
 
