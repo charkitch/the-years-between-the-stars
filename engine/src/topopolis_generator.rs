@@ -75,7 +75,7 @@ mod tests {
         let cluster = generate_cluster();
         let normal = cluster.iter()
             .find(|s| s.special_kind == SpecialSystemKind::None)
-            .unwrap();
+            .expect("cluster should contain non-special systems");
         assert!(generate_topopolis(normal).is_empty());
     }
 
@@ -84,7 +84,7 @@ mod tests {
         let cluster = generate_cluster();
         let crown = cluster.iter()
             .find(|s| s.special_kind == SpecialSystemKind::TheCrown)
-            .unwrap();
+            .expect("cluster should contain Crown system");
         let a = generate_topopolis(crown);
         let b = generate_topopolis(crown);
         assert_eq!(a[0].coil_count, b[0].coil_count);

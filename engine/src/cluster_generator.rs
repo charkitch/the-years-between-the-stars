@@ -171,7 +171,7 @@ mod tests {
     fn iron_star_placement() {
         let cluster = generate_cluster();
         let origin = &cluster[0];
-        let iron = cluster.iter().find(|s| s.star_type == StarType::Iron).unwrap();
+        let iron = cluster.iter().find(|s| s.star_type == StarType::Iron).expect("cluster should contain iron star");
         let dx = iron.x - origin.x;
         let dy = iron.y - origin.y;
         let dist = (dx * dx + dy * dy).sqrt();
@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn iron_star_has_special_kind() {
         let cluster = generate_cluster();
-        let iron = cluster.iter().find(|s| s.star_type == StarType::Iron).unwrap();
+        let iron = cluster.iter().find(|s| s.star_type == StarType::Iron).expect("cluster should contain iron star");
         assert_eq!(iron.special_kind, SpecialSystemKind::IronStar);
     }
 
@@ -244,7 +244,7 @@ mod tests {
         let origin = &cluster[0];
         let crown = cluster.iter()
             .find(|s| s.special_kind == SpecialSystemKind::TheCrown)
-            .unwrap();
+            .expect("cluster should contain Crown system");
         let dx = crown.x - origin.x;
         let dy = crown.y - origin.y;
         let dist = (dx * dx + dy * dy).sqrt();
@@ -259,8 +259,8 @@ mod tests {
     fn deterministic_crown_placement() {
         let a = generate_cluster();
         let b = generate_cluster();
-        let a_crown = a.iter().find(|s| s.special_kind == SpecialSystemKind::TheCrown).unwrap();
-        let b_crown = b.iter().find(|s| s.special_kind == SpecialSystemKind::TheCrown).unwrap();
+        let a_crown = a.iter().find(|s| s.special_kind == SpecialSystemKind::TheCrown).expect("cluster should contain Crown system");
+        let b_crown = b.iter().find(|s| s.special_kind == SpecialSystemKind::TheCrown).expect("cluster should contain Crown system");
         assert_eq!(a_crown.id, b_crown.id);
         assert_eq!(a_crown.x, b_crown.x);
         assert_eq!(a_crown.y, b_crown.y);

@@ -172,7 +172,8 @@ pub fn select_game_event(pool: EventPool, ctx: &EventContext, seed: u32) -> Opti
             return Some(event.clone());
         }
     }
-    Some(weighted.last().unwrap().0.clone())
+    // Fallback: floating-point rounding can overshoot — weighted is non-empty (early return above)
+    Some(weighted.last().expect("weighted pool confirmed non-empty").0.clone())
 }
 
 #[cfg(test)]
@@ -310,6 +311,6 @@ mod tests {
         };
         let event = select_game_event(EventPool::Triggered, &ctx_with_flag, 2);
         assert!(event.is_some());
-        assert_eq!(event.unwrap().id, "REBEL_CONTACT_FOLLOWS_UP");
+        assert_eq!(event.expect("triggered event should be selected").id, "REBEL_CONTACT_FOLLOWS_UP");
     }
 }

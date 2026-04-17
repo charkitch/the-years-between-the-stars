@@ -164,7 +164,8 @@ pub fn pick_weighted_surface(rng: &mut PRNG, weights: &[(SurfaceType, f64)]) -> 
             return surface_type;
         }
     }
-    weights.last().unwrap().0
+    // Fallback: floating-point rounding can overshoot — all call sites pass non-empty weight slices
+    weights.last().expect("weight table must be non-empty").0
 }
 
 pub fn generate_rocky_moon_count(rng: &mut PRNG) -> i32 {
