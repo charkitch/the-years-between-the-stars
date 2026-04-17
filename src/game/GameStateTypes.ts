@@ -157,7 +157,6 @@ export interface GameActions {
   setCanLandNow: (canLandNow: boolean) => void;
   setCanScanNow: (canScanNow: boolean) => void;
   setCanHailNow: (canHailNow: boolean) => void;
-  addCredits: (delta: number) => void;
   addCargo: (good: GoodName, qty: number, purchasePrice?: number) => void;
   removeCargo: (good: GoodName, qty: number) => void;
   setCargoFromEngine: (cargo: Partial<Record<GoodName, number>>) => void;

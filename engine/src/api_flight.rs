@@ -93,7 +93,7 @@ pub fn tick_flight(context_json: &str) -> Result<String, JsValue> {
     with_engine_mut(|engine| {
         let ps = &mut engine.player_state;
 
-        ps.fuel = (ps.fuel + ctx.fuel_rate * ctx.dt).clamp(0.0, STARTING_FUEL);
+        ps.fuel = (ps.fuel + ctx.fuel_rate * ctx.dt).clamp(0.0, MAX_FUEL);
 
         ps.heat += ctx.heat_rate * ctx.dt;
         if ctx.cooling_active && ps.heat > 0.0 {

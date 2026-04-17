@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGameState } from '../../game/GameState';
-import { engineTradeBuy, engineTradeSell } from '../../game/engine';
+import { engineTradeBuy, engineTradeSell, engineStationRefuel, engineStationRepair } from '../../game/engine';
 import { HYPERSPACE, MAX_CARGO, POLITICAL_DESCRIPTIONS, POLITICAL_TYPE_DISPLAY, ECONOMY_DESCRIPTIONS, type GoodName } from '../../game/constants';
 import styles from './StationUI.module.css';
 
+// Mirrored in engine/src/types/constants.rs (SHIELD_REPAIR_COST_PER_POINT)
 const SHIELD_REPAIR_RATE = 5; // CR per shield point
 
 interface StationUIProps {
@@ -47,10 +48,6 @@ export function StationUI({ onUndock }: StationUIProps) {
   const currentSystemId = useGameState(s => s.currentSystemId);
   const currentSystemPayload = useGameState(s => s.currentSystemPayload);
   const player = useGameState(s => s.player);
-  const addCredits = useGameState(s => s.addCredits);
-  const setFuel = useGameState(s => s.setFuel);
-  const setShields = useGameState(s => s.setShields);
-  const saveGame = useGameState(s => s.saveGame);
 
   const starData = cluster[currentSystemId];
   const civState = currentSystemPayload?.civState;
@@ -75,23 +72,19 @@ export function StationUI({ onUndock }: StationUIProps) {
   };
 
   const fuelNeeded = Math.max(0, HYPERSPACE.tankSize - player.fuel);
-  const FUEL_PRICE_PER_UNIT = 50;
+  const FUEL_PRICE_PER_UNIT = 50; // mirrored in engine/src/types/constants.rs
   const refuelCost = Math.round(fuelNeeded * FUEL_PRICE_PER_UNIT);
 
   const handleRefuel = () => {
     if (player.credits < refuelCost || fuelNeeded === 0) return;
-    addCredits(-refuelCost);
-    setFuel(HYPERSPACE.tankSize);
-    saveGame();
+    engineStationRefuel();
   };
 
   const shieldMissing = Math.max(0, 100 - Math.floor(player.shields));
   const repairCost = shieldMissing * SHIELD_REPAIR_RATE;
   const handleRepair = () => {
     if (player.credits < repairCost || shieldMissing === 0) return;
-    addCredits(-repairCost);
-    setShields(100);
-    saveGame();
+    engineStationRepair();
   };
 
   return (

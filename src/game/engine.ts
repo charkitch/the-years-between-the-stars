@@ -19,6 +19,8 @@ import initWasm, {
   trade_buy,
   trade_sell,
   tick_flight,
+  station_refuel,
+  station_repair,
 } from '../../engine/pkg/time_in_transit_engine';
 import type { StationArchetype } from './archetypes';
 import { useGameState } from './GameState';
@@ -507,18 +509,28 @@ export function engineApplyChoiceEffect(
   return JSON.parse(result);
 }
 
-export function engineTradeBuy(good: GoodName, qty: number, price: number): void {
-  const snapshot: WasmPlayerState = JSON.parse(trade_buy(JSON.stringify(good), qty, price));
+/** Sync a WASM transaction result: parse snapshot, sync to store, save. */
+function syncTransaction(result: string): void {
+  const snapshot: WasmPlayerState = JSON.parse(result);
   const state = useGameState.getState();
   state.syncPlayerStateFromEngine(snapshot);
   state.saveGame();
 }
 
+export function engineTradeBuy(good: GoodName, qty: number, price: number): void {
+  syncTransaction(trade_buy(JSON.stringify(good), qty, price));
+}
+
 export function engineTradeSell(good: GoodName, qty: number, price: number): void {
-  const snapshot: WasmPlayerState = JSON.parse(trade_sell(JSON.stringify(good), qty, price));
-  const state = useGameState.getState();
-  state.syncPlayerStateFromEngine(snapshot);
-  state.saveGame();
+  syncTransaction(trade_sell(JSON.stringify(good), qty, price));
+}
+
+export function engineStationRefuel(): void {
+  syncTransaction(station_refuel());
+}
+
+export function engineStationRepair(): void {
+  syncTransaction(station_repair());
 }
 
 export function engineTickFlight(context: FlightTickContext): FlightTickResult {

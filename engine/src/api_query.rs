@@ -69,7 +69,7 @@ pub fn apply_choice_effect(
         let ps = &mut engine.player_state;
 
         ps.credits += effect.credits_reward;
-        ps.fuel = (ps.fuel + effect.fuel_reward).max(0.0).min(STARTING_FUEL);
+        ps.fuel = (ps.fuel + effect.fuel_reward).max(0.0).min(MAX_FUEL);
 
         let choices = ps.player_choices.entry(system_id).or_insert_with(SystemChoices::default);
         choices.trading_reputation += effect.trading_reputation;

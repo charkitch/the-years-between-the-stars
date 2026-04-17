@@ -86,7 +86,6 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
   setCanHailNow: (canHailNow) => set((s) => (
     s.ui.canHailNow === canHailNow ? {} : { ui: { ...s.ui, canHailNow } }
   )),
-  addCredits: (delta) => set(s => ({ player: { ...s.player, credits: s.player.credits + delta } })),
   addCargo: (good, qty, purchasePrice) => set(s => {
     const cargo = { ...s.player.cargo };
     const oldQty = cargo[good] ?? 0;

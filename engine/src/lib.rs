@@ -25,6 +25,7 @@ mod api_flight;
 mod api_trading;
 mod api_events;
 mod api_query;
+mod api_station;
 
 #[cfg(test)]
 mod tests {
