@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGameState } from '../../game/GameState';
 import { engineTradeBuy, engineTradeSell, engineStationRefuel, engineStationRepair } from '../../game/engine';
-import { HYPERSPACE, MAX_CARGO, POLITICAL_DESCRIPTIONS, POLITICAL_TYPE_DISPLAY, ECONOMY_DESCRIPTIONS, type GoodName } from '../../game/constants';
+import { HYPERSPACE, MAX_CARGO, POLITICAL_TYPE_DISPLAY, ECONOMY_DESCRIPTIONS, type GoodName } from '../../game/constants';
 import styles from './StationUI.module.css';
 
 // Mirrored in engine/src/types/constants.rs (SHIELD_REPAIR_COST_PER_POINT)
@@ -15,22 +15,8 @@ type TabId = 'trade' | 'refuel' | 'cargo';
 
 export function StationUI({ onUndock }: StationUIProps) {
   const [tab, setTab] = useState<TabId>('trade');
-  const [isPoliticsTooltipOpen, setIsPoliticsTooltipOpen] = useState(false);
   const [isEconTooltipOpen, setIsEconTooltipOpen] = useState(false);
-  const politicsTooltipRef = useRef<HTMLSpanElement>(null);
   const econTooltipRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (!isPoliticsTooltipOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (politicsTooltipRef.current && !politicsTooltipRef.current.contains(e.target as Node))
-        setIsPoliticsTooltipOpen(false);
-    };
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsPoliticsTooltipOpen(false); };
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey); };
-  }, [isPoliticsTooltipOpen]);
 
   useEffect(() => {
     if (!isEconTooltipOpen) return;
@@ -121,21 +107,8 @@ export function StationUI({ onUndock }: StationUIProps) {
           </div>
           <div className={styles.infoItem}>
             POLITICS:{' '}
-            <span
-              ref={politicsTooltipRef}
-              className={`${styles.infoValue} ${styles.tooltipAnchor}`}
-              onClick={() => setIsPoliticsTooltipOpen(!isPoliticsTooltipOpen)}
-            >
+            <span className={styles.infoValue}>
               {POLITICAL_TYPE_DISPLAY[civState.politics] ?? civState.politics}
-              {POLITICAL_DESCRIPTIONS[civState.politics] && (
-                <div className={`${styles.tooltipPopup} ${isPoliticsTooltipOpen ? styles.tooltipOpen : ''}`}>
-                  <button
-                    className={styles.tooltipClose}
-                    onClick={(e) => { e.stopPropagation(); setIsPoliticsTooltipOpen(false); }}
-                  >×</button>
-                  {POLITICAL_DESCRIPTIONS[civState.politics].desc}
-                </div>
-              )}
             </span>
           </div>
           <div className={styles.infoItem}>

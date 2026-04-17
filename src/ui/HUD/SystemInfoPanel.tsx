@@ -1,7 +1,7 @@
 import type { StarSystemData } from '../../game/engine';
 import type { SystemPayload } from '../../game/engine';
 import type { Faction } from '../../game/data/factions';
-import { STAR_TYPE_DISPLAY, STAR_DESCRIPTIONS, ECONOMY_DESCRIPTIONS } from '../../game/constants';
+import { STAR_TYPE_DISPLAY, STAR_DESCRIPTIONS, ECONOMY_DESCRIPTIONS, POLITICAL_DESCRIPTIONS, POLITICAL_TYPE_DISPLAY } from '../../game/constants';
 import { useClickAwayTooltip } from '../hooks/useClickAwayTooltip';
 import styles from './HUD.module.css';
 
@@ -28,7 +28,9 @@ export function SystemInfoPanel({
 }: SystemInfoPanelProps) {
   const starTooltip = useClickAwayTooltip();
   const econTooltip = useClickAwayTooltip();
+  const politicsTooltip = useClickAwayTooltip();
   const econKey = currentSystemPayload?.civState.economy ?? currentStar?.economy;
+  const politicsKey = currentSystemPayload?.civState.politics;
   const econDesc = econKey ? ECONOMY_DESCRIPTIONS[econKey] : undefined;
 
   return (
@@ -86,7 +88,29 @@ export function SystemInfoPanel({
               {econDesc.desc}
             </div>
           )}
-        </span><span className={styles.systemInfoText}>
+        </span>{politicsKey && (
+          <><span className={styles.systemInfoText}> · </span><span
+            ref={politicsTooltip.ref}
+            className={`${styles.starType} ${politicsTooltip.isOpen ? styles.active : ''}`}
+            onClick={() => politicsTooltip.setIsOpen(!politicsTooltip.isOpen)}
+          >
+            {POLITICAL_TYPE_DISPLAY[politicsKey] ?? politicsKey}
+            {POLITICAL_DESCRIPTIONS[politicsKey] && (
+              <div className={`${styles.tooltip} ${politicsTooltip.isOpen ? styles.tooltipOpen : ''}`}>
+                <button
+                  className={styles.closeButton}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    politicsTooltip.setIsOpen(false);
+                  }}
+                >
+                  ×
+                </button>
+                {POLITICAL_DESCRIPTIONS[politicsKey].desc}
+              </div>
+            )}
+          </span></>
+        )}<span className={styles.systemInfoText}>
         {currentSystemPayload && (
           <span
             className={styles.factionTag}

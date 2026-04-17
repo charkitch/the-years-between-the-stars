@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useGameState } from '../../game/GameState';
-import { POLITICAL_DESCRIPTIONS, POLITICAL_TYPE_DISPLAY, ECONOMY_DESCRIPTIONS } from '../../game/constants';
+import { POLITICAL_TYPE_DISPLAY, ECONOMY_DESCRIPTIONS } from '../../game/constants';
 import styles from './LandingDialog.module.css';
 
 interface LandingDialogProps {
@@ -15,9 +15,7 @@ export function LandingDialog({ onChoice }: LandingDialogProps) {
   const currentSystemId = useGameState(s => s.currentSystemId);
 
   const [confirmed, setConfirmed] = useState(false);
-  const [isPoliticsTooltipOpen, setIsPoliticsTooltipOpen] = useState(false);
   const [isEconTooltipOpen, setIsEconTooltipOpen] = useState(false);
-  const politicsTooltipRef = useRef<HTMLSpanElement>(null);
   const econTooltipRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
@@ -33,18 +31,6 @@ export function LandingDialog({ onChoice }: LandingDialogProps) {
       onChoice('proceed');
     }
   }, [pendingGameEvent?.visited, onChoice]);
-
-  useEffect(() => {
-    if (!isPoliticsTooltipOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (politicsTooltipRef.current && !politicsTooltipRef.current.contains(e.target as Node))
-        setIsPoliticsTooltipOpen(false);
-    };
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsPoliticsTooltipOpen(false); };
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleKey); };
-  }, [isPoliticsTooltipOpen]);
 
   useEffect(() => {
     if (!isEconTooltipOpen) return;
@@ -78,22 +64,7 @@ export function LandingDialog({ onChoice }: LandingDialogProps) {
             YEAR {galaxyYear.toLocaleString()}
           </div>
           <div className={styles.systemLabel}>
-            <span
-              ref={politicsTooltipRef}
-              className={styles.tooltipAnchor}
-              onClick={() => setIsPoliticsTooltipOpen(!isPoliticsTooltipOpen)}
-            >
-              {(POLITICAL_TYPE_DISPLAY[civState.politics] ?? civState.politics).toUpperCase()}
-              {POLITICAL_DESCRIPTIONS[civState.politics] && (
-                <div className={`${styles.tooltipPopup} ${isPoliticsTooltipOpen ? styles.tooltipOpen : ''}`}>
-                  <button
-                    className={styles.tooltipClose}
-                    onClick={(e) => { e.stopPropagation(); setIsPoliticsTooltipOpen(false); }}
-                  >×</button>
-                  {POLITICAL_DESCRIPTIONS[civState.politics].desc}
-                </div>
-              )}
-            </span>
+            {(POLITICAL_TYPE_DISPLAY[civState.politics] ?? civState.politics).toUpperCase()}
           </div>
         </div>
 
