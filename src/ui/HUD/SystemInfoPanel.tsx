@@ -1,0 +1,116 @@
+import type { StarSystemData } from '../../game/engine';
+import type { SystemPayload } from '../../game/engine';
+import type { Faction } from '../../game/data/factions';
+import { STAR_TYPE_DISPLAY, STAR_DESCRIPTIONS, ECONOMY_DESCRIPTIONS } from '../../game/constants';
+import { useClickAwayTooltip } from '../hooks/useClickAwayTooltip';
+import styles from './HUD.module.css';
+
+interface SystemInfoPanelProps {
+  currentStar: StarSystemData | undefined;
+  currentSystemPayload: SystemPayload | null;
+  galaxyYear: number;
+  targetStar: StarSystemData | null;
+  currentFaction: Faction | undefined;
+  currentFactionKnown: boolean;
+  credits: number;
+  isMobileHUD: boolean;
+}
+
+export function SystemInfoPanel({
+  currentStar,
+  currentSystemPayload,
+  galaxyYear,
+  targetStar,
+  currentFaction,
+  currentFactionKnown,
+  credits,
+  isMobileHUD,
+}: SystemInfoPanelProps) {
+  const starTooltip = useClickAwayTooltip();
+  const econTooltip = useClickAwayTooltip();
+  const econKey = currentSystemPayload?.civState.economy ?? currentStar?.economy;
+  const econDesc = econKey ? ECONOMY_DESCRIPTIONS[econKey] : undefined;
+
+  return (
+    <div className={styles.topLeft}>
+      <div className={styles.credits}>CR {credits.toLocaleString()}</div>
+      <div className={styles.yearLabel}>YEAR {galaxyYear.toLocaleString()}</div>
+      <div className={styles.systemInfo}>
+        <span className={styles.systemInfoText}>
+          {currentStar?.name} · </span><span
+          ref={starTooltip.ref}
+          className={`${styles.starType} ${starTooltip.isOpen ? styles.active : ''}`}
+          onClick={() => starTooltip.setIsOpen(!starTooltip.isOpen)}
+        >
+          {(currentStar && STAR_TYPE_DISPLAY[currentStar.starType]) ?? `${currentStar?.starType}-TYPE`}
+          {currentStar && STAR_DESCRIPTIONS[currentStar.starType] && (
+            <div className={`${styles.tooltip} ${starTooltip.isOpen ? styles.tooltipOpen : ''}`}>
+              <button
+                className={styles.closeButton}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  starTooltip.setIsOpen(false);
+                }}
+              >
+                ×
+              </button>
+              {STAR_DESCRIPTIONS[currentStar.starType].desc}
+              <a
+                href={STAR_DESCRIPTIONS[currentStar.starType].wiki}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.wikiLink}
+                onClick={(e) => e.stopPropagation()}
+              >
+                LEARN MORE ON WIKIPEDIA
+              </a>
+            </div>
+          )}
+        </span> · <span
+          ref={econTooltip.ref}
+          className={`${styles.starType} ${econTooltip.isOpen ? styles.active : ''}`}
+          onClick={() => econTooltip.setIsOpen(!econTooltip.isOpen)}
+        >
+          {econKey}
+          {econDesc && (
+            <div className={`${styles.tooltip} ${econTooltip.isOpen ? styles.tooltipOpen : ''}`}>
+              <button
+                className={styles.closeButton}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  econTooltip.setIsOpen(false);
+                }}
+              >
+                ×
+              </button>
+              {econDesc.desc}
+            </div>
+          )}
+        </span><span className={styles.systemInfoText}>
+        {currentSystemPayload && (
+          <span
+            className={styles.factionTag}
+            style={{
+              color: currentFactionKnown && currentFaction
+                ? `#${currentFaction.color.toString(16).padStart(6, '0')}`
+                : 'var(--color-hud-dim)',
+            }}
+          >
+            · {currentFactionKnown && currentFaction ? currentFaction.name.toUpperCase() : 'UNKNOWN'}
+          </span>
+        )}
+        </span>
+      </div>
+      {targetStar && (
+        <div className={styles.jumpTarget}>JUMP TARGET: {targetStar.name}</div>
+      )}
+      {!isMobileHUD && (
+        <div className={styles.controls}>
+          W/S Pitch · A/D Roll · Q/E Yaw<br />
+          SPACE Thrust · SHIFT Boost · TAB Target<br />
+          F Dock / Land · G Cluster Map · M System Map · J Jump · H Hail · V Scan
+        </div>
+      )}
+    </div>
+  );
+}

@@ -38,6 +38,15 @@ export interface SceneEntity {
   visited?: boolean;
 }
 
+/** Body types that can be scanned for landing site intel. */
+export const SCANNABLE_HOST_TYPES: ReadonlySet<SceneEntity['type']> = new Set([
+  'planet', 'dyson_shell', 'topopolis',
+]);
+
+export function isScannableHost(type: SceneEntity['type']): type is 'planet' | 'dyson_shell' | 'topopolis' {
+  return SCANNABLE_HOST_TYPES.has(type);
+}
+
 export interface XRayTransferStream {
   donorId: string;
   accretorId: string;

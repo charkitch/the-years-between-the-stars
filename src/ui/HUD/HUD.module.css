@@ -303,3 +303,55 @@
   top: calc(92px + env(safe-area-inset-top));
   width: min(240px, 82vw);
 }
+
+/* ── SystemInfoPanel ──────────────────────────────────────────────────── */
+
+.yearLabel {
+  font-size: 11px;
+  color: var(--color-hud-dim);
+  letter-spacing: 2px;
+  margin-bottom: 2px;
+}
+
+.jumpTarget {
+  color: var(--color-hyperspace-bright);
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.factionTag {
+  margin-left: 6px;
+}
+
+/* ── TargetInfoPanel ──────────────────────────────────────────────────── */
+
+.targetDist {
+  color: var(--color-hud-dim);
+  font-size: 11px;
+}
+
+.targetDetail {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.targetScan {
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.targetAction {
+  font-size: 10px;
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
+
+.targetActionLand {
+  composes: targetAction;
+  color: #66FFAA;
+}
+
+.targetHint {
+  font-size: 10px;
+  opacity: 0.5;
+}

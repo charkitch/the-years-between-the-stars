@@ -1,11 +1,12 @@
 import { useGameState } from '../../game/GameState';
-import { useState, useRef, useEffect } from 'react';
 import { StatusBars, MobileStatusBars } from './StatusBars';
 import { TargetIndicator } from './TargetIndicator';
+import { SystemInfoPanel } from './SystemInfoPanel';
+import { TargetInfoPanel } from './TargetInfoPanel';
 import type { SceneEntity } from '../../game/rendering/SceneRenderer';
+import { isScannableHost } from '../../game/rendering/scene/types';
 import { getFaction } from '../../game/data/factions';
-import type { SecretBaseData } from '../../game/engine';
-import { STAR_TYPE_DISPLAY, STAR_DESCRIPTIONS, ECONOMY_DESCRIPTIONS, SCAN_INTEL_MAX_AGE_YEARS } from '../../game/constants';
+import { SCAN_INTEL_MAX_AGE_YEARS } from '../../game/constants';
 import type { RuntimeProfile } from '../../runtime/runtimeProfile';
 import type { ScannableBodyId } from '../../game/types';
 import { TouchFlightControls } from './TouchFlightControls';
@@ -45,11 +46,6 @@ export function HUD({
   onSystemMap,
   onMenu,
 }: HUDProps) {
-  const [isStarTooltipOpen, setIsStarTooltipOpen] = useState(false);
-  const [isEconTooltipOpen, setIsEconTooltipOpen] = useState(false);
-  const tooltipRef = useRef<HTMLSpanElement>(null);
-  const econTooltipRef = useRef<HTMLSpanElement>(null);
-
   const player = useGameState(s => s.player);
   const cluster = useGameState(s => s.cluster);
   const currentSystemId = useGameState(s => s.currentSystemId);
@@ -66,52 +62,6 @@ export function HUD({
   const knownFactions = useGameState(s => s.knownFactions);
   const currentSystemPayload = useGameState(s => s.currentSystemPayload);
   const scannedBodies = useGameState(s => s.scannedBodies);
-
-  useEffect(() => {
-    if (!isStarTooltipOpen) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (tooltipRef.current && !tooltipRef.current.contains(e.target as Node)) {
-        setIsStarTooltipOpen(false);
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsStarTooltipOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isStarTooltipOpen]);
-
-  useEffect(() => {
-    if (!isEconTooltipOpen) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (econTooltipRef.current && !econTooltipRef.current.contains(e.target as Node)) {
-        setIsEconTooltipOpen(false);
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsEconTooltipOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isEconTooltipOpen]);
 
   const currentStar = cluster[currentSystemId];
   const targetStar = hyperspaceTarget !== null ? cluster[hyperspaceTarget] : null;
@@ -134,7 +84,7 @@ export function HUD({
     ? (
       targetEntity.type === 'landing_site'
         ? targetEntity.siteHostId ?? null
-        : targetEntity.type === 'planet' || targetEntity.type === 'dyson_shell' || targetEntity.type === 'topopolis'
+        : isScannableHost(targetEntity.type)
           ? targetEntity.id
           : null
     ) as ScannableBodyId | null
@@ -150,11 +100,9 @@ export function HUD({
     targetSiteDiscovered = sites.filter(e => e.siteDiscovered).length;
   }
 
-  // Check if target is a secret base
-  const targetSecretBase: SecretBaseData | undefined =
-    player.targetId && currentSystem
-      ? currentSystem.secretBases.find(b => b.id === player.targetId)
-      : undefined;
+  const targetSecretBase = player.targetId && currentSystem
+    ? currentSystem.secretBases.find(b => b.id === player.targetId)
+    : undefined;
   const isMobileHUD = Boolean(runtimeProfile?.isMobile);
   const touchFlightEnabled = isMobileHUD && isLandscapePlayable && uiMode === 'flight';
   const isInMotion = player.speed > 1;
@@ -179,170 +127,26 @@ export function HUD({
         </div>
       )}
 
-      {/* Top-left: system info + credits */}
-      <div className={styles.topLeft}>
-        <div className={styles.credits}>CR {player.credits.toLocaleString()}</div>
-        <div style={{ fontSize: '11px', color: 'var(--color-hud-dim)', letterSpacing: '2px', marginBottom: '2px' }}>
-          YEAR {galaxyYear.toLocaleString()}
-        </div>
-        <div className={styles.systemInfo}>
-          <span className={styles.systemInfoText}>
-            {currentStar?.name} · </span><span
-            ref={tooltipRef}
-            className={`${styles.starType} ${isStarTooltipOpen ? styles.active : ''}`}
-            onClick={() => setIsStarTooltipOpen(!isStarTooltipOpen)}
-          >
-            {STAR_TYPE_DISPLAY[currentStar?.starType] ?? `${currentStar?.starType}-TYPE`}
-            {currentStar && STAR_DESCRIPTIONS[currentStar.starType] && (
-              <div className={`${styles.tooltip} ${isStarTooltipOpen ? styles.tooltipOpen : ''}`}>
-                <button
-                  className={styles.closeButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsStarTooltipOpen(false);
-                  }}
-                >
-                  ×
-                </button>
-                {STAR_DESCRIPTIONS[currentStar.starType].desc}
-                <a
-                  href={STAR_DESCRIPTIONS[currentStar.starType].wiki}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.wikiLink}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  LEARN MORE ON WIKIPEDIA
-                </a>
-              </div>
-            )}
-          </span> · <span
-            ref={econTooltipRef}
-            className={`${styles.starType} ${isEconTooltipOpen ? styles.active : ''}`}
-            onClick={() => setIsEconTooltipOpen(!isEconTooltipOpen)}
-          >
-            {currentSystemPayload?.civState.economy ?? currentStar?.economy}
-            {(() => {
-              const econKey = currentSystemPayload?.civState.economy ?? currentStar?.economy;
-              return econKey && ECONOMY_DESCRIPTIONS[econKey] ? (
-                <div className={`${styles.tooltip} ${isEconTooltipOpen ? styles.tooltipOpen : ''}`}>
-                  <button
-                    className={styles.closeButton}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsEconTooltipOpen(false);
-                    }}
-                  >
-                    ×
-                  </button>
-                  {ECONOMY_DESCRIPTIONS[econKey].desc}
-                </div>
-              ) : null;
-            })()}
-          </span><span className={styles.systemInfoText}>
-          {currentSystemPayload && (
-            <span
-              style={{
-                color: currentFactionKnown && currentFaction
-                  ? `#${currentFaction.color.toString(16).padStart(6, '0')}`
-                  : 'var(--color-hud-dim)',
-                marginLeft: '6px',
-              }}
-            >
-              · {currentFactionKnown && currentFaction ? currentFaction.name.toUpperCase() : 'UNKNOWN'}
-            </span>
-          )}
-          </span>
-        </div>
-        {targetStar && (
-          <div style={{ color: 'var(--color-hyperspace-bright)', fontSize: '11px', marginTop: '4px' }}>
-            JUMP TARGET: {targetStar.name}
-          </div>
-        )}
-        {!isMobileHUD && (
-          <div className={styles.controls}>
-            W/S Pitch · A/D Roll · Q/E Yaw<br />
-            SPACE Thrust · SHIFT Boost · TAB Target<br />
-            F Dock / Land · G Cluster Map · M System Map · J Jump · H Hail · V Scan
-          </div>
-        )}
-      </div>
+      <SystemInfoPanel
+        currentStar={currentStar}
+        currentSystemPayload={currentSystemPayload}
+        galaxyYear={galaxyYear}
+        targetStar={targetStar}
+        currentFaction={currentFaction}
+        currentFactionKnown={Boolean(currentFactionKnown)}
+        credits={player.credits}
+        isMobileHUD={isMobileHUD}
+      />
 
-      {/* Top-right: target info */}
-      <div className={styles.topRight}>
-        {targetEntity ? (
-          <div className={styles.targetInfo}>
-            {targetSecretBase ? (
-              <>
-                <div className={styles.targetLabel} style={{
-                  color: targetSecretBase.type === 'asteroid' ? '#AA7744'
-                    : targetSecretBase.type === 'oort_cloud' ? '#4488CC'
-                    : '#8844FF',
-                }}>SIGNAL</div>
-                <div>{targetSecretBase.name.toUpperCase()}</div>
-                <div style={{ color: 'var(--color-hud-dim)', fontSize: '11px' }}>
-                  DIST: {targetDist} wu
-                </div>
-                <div style={{ fontSize: '10px', opacity: 0.6 }}>
-                  TYPE: {targetSecretBase.type === 'asteroid' ? 'ASTEROID BASE'
-                    : targetSecretBase.type === 'oort_cloud' ? 'OORT CLOUD BASE'
-                    : 'VOID STATION'}
-                </div>
-                <div style={{
-                  color: targetSecretBase.type === 'asteroid' ? '#AA7744'
-                    : targetSecretBase.type === 'oort_cloud' ? '#4488CC'
-                    : '#8844FF',
-                  fontSize: '10px', marginTop: '4px', letterSpacing: '1px',
-                }}>
-                  F TO DOCK
-                </div>
-              </>
-            ) : (
-              <>
-                <div className={styles.targetLabel}>TARGET</div>
-                <div>
-                  {targetEntity.name.toUpperCase()}
-                </div>
-                <div style={{ color: 'var(--color-hud-dim)', fontSize: '11px' }}>
-                  DIST: {targetDist} wu
-                </div>
-                <div style={{ fontSize: '10px', opacity: 0.6 }}>
-                  TYPE: {targetEntity.type === 'dyson_shell'
-                    ? 'DYSON SHELL'
-                    : targetEntity.type === 'topopolis'
-                    ? 'TOPOPOLIS'
-                    : targetEntity.type === 'landing_site'
-                      ? `SITE · ${(targetEntity.siteClassification ?? 'unknown').split('_').join(' ').toUpperCase()}`
-                      : targetEntity.type.toUpperCase()}
-                </div>
-                {targetEntity.type === 'landing_site' && targetEntity.siteHostLabel && (
-                  <div style={{ fontSize: '10px', opacity: 0.6 }}>
-                    HOST: {targetEntity.siteHostLabel.toUpperCase()}
-                  </div>
-                )}
-                {(targetEntity.type === 'planet' || targetEntity.type === 'dyson_shell' || targetEntity.type === 'topopolis' || targetEntity.type === 'landing_site') && (
-                  <div style={{ fontSize: '10px', opacity: 0.75 }}>
-                    SCAN: {targetIsScanned ? 'SCANNED' : 'UNSCANNED'}
-                    {targetIsScanned ? ` · SITES ${targetSiteDiscovered}/${targetSiteTotal}` : ''}
-                  </div>
-                )}
-                {targetEntity.type === 'landing_site' && (
-                  <div style={{ color: '#66FFAA', fontSize: '10px', marginTop: '4px', letterSpacing: '1px' }}>
-                    F TO LAND
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        ) : (
-          <div className={styles.targetInfo}>
-            <div className={styles.targetLabel}>NO TARGET</div>
-            <div style={{ fontSize: '10px', opacity: 0.5 }}>
-              {isMobileHUD ? 'ACTIONS > TARGET' : 'TAB to cycle'}
-            </div>
-          </div>
-        )}
-      </div>
+      <TargetInfoPanel
+        targetEntity={targetEntity}
+        targetSecretBase={targetSecretBase}
+        targetDist={targetDist}
+        targetIsScanned={targetIsScanned}
+        targetSiteTotal={targetSiteTotal}
+        targetSiteDiscovered={targetSiteDiscovered}
+        isMobileHUD={isMobileHUD}
+      />
 
       {/* Bottom-left: status bars (desktop only) */}
       {!isMobileHUD && (

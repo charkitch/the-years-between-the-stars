@@ -9,6 +9,7 @@ import {
 } from '../constants';
 import type { ScannableBodyId, GalaxyYear } from '../types';
 import type { SceneEntity } from '../rendering/SceneRenderer';
+import { isScannableHost } from '../rendering/scene/types';
 
 /**
  * Distance from a point to the nearest part of an entity.
@@ -40,7 +41,7 @@ export class ScanningSystem {
     const targetId = state.player.targetId;
     if (!targetId) return false;
     const entity = this.sceneRenderer.getEntity(targetId);
-    if (!entity || (entity.type !== 'planet' && entity.type !== 'dyson_shell' && entity.type !== 'topopolis')) return false;
+    if (!entity || !isScannableHost(entity.type)) return false;
     if (this.currentVisitScannedHosts.has(targetId as ScannableBodyId)) return false;
     const shipPos = this.sceneRenderer.shipGroup.position;
     const dist = nearestEntityDist(shipPos, entity);
@@ -60,7 +61,7 @@ export class ScanningSystem {
       return;
     }
     const entity = this.sceneRenderer.getEntity(targetId);
-    if (!entity || (entity.type !== 'planet' && entity.type !== 'dyson_shell' && entity.type !== 'topopolis')) {
+    if (!entity || !isScannableHost(entity.type)) {
       state.setAlert('TARGET PLANET OR MEGASTRUCTURE TO SCAN');
       setTimeout(() => useGameState.getState().setAlert(null), 1800);
       return;
@@ -96,7 +97,7 @@ export class ScanningSystem {
     const targetId = this.activeScanTargetId;
     if (!targetId) return;
     const entity = this.sceneRenderer.getEntity(targetId);
-    if (!entity || (entity.type !== 'planet' && entity.type !== 'dyson_shell' && entity.type !== 'topopolis')) {
+    if (!entity || !isScannableHost(entity.type)) {
       this.clear(state);
       return;
     }

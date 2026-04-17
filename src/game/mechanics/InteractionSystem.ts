@@ -15,6 +15,7 @@ import {
 import { stationHostTypeToken } from '../archetypes';
 import { STARTING_SYSTEM_ID } from '../constants';
 import type { SystemId } from '../types';
+import { isScannableHost } from '../rendering/scene/types';
 
 const FIRST_SYSTEM_ID = STARTING_SYSTEM_ID;
 const LAND_MAX_SPEED = 55;
@@ -61,7 +62,7 @@ export class InteractionSystem {
     if (!site || site.type !== 'landing_site' || !site.siteDiscovered) return false;
     const hostId = site.siteHostId;
     const host = hostId ? this.sceneRenderer.getEntity(hostId) : null;
-    if (!host || (host.type !== 'planet' && host.type !== 'dyson_shell' && host.type !== 'topopolis')) return false;
+    if (!host || !isScannableHost(host.type)) return false;
     const shipPos = this.sceneRenderer.shipGroup.position;
     const dist = shipPos.distanceTo(site.worldPos);
     const required = getInteractionDistance(host.type, host.collisionRadius);
@@ -107,7 +108,7 @@ export class InteractionSystem {
     }
     const hostId = site.siteHostId;
     const host = hostId ? this.sceneRenderer.getEntity(hostId) : null;
-    if (!host || (host.type !== 'planet' && host.type !== 'dyson_shell' && host.type !== 'topopolis')) {
+    if (!host || !isScannableHost(host.type)) {
       setTimedAlert('INVALID LANDING TARGET');
       return;
     }
