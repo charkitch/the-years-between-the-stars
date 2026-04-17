@@ -195,6 +195,7 @@ export interface SaveData {
   cargoCostBasis: Partial<Record<GoodName, number>>;
   fuel: number;
   shields: number;
+  targetId?: string | null;
   currentSystemId: SystemId;
   visitedSystems: SystemId[];
   galaxyYear: GalaxyYear;
