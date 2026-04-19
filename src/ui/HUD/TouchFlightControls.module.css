@@ -10,10 +10,10 @@
 
 .stickZone {
   position: absolute;
-  left: calc(24px + env(safe-area-inset-left));
-  bottom: calc(24px + env(safe-area-inset-bottom));
-  width: 112px;
-  height: 112px;
+  left: calc(min(24px, 3dvh) + env(safe-area-inset-left));
+  bottom: calc(min(24px, 6dvh) + env(safe-area-inset-bottom));
+  width: min(112px, 27dvh);
+  height: min(112px, 27dvh);
   pointer-events: auto;
 }
 
@@ -30,10 +30,10 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 42px;
-  height: 42px;
-  margin-left: -21px;
-  margin-top: -21px;
+  width: min(42px, 10dvh);
+  height: min(42px, 10dvh);
+  margin-left: max(-21px, -5dvh);
+  margin-top: max(-21px, -5dvh);
   border-radius: 50%;
   border: 2px solid rgba(140, 255, 210, 0.9);
   background: rgba(20, 70, 45, 0.85);
@@ -42,24 +42,24 @@
 
 .rightStickZone {
   position: absolute;
-  right: calc(24px + env(safe-area-inset-right));
-  bottom: calc(24px + env(safe-area-inset-bottom));
-  width: 112px;
-  height: 112px;
+  right: calc(min(24px, 3dvh) + env(safe-area-inset-right));
+  bottom: calc(min(24px, 6dvh) + env(safe-area-inset-bottom));
+  width: min(112px, 27dvh);
+  height: min(112px, 27dvh);
   pointer-events: auto;
 }
 
 .boostButton {
   position: absolute;
-  left: calc(24px + env(safe-area-inset-left));
-  bottom: calc(150px + env(safe-area-inset-bottom));
-  width: 112px;
-  min-height: 38px;
+  left: calc(min(24px, 3dvh) + env(safe-area-inset-left));
+  bottom: calc(min(150px, 37dvh) + env(safe-area-inset-bottom));
+  width: min(112px, 27dvh);
+  min-height: min(38px, 9dvh);
   border: 1px solid rgba(255, 214, 102, 0.72);
   background: rgba(38, 30, 8, 0.88);
   color: rgba(255, 224, 158, 0.96);
   letter-spacing: 1.2px;
-  font-size: 11px;
+  font-size: min(11px, 2.8dvh);
   box-shadow: 0 0 14px rgba(255, 170, 0, 0.24);
   pointer-events: auto;
 }
@@ -81,17 +81,17 @@
 
 .quickActionButton {
   position: absolute;
-  left: calc(50% - 56px);
-  min-width: 112px;
-  min-height: 42px;
+  left: calc(50% - min(56px, 7vw));
+  min-width: min(112px, 14vw);
+  min-height: min(42px, 10dvh);
   letter-spacing: 1.6px;
-  font-size: 12px;
+  font-size: min(12px, 3dvh);
   pointer-events: auto;
 }
 
 .quickDockButton {
   composes: quickActionButton;
-  bottom: calc(118px + env(safe-area-inset-bottom));
+  bottom: calc(min(118px, 29dvh) + env(safe-area-inset-bottom));
   border: 1px solid rgba(96, 223, 255, 0.72);
   background: rgba(8, 34, 44, 0.84);
   color: rgba(170, 235, 255, 0.96);
@@ -100,16 +100,25 @@
 
 .quickLandButton {
   composes: quickActionButton;
-  bottom: calc(118px + env(safe-area-inset-bottom));
+  bottom: calc(min(118px, 29dvh) + env(safe-area-inset-bottom));
   border: 1px solid rgba(102, 255, 170, 0.72);
   background: rgba(8, 44, 24, 0.84);
   color: rgba(170, 255, 210, 0.96);
   box-shadow: 0 0 16px rgba(85, 255, 170, 0.22);
 }
 
+.quickHailButton {
+  composes: quickActionButton;
+  bottom: calc(min(168px, 41dvh) + env(safe-area-inset-bottom));
+  border: 1px solid rgba(96, 223, 255, 0.72);
+  background: rgba(8, 28, 44, 0.84);
+  color: rgba(170, 235, 255, 0.96);
+  box-shadow: 0 0 16px rgba(85, 196, 255, 0.22);
+}
+
 .quickScanButton {
   composes: quickActionButton;
-  bottom: calc(168px + env(safe-area-inset-bottom));
+  bottom: calc(min(218px, 53dvh) + env(safe-area-inset-bottom));
   border: 1px solid rgba(255, 200, 80, 0.72);
   background: rgba(44, 34, 8, 0.84);
   color: rgba(255, 224, 158, 0.96);
@@ -118,13 +127,13 @@
 
 .menuWrap {
   position: absolute;
-  right: calc(20px + env(safe-area-inset-right));
-  bottom: calc(150px + env(safe-area-inset-bottom));
+  right: calc(min(20px, 2.5dvh) + env(safe-area-inset-right));
+  bottom: calc(min(150px, 37dvh) + env(safe-area-inset-bottom));
   pointer-events: auto;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: min(8px, 2dvh);
 }
 
 .actionsWrap {
@@ -133,24 +142,22 @@
   justify-content: flex-end;
 }
 
-.targetButton {
-  min-width: 120px;
-  min-height: 42px;
+.menuActionBase {
+  min-width: min(120px, 15vw);
+  min-height: min(42px, 10dvh);
   border: 1px solid rgba(100, 255, 180, 0.58);
   background: rgba(10, 20, 15, 0.88);
   color: rgba(180, 255, 220, 0.95);
-  font-size: 11px;
+  font-size: min(11px, 2.8dvh);
   letter-spacing: 1.4px;
 }
 
+.targetButton {
+  composes: menuActionBase;
+}
+
 .menuButton {
-  min-width: 120px;
-  min-height: 42px;
-  border: 1px solid rgba(100, 255, 180, 0.58);
-  background: rgba(10, 20, 15, 0.88);
-  color: rgba(180, 255, 220, 0.95);
-  font-size: 11px;
-  letter-spacing: 1.4px;
+  composes: menuActionBase;
 }
 
 .menuButtonOpen {
@@ -161,13 +168,13 @@
 .actionMenu {
   position: absolute;
   right: 0;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + min(8px, 2dvh));
   transform: none;
   width: min(90vw, 330px);
   display: grid;
   grid-template-columns: repeat(4, minmax(68px, 1fr));
-  gap: 8px;
-  padding: 8px;
+  gap: min(8px, 2dvh);
+  padding: min(8px, 2dvh);
   max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 220px);
   overflow-y: auto;
   border: 1px solid rgba(100, 255, 180, 0.48);
@@ -176,9 +183,9 @@
 }
 
 .actionButton {
-  min-height: 42px;
-  padding: 8px 10px;
-  font-size: 11px;
+  min-height: min(42px, 10dvh);
+  padding: min(8px, 2dvh) min(10px, 1.2vw);
+  font-size: min(11px, 2.8dvh);
   letter-spacing: 1px;
   border: 1px solid rgba(100, 255, 180, 0.5);
   background: rgba(10, 20, 15, 0.8);

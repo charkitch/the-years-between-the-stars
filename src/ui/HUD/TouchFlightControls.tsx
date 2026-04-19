@@ -15,6 +15,7 @@ interface TouchFlightControlsProps {
   canDockNow: boolean;
   canLandNow: boolean;
   canScanNow: boolean;
+  canHailNow: boolean;
   onInputChange: (input: TouchFlightInput) => void;
   onDock: () => void;
   onHail: () => void;
@@ -26,7 +27,7 @@ interface TouchFlightControlsProps {
   onMenu: () => void;
 }
 
-const STICK_RADIUS = 48;
+const STICK_RADIUS_FRACTION = 48 / 112; // knob travel as fraction of zone size
 const STICK_DEADZONE = 0.14;
 const ROLL_EDGE_THRESHOLD = 0.5;
 
@@ -36,6 +37,7 @@ export function TouchFlightControls({
   canDockNow,
   canLandNow,
   canScanNow,
+  canHailNow,
   onInputChange,
   onDock,
   onHail,
@@ -48,6 +50,8 @@ export function TouchFlightControls({
 }: TouchFlightControlsProps) {
   const leftStickRef = useRef<HTMLDivElement>(null);
   const rightStickRef = useRef<HTMLDivElement>(null);
+  const leftRadiusRef = useRef(48);
+  const rightRadiusRef = useRef(48);
 
   const [leftActive, setLeftActive] = useState(false);
   const [leftPointerId, setLeftPointerId] = useState<number | null>(null);
@@ -105,7 +109,8 @@ export function TouchFlightControls({
   }, [enabled, leftX, leftY, roll, thrust, boostActive, onInputChange]);
 
   const updateStickFromPointer = (
-    stickRef: React.RefObject<HTMLDivElement>,
+    stickRef: React.RefObject<HTMLDivElement | null>,
+    radiusRef: React.RefObject<number>,
     clientX: number,
     clientY: number,
     setX: (x: number) => void,
@@ -117,14 +122,16 @@ export function TouchFlightControls({
     if (!root) return;
 
     const rect = root.getBoundingClientRect();
+    const radius = rect.width * STICK_RADIUS_FRACTION;
+    radiusRef.current = radius;
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
     const dx = clientX - cx;
     const dy = clientY - cy;
     const dist = Math.hypot(dx, dy);
-    const clamped = Math.min(dist, STICK_RADIUS);
-    const nx = dist > 0 ? (dx / dist) * (clamped / STICK_RADIUS) : 0;
-    const ny = dist > 0 ? (dy / dist) * (clamped / STICK_RADIUS) : 0;
+    const clamped = Math.min(dist, radius);
+    const nx = dist > 0 ? (dx / dist) * (clamped / radius) : 0;
+    const ny = dist > 0 ? (dy / dist) * (clamped / radius) : 0;
     setRawX?.(nx);
     setRawY?.(ny);
 
@@ -140,13 +147,13 @@ export function TouchFlightControls({
     e.currentTarget.setPointerCapture(e.pointerId);
     setLeftActive(true);
     setLeftPointerId(e.pointerId);
-    updateStickFromPointer(leftStickRef, e.clientX, e.clientY, setLeftX, setLeftY);
+    updateStickFromPointer(leftStickRef, leftRadiusRef, e.clientX, e.clientY, setLeftX, setLeftY);
   };
 
   const handleLeftMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!enabled || !leftActive || e.pointerId !== leftPointerId) return;
     e.preventDefault();
-    updateStickFromPointer(leftStickRef, e.clientX, e.clientY, setLeftX, setLeftY);
+    updateStickFromPointer(leftStickRef, leftRadiusRef, e.clientX, e.clientY, setLeftX, setLeftY);
   };
 
   const handleLeftUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -164,13 +171,13 @@ export function TouchFlightControls({
     e.currentTarget.setPointerCapture(e.pointerId);
     setRightActive(true);
     setRightPointerId(e.pointerId);
-    updateStickFromPointer(rightStickRef, e.clientX, e.clientY, setRightX, setRightY, setRightRawX, setRightRawY);
+    updateStickFromPointer(rightStickRef, rightRadiusRef, e.clientX, e.clientY, setRightX, setRightY, setRightRawX, setRightRawY);
   };
 
   const handleRightMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!enabled || !rightActive || e.pointerId !== rightPointerId) return;
     e.preventDefault();
-    updateStickFromPointer(rightStickRef, e.clientX, e.clientY, setRightX, setRightY, setRightRawX, setRightRawY);
+    updateStickFromPointer(rightStickRef, rightRadiusRef, e.clientX, e.clientY, setRightX, setRightY, setRightRawX, setRightRawY);
   };
 
   const handleRightUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -204,7 +211,7 @@ export function TouchFlightControls({
         <div
           className={styles.stickKnob}
           style={{
-            transform: `translate(${leftX * STICK_RADIUS}px, ${leftY * STICK_RADIUS}px)`,
+            transform: `translate(${leftX * leftRadiusRef.current}px, ${leftY * leftRadiusRef.current}px)`,
           }}
         />
       </div>
@@ -221,7 +228,7 @@ export function TouchFlightControls({
         <div
           className={styles.stickKnob}
           style={{
-            transform: `translate(${rightX * STICK_RADIUS}px, ${rightY * STICK_RADIUS}px)`,
+            transform: `translate(${rightX * rightRadiusRef.current}px, ${rightY * rightRadiusRef.current}px)`,
           }}
         />
       </div>
@@ -259,6 +266,15 @@ export function TouchFlightControls({
           LAND
         </button>
       )}
+      {enabled && canHailNow && (
+        <button
+          type="button"
+          className={styles.quickHailButton}
+          onClick={onHail}
+        >
+          HAIL
+        </button>
+      )}
       {enabled && canScanNow && (
         <button
           type="button"
@@ -289,9 +305,6 @@ export function TouchFlightControls({
           </button>
           {actionsOpen && enabled && (
             <div className={styles.actionMenu}>
-              <button type="button" className={styles.actionButton} onClick={() => runAction(onHail)}>HAIL</button>
-              <button type="button" className={styles.actionButton} onClick={() => runAction(onLand)}>LAND</button>
-              <button type="button" className={styles.actionButton} onClick={() => runAction(onScan)}>SCAN</button>
               <button type="button" className={styles.actionButton} onClick={() => runAction(onClusterMap)}>CLUSTER</button>
               <button type="button" className={styles.actionButton} onClick={() => runAction(onSystemMap)}>SYSTEM</button>
               <button type="button" className={styles.actionButton} onClick={() => runAction(onMenu)}>MENU</button>

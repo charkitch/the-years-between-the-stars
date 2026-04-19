@@ -279,12 +279,14 @@
 
 .mobile .topRight {
   max-width: min(42vw, 280px);
+  max-height: calc(100dvh - min(274px, 67dvh) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow: hidden;
 }
 
 .mobile .targetInfo {
-  min-width: 120px;
-  padding: 6px 8px;
-  font-size: 11px;
+  min-width: min(120px, 15vw);
+  padding: min(6px, 1.5dvh) min(8px, 1vw);
+  font-size: min(11px, 2.8dvh);
 }
 
 .mobile .crosshair {

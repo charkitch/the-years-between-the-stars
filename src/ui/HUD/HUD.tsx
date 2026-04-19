@@ -212,6 +212,7 @@ export function HUD({
           canDockNow={canDockNow}
           canLandNow={canLandNow}
           canScanNow={canScanNow}
+          canHailNow={canHailNow}
           onInputChange={onTouchFlightInput}
           onDock={onDock}
           onHail={onHail}

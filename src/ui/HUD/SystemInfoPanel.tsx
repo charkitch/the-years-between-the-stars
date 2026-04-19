@@ -68,50 +68,7 @@ export function SystemInfoPanel({
               </a>
             </div>
           )}
-        </span> · <span
-          ref={econTooltip.ref}
-          className={`${styles.starType} ${econTooltip.isOpen ? styles.active : ''}`}
-          onClick={() => econTooltip.setIsOpen(!econTooltip.isOpen)}
-        >
-          {econKey}
-          {econDesc && (
-            <div className={`${styles.tooltip} ${econTooltip.isOpen ? styles.tooltipOpen : ''}`}>
-              <button
-                className={styles.closeButton}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  econTooltip.setIsOpen(false);
-                }}
-              >
-                ×
-              </button>
-              {econDesc.desc}
-            </div>
-          )}
-        </span>{politicsKey && (
-          <><span className={styles.systemInfoText}> · </span><span
-            ref={politicsTooltip.ref}
-            className={`${styles.starType} ${politicsTooltip.isOpen ? styles.active : ''}`}
-            onClick={() => politicsTooltip.setIsOpen(!politicsTooltip.isOpen)}
-          >
-            {POLITICAL_TYPE_DISPLAY[politicsKey] ?? politicsKey}
-            {POLITICAL_DESCRIPTIONS[politicsKey] && (
-              <div className={`${styles.tooltip} ${politicsTooltip.isOpen ? styles.tooltipOpen : ''}`}>
-                <button
-                  className={styles.closeButton}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    politicsTooltip.setIsOpen(false);
-                  }}
-                >
-                  ×
-                </button>
-                {POLITICAL_DESCRIPTIONS[politicsKey].desc}
-              </div>
-            )}
-          </span></>
-        )}<span className={styles.systemInfoText}>
-        {currentSystemPayload && (
+        </span>{currentSystemPayload && (
           <span
             className={styles.factionTag}
             style={{
@@ -120,11 +77,61 @@ export function SystemInfoPanel({
                 : 'var(--color-hud-dim)',
             }}
           >
-            · {currentFactionKnown && currentFaction ? currentFaction.name.toUpperCase() : 'UNKNOWN'}
+            {' · '}{currentFactionKnown && currentFaction ? currentFaction.name.toUpperCase() : 'UNKNOWN'}
           </span>
         )}
-        </span>
       </div>
+      {(politicsKey || econKey) && (
+        <div className={styles.systemInfo}>
+          {politicsKey && (
+            <span
+              ref={politicsTooltip.ref}
+              className={`${styles.starType} ${politicsTooltip.isOpen ? styles.active : ''}`}
+              onClick={() => politicsTooltip.setIsOpen(!politicsTooltip.isOpen)}
+            >
+              {POLITICAL_TYPE_DISPLAY[politicsKey] ?? politicsKey}
+              {POLITICAL_DESCRIPTIONS[politicsKey] && (
+                <div className={`${styles.tooltip} ${politicsTooltip.isOpen ? styles.tooltipOpen : ''}`}>
+                  <button
+                    className={styles.closeButton}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      politicsTooltip.setIsOpen(false);
+                    }}
+                  >
+                    ×
+                  </button>
+                  {POLITICAL_DESCRIPTIONS[politicsKey].desc}
+                </div>
+              )}
+            </span>
+          )}
+          {politicsKey && econKey && <span className={styles.systemInfoText}> · </span>}
+          {econKey && (
+            <span
+              ref={econTooltip.ref}
+              className={`${styles.starType} ${econTooltip.isOpen ? styles.active : ''}`}
+              onClick={() => econTooltip.setIsOpen(!econTooltip.isOpen)}
+            >
+              {econKey}
+              {econDesc && (
+                <div className={`${styles.tooltip} ${econTooltip.isOpen ? styles.tooltipOpen : ''}`}>
+                  <button
+                    className={styles.closeButton}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      econTooltip.setIsOpen(false);
+                    }}
+                  >
+                    ×
+                  </button>
+                  {econDesc.desc}
+                </div>
+              )}
+            </span>
+          )}
+        </div>
+      )}
       {targetStar && (
         <div className={styles.jumpTarget}>JUMP TARGET: {targetStar.name}</div>
       )}

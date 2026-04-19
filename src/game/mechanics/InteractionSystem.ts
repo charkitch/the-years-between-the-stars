@@ -74,7 +74,9 @@ export class InteractionSystem {
     const targetId = state.player.targetId;
     if (!targetId) return false;
     const entity = this.sceneRenderer.getEntity(targetId);
-    return entity?.type === 'npc_ship';
+    if (!entity || entity.type !== 'npc_ship') return false;
+    const dist = this.sceneRenderer.shipGroup.position.distanceTo(entity.worldPos);
+    return dist <= getInteractionDistance('npc_ship', entity.collisionRadius);
   }
 
   tryInteract(): void {

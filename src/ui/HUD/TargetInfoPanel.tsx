@@ -33,7 +33,7 @@ export function TargetInfoPanel({
       {targetEntity ? (
         <div className={styles.targetInfo}>
           {targetSecretBase ? (
-            <SecretBaseTarget base={targetSecretBase} dist={targetDist} />
+            <SecretBaseTarget base={targetSecretBase} dist={targetDist} isMobile={isMobileHUD} />
           ) : (
             <EntityTarget
               entity={targetEntity}
@@ -41,6 +41,7 @@ export function TargetInfoPanel({
               isScanned={targetIsScanned}
               siteTotal={targetSiteTotal}
               siteDiscovered={targetSiteDiscovered}
+              isMobile={isMobileHUD}
             />
           )}
         </div>
@@ -56,7 +57,7 @@ export function TargetInfoPanel({
   );
 }
 
-function SecretBaseTarget({ base, dist }: { base: SecretBaseData; dist: number }) {
+function SecretBaseTarget({ base, dist, isMobile }: { base: SecretBaseData; dist: number; isMobile: boolean }) {
   const color = SECRET_BASE_COLORS[base.type] ?? '#8844FF';
   return (
     <>
@@ -68,19 +69,20 @@ function SecretBaseTarget({ base, dist }: { base: SecretBaseData; dist: number }
           : base.type === 'oort_cloud' ? 'OORT CLOUD BASE'
           : 'VOID STATION'}
       </div>
-      <div className={styles.targetAction} style={{ color }}>F TO DOCK</div>
+      {!isMobile && <div className={styles.targetAction} style={{ color }}>F TO DOCK</div>}
     </>
   );
 }
 
 function EntityTarget({
-  entity, dist, isScanned, siteTotal, siteDiscovered,
+  entity, dist, isScanned, siteTotal, siteDiscovered, isMobile,
 }: {
   entity: SceneEntity;
   dist: number;
   isScanned: boolean;
   siteTotal: number;
   siteDiscovered: number;
+  isMobile: boolean;
 }) {
   return (
     <>
@@ -105,7 +107,7 @@ function EntityTarget({
           {isScanned ? ` · SITES ${siteDiscovered}/${siteTotal}` : ''}
         </div>
       )}
-      {entity.type === 'landing_site' && (
+      {!isMobile && entity.type === 'landing_site' && (
         <div className={styles.targetActionLand}>F TO LAND</div>
       )}
     </>
