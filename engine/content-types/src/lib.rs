@@ -178,7 +178,7 @@ pub struct EventChoice {
     pub label: String,
     pub description: String,
     pub effect: ChoiceEffect,
-    #[serde(default, skip_serializing)]
+    #[serde(default)]
     pub requires: Vec<EventCondition>,
     #[serde(default)]
     pub requires_min_tech: Option<i32>,

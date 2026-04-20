@@ -4,8 +4,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use serde_json::{Map as JsonMap, Number as JsonNumber, Value as JsonValue};
-use serde_yaml::{Mapping as YamlMapping, Value as YamlValue};
+use content_types::{GameEvent, TriggerFile, SystemEntryDialog};
 
 struct EventPoolSpec {
     dir: &'static str,
@@ -54,78 +53,13 @@ fn to_const_name(pool: &str) -> String {
     format!("{}_EVENT_FILES", pool.to_ascii_uppercase())
 }
 
-// Content authors keep writing YAML, but the runtime consumes generated JSON.
-// The converter below is expected to preserve the typed serde semantics used by
-// current content; content.rs tests lock that contract against representative
-// fixtures so future YAML features do not silently drift.
-fn parse_yaml_as_json(path: &Path) -> Result<String, String> {
+fn yaml_to_bincode<T: serde::de::DeserializeOwned + serde::Serialize>(path: &Path) -> Result<Vec<u8>, String> {
     let raw = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read content file {}: {}", path.display(), e))?;
-    let yaml: YamlValue = serde_yaml::from_str(&raw)
+        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+    let value: T = serde_yaml::from_str(&raw)
         .map_err(|e| format!("Failed to parse YAML {}: {}", path.display(), e))?;
-    let json = yaml_to_json(yaml)
-        .map_err(|e| format!("Failed to convert YAML {} to JSON: {}", path.display(), e))?;
-    serde_json::to_string(&json)
-        .map_err(|e| format!("Failed to serialize JSON {}: {}", path.display(), e))
-}
-
-fn yaml_tag_name(raw: &str) -> String {
-    raw.strip_prefix('!').unwrap_or(raw).to_string()
-}
-
-fn yaml_key_to_string(key: YamlValue) -> Result<String, String> {
-    match key {
-        YamlValue::Null => Ok("null".to_string()),
-        YamlValue::Bool(v) => Ok(v.to_string()),
-        YamlValue::Number(v) => Ok(v.to_string()),
-        YamlValue::String(v) => Ok(v),
-        YamlValue::Tagged(tagged) => Ok(yaml_tag_name(&tagged.tag.to_string())),
-        other => Err(format!("Unsupported YAML mapping key type: {:?}", other)),
-    }
-}
-
-fn yaml_mapping_to_json(mapping: YamlMapping) -> Result<JsonValue, String> {
-    mapping
-        .into_iter()
-        .map(|(key, value)| Ok((yaml_key_to_string(key)?, yaml_to_json(value)?)))
-        .collect::<Result<JsonMap<_, _>, String>>()
-        .map(JsonValue::Object)
-}
-
-fn yaml_to_json(value: YamlValue) -> Result<JsonValue, String> {
-    match value {
-        YamlValue::Null => Ok(JsonValue::Null),
-        YamlValue::Bool(v) => Ok(JsonValue::Bool(v)),
-        YamlValue::Number(v) => {
-            if let Some(i) = v.as_i64() {
-                return Ok(JsonValue::Number(i.into()));
-            }
-            if let Some(u) = v.as_u64() {
-                return Ok(JsonValue::Number(u.into()));
-            }
-            if let Some(f) = v.as_f64() {
-                let n = JsonNumber::from_f64(f)
-                    .ok_or_else(|| format!("Invalid floating-point value {}", f))?;
-                return Ok(JsonValue::Number(n));
-            }
-            Err(format!("Unsupported YAML number {}", v))
-        }
-        YamlValue::String(v) => Ok(JsonValue::String(v)),
-        YamlValue::Sequence(seq) => seq
-            .into_iter()
-            .map(yaml_to_json)
-            .collect::<Result<Vec<_>, _>>()
-            .map(JsonValue::Array),
-        YamlValue::Mapping(mapping) => yaml_mapping_to_json(mapping),
-        YamlValue::Tagged(tagged) => {
-            let mut out = JsonMap::new();
-            out.insert(
-                yaml_tag_name(&tagged.tag.to_string()),
-                yaml_to_json(tagged.value)?,
-            );
-            Ok(JsonValue::Object(out))
-        }
-    }
+    bincode::serde::encode_to_vec(&value, bincode::config::standard())
+        .map_err(|e| format!("Failed to encode bincode {}: {}", path.display(), e))
 }
 
 fn rel_label(root: &Path, path: &Path, prefix: &str) -> Result<String, String> {
@@ -136,7 +70,7 @@ fn rel_label(root: &Path, path: &Path, prefix: &str) -> Result<String, String> {
     Ok(format!("{}/{}", prefix, rel))
 }
 
-fn discover_event_entries(root: &Path) -> Result<BTreeMap<String, Vec<(String, String)>>, String> {
+fn discover_event_entries(root: &Path) -> Result<BTreeMap<String, Vec<(String, Vec<u8>)>>, String> {
     let mut by_pool = BTreeMap::new();
     for pool in EVENT_POOLS {
         by_pool.insert(pool.dir.to_string(), Vec::new());
@@ -157,30 +91,50 @@ fn discover_event_entries(root: &Path) -> Result<BTreeMap<String, Vec<(String, S
         let entries = by_pool
             .get_mut(&pool)
             .ok_or_else(|| format!("Unknown event pool '{}' for file '{}'", pool, rel_string))?;
-        entries.push((rel_string, parse_yaml_as_json(&path)?));
+        entries.push((rel_string, yaml_to_bincode::<GameEvent>(&path)?));
     }
 
     Ok(by_pool)
 }
 
-fn discover_prefixed_entries(root: &Path, prefix: &str) -> Result<Vec<(String, String)>, String> {
-    let mut entries = Vec::new();
-    for path in discover_yaml_files(root)? {
-        entries.push((rel_label(root, &path, prefix)?, parse_yaml_as_json(&path)?));
-    }
-    Ok(entries)
+fn discover_trigger_entries(root: &Path) -> Result<Vec<(String, Vec<u8>)>, String> {
+    discover_yaml_files(root)?
+        .into_iter()
+        .map(|path| {
+            let label = rel_label(root, &path, "triggers")?;
+            let bytes = yaml_to_bincode::<TriggerFile>(&path)?;
+            Ok((label, bytes))
+        })
+        .collect()
 }
 
-fn write_entries_const(
+fn discover_dialog_entries(root: &Path) -> Result<Vec<(String, Vec<u8>)>, String> {
+    discover_yaml_files(root)?
+        .into_iter()
+        .map(|path| {
+            let label = rel_label(root, &path, "dialogs")?;
+            let bytes = yaml_to_bincode::<SystemEntryDialog>(&path)?;
+            Ok((label, bytes))
+        })
+        .collect()
+}
+
+fn write_bytes_const(
     file: &mut fs::File,
     const_name: &str,
-    entries: &[(String, String)],
+    entries: &[(String, Vec<u8>)],
 ) -> Result<(), String> {
-    writeln!(file, "pub const {}: &[(&str, &str)] = &[", const_name)
+    writeln!(file, "pub const {}: &[(&str, &[u8])] = &[", const_name)
         .map_err(|e| format!("Failed writing const {}: {}", const_name, e))?;
-    for (label, json) in entries {
-        writeln!(file, "    ({:?}, {:?}),", label, json)
-            .map_err(|e| format!("Failed writing registry entry {}: {}", label, e))?;
+    for (label, bytes) in entries {
+        write!(file, "    ({:?}, &[", label)
+            .map_err(|e| format!("Failed writing entry {}: {}", label, e))?;
+        for (i, byte) in bytes.iter().enumerate() {
+            if i > 0 { write!(file, ",").map_err(|e| e.to_string())?; }
+            write!(file, "{}", byte).map_err(|e| e.to_string())?;
+        }
+        writeln!(file, "]),")
+            .map_err(|e| format!("Failed writing entry {}: {}", label, e))?;
     }
     writeln!(file, "];").map_err(|e| format!("Failed closing const {}: {}", const_name, e))?;
     Ok(())
@@ -189,7 +143,7 @@ fn write_entries_const(
 fn write_event_pool_lookup(file: &mut fs::File) -> Result<(), String> {
     writeln!(
         file,
-        "pub fn event_entries_for_pool(pool: crate::events::EventPool) -> &'static [(&'static str, &'static str)] {{"
+        "pub fn event_entries_for_pool(pool: crate::events::EventPool) -> &'static [(&'static str, &'static [u8])] {{"
     )
     .map_err(|e| format!("Failed writing event pool helper signature: {}", e))?;
     writeln!(file, "    match pool {{")
@@ -212,7 +166,7 @@ fn write_event_pool_lookup(file: &mut fs::File) -> Result<(), String> {
 fn write_dialog_lookup(file: &mut fs::File) -> Result<(), String> {
     writeln!(
         file,
-        "pub fn dialog_entry_by_label(label: &str) -> Option<(&'static str, &'static str)> {{"
+        "pub fn dialog_entry_by_label(label: &str) -> Option<(&'static str, &'static [u8])> {{"
     )
     .map_err(|e| format!("Failed writing dialog helper signature: {}", e))?;
     writeln!(
@@ -226,9 +180,9 @@ fn write_dialog_lookup(file: &mut fs::File) -> Result<(), String> {
 
 fn write_generated_registry(
     out_path: &Path,
-    event_entries: &BTreeMap<String, Vec<(String, String)>>,
-    trigger_entries: &[(String, String)],
-    dialog_entries: &[(String, String)],
+    event_entries: &BTreeMap<String, Vec<(String, Vec<u8>)>>,
+    trigger_entries: &[(String, Vec<u8>)],
+    dialog_entries: &[(String, Vec<u8>)],
 ) -> Result<(), String> {
     let mut file = fs::File::create(out_path)
         .map_err(|e| format!("Failed to create {}: {}", out_path.display(), e))?;
@@ -247,11 +201,11 @@ fn write_generated_registry(
         let entries = event_entries
             .get(pool.dir)
             .ok_or_else(|| format!("Internal error: missing pool {}", pool.dir))?;
-        write_entries_const(&mut file, &const_name, entries)?;
+        write_bytes_const(&mut file, &const_name, entries)?;
     }
 
-    write_entries_const(&mut file, "TRIGGER_FILES", trigger_entries)?;
-    write_entries_const(&mut file, "DIALOG_FILES", dialog_entries)?;
+    write_bytes_const(&mut file, "TRIGGER_FILES", trigger_entries)?;
+    write_bytes_const(&mut file, "DIALOG_FILES", dialog_entries)?;
     write_event_pool_lookup(&mut file)?;
     write_dialog_lookup(&mut file)?;
 
@@ -269,8 +223,8 @@ fn main() -> Result<(), String> {
     );
     let content_root = manifest_dir.join("content");
     let event_entries = discover_event_entries(&content_root.join("events"))?;
-    let trigger_entries = discover_prefixed_entries(&content_root.join("triggers"), "triggers")?;
-    let dialog_entries = discover_prefixed_entries(&content_root.join("dialogs"), "dialogs")?;
+    let trigger_entries = discover_trigger_entries(&content_root.join("triggers"))?;
+    let dialog_entries = discover_dialog_entries(&content_root.join("dialogs"))?;
 
     let out_dir = PathBuf::from(
         env::var("OUT_DIR").map_err(|e| format!("OUT_DIR is unavailable: {}", e))?,

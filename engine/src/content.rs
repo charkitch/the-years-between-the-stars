@@ -54,19 +54,22 @@ pub fn story_chains() -> Vec<StoryChainDef> {
     ]
 }
 
-fn parse_event(label: &str, raw: &str) -> GameEvent {
-    serde_json::from_str::<GameEvent>(raw)
-        .unwrap_or_else(|e| panic!("Failed to parse event JSON {}: {}", label, e))
+fn decode_bincode<T: serde::de::DeserializeOwned>(label: &str, raw: &[u8]) -> T {
+    let (value, _) = bincode::serde::decode_from_slice(raw, bincode::config::standard())
+        .unwrap_or_else(|e| panic!("Failed to decode bincode {}: {}", label, e));
+    value
 }
 
-fn parse_trigger_file(label: &str, raw: &str) -> TriggerFile {
-    serde_json::from_str::<TriggerFile>(raw)
-        .unwrap_or_else(|e| panic!("Failed to parse trigger JSON {}: {}", label, e))
+fn parse_event(label: &str, raw: &[u8]) -> GameEvent {
+    decode_bincode(label, raw)
 }
 
-fn parse_dialog(label: &str, raw: &str) -> SystemEntryDialog {
-    serde_json::from_str::<SystemEntryDialog>(raw)
-        .unwrap_or_else(|e| panic!("Failed to parse dialog JSON {}: {}", label, e))
+fn parse_trigger_file(label: &str, raw: &[u8]) -> TriggerFile {
+    decode_bincode(label, raw)
+}
+
+fn parse_dialog(label: &str, raw: &[u8]) -> SystemEntryDialog {
+    decode_bincode(label, raw)
 }
 
 mod generated_content_registry {
@@ -75,7 +78,7 @@ mod generated_content_registry {
 
 type EventCache = HashMap<EventPool, Vec<GameEvent>>;
 
-fn load_events(entries: &[(&str, &str)]) -> Vec<GameEvent> {
+fn load_events(entries: &[(&str, &[u8])]) -> Vec<GameEvent> {
     entries.iter().map(|(label, raw)| parse_event(label, raw)).collect()
 }
 
@@ -109,20 +112,17 @@ pub(crate) fn events_for_pool(pool: EventPool) -> Vec<GameEvent> {
 }
 
 pub fn all_triggers() -> HashMap<String, Trigger> {
-    let mut out = HashMap::new();
-    for (label, raw) in generated_content_registry::TRIGGER_FILES {
-        let trigger_file = parse_trigger_file(label, raw);
-        for trigger in trigger_file.triggers {
-            out.insert(trigger.id.clone(), trigger);
-        }
-    }
-    out
+    generated_content_registry::TRIGGER_FILES
+        .iter()
+        .flat_map(|(label, raw)| parse_trigger_file(label, raw).triggers)
+        .map(|trigger| (trigger.id.clone(), trigger))
+        .collect()
 }
 
 fn dialog_by_label(label: &str) -> SystemEntryDialog {
     generated_content_registry::dialog_entry_by_label(label)
         .map(|(entry_label, raw)| parse_dialog(entry_label, raw))
-        .unwrap_or_else(|| panic!("Missing dialog JSON {}", label))
+        .unwrap_or_else(|| panic!("Missing dialog {}", label))
 }
 
 pub fn iron_star_arrival_dialog() -> SystemEntryDialog {
@@ -140,29 +140,29 @@ mod tests {
 
     use super::*;
 
-    fn assert_sorted(entries: &[(&str, &str)]) {
+    fn assert_sorted(entries: &[(&str, &[u8])]) {
         let labels: Vec<&str> = entries.iter().map(|(label, _)| *label).collect();
         let mut sorted = labels.clone();
         sorted.sort();
         assert_eq!(labels, sorted);
     }
 
-    fn find_entry<'a>(entries: &'a [(&'a str, &'a str)], label: &str) -> &'a str {
+    fn find_entry<'a>(entries: &'a [(&'a str, &'a [u8])], label: &str) -> &'a [u8] {
         entries
             .iter()
             .find_map(|(entry_label, raw)| (*entry_label == label).then_some(*raw))
             .unwrap_or_else(|| panic!("Missing generated entry {}", label))
     }
 
-    fn assert_yaml_fixture_matches_generated_json<T>(label: &str, yaml_raw: &str, json_raw: &str)
+    fn assert_yaml_fixture_matches_generated_bincode<T>(label: &str, yaml_raw: &str, bincode_raw: &[u8])
     where
-        T: DeserializeOwned + PartialEq + Debug,
+        T: DeserializeOwned + serde::Serialize + PartialEq + Debug,
     {
-        let from_yaml = serde_yaml::from_str::<T>(yaml_raw)
+        let from_yaml: T = serde_yaml::from_str(yaml_raw)
             .unwrap_or_else(|e| panic!("Failed to parse fixture YAML {}: {}", label, e));
-        let from_json = serde_json::from_str::<T>(json_raw)
-            .unwrap_or_else(|e| panic!("Failed to parse generated JSON {}: {}", label, e));
-        assert_eq!(from_yaml, from_json, "Typed mismatch for {}", label);
+        let (from_bincode, _): (T, _) = bincode::serde::decode_from_slice(bincode_raw, bincode::config::standard())
+            .unwrap_or_else(|e| panic!("Failed to decode generated bincode {}: {}", label, e));
+        assert_eq!(from_yaml, from_bincode, "Typed mismatch for {}", label);
     }
 
     #[test]
@@ -195,48 +195,48 @@ mod tests {
     #[test]
     fn generated_event_pool_lookup_matches_per_pool_constants() {
         assert_eq!(
-            generated_content_registry::event_entries_for_pool(EventPool::Landing),
-            generated_content_registry::LANDING_EVENT_FILES
+            generated_content_registry::event_entries_for_pool(EventPool::Landing).len(),
+            generated_content_registry::LANDING_EVENT_FILES.len()
         );
         assert_eq!(
-            generated_content_registry::event_entries_for_pool(EventPool::AsteroidBase),
-            generated_content_registry::ASTEROID_BASE_EVENT_FILES
+            generated_content_registry::event_entries_for_pool(EventPool::AsteroidBase).len(),
+            generated_content_registry::ASTEROID_BASE_EVENT_FILES.len()
         );
         assert_eq!(
-            generated_content_registry::event_entries_for_pool(EventPool::OortCloudBase),
-            generated_content_registry::OORT_CLOUD_EVENT_FILES
+            generated_content_registry::event_entries_for_pool(EventPool::OortCloudBase).len(),
+            generated_content_registry::OORT_CLOUD_EVENT_FILES.len()
         );
         assert_eq!(
-            generated_content_registry::event_entries_for_pool(EventPool::MaximumSpace),
-            generated_content_registry::MAXIMUM_SPACE_EVENT_FILES
+            generated_content_registry::event_entries_for_pool(EventPool::MaximumSpace).len(),
+            generated_content_registry::MAXIMUM_SPACE_EVENT_FILES.len()
         );
         assert_eq!(
-            generated_content_registry::event_entries_for_pool(EventPool::Triggered),
-            generated_content_registry::TRIGGERED_EVENT_FILES
+            generated_content_registry::event_entries_for_pool(EventPool::Triggered).len(),
+            generated_content_registry::TRIGGERED_EVENT_FILES.len()
         );
         assert_eq!(
-            generated_content_registry::event_entries_for_pool(EventPool::SystemEntry),
-            generated_content_registry::SYSTEM_ENTRY_EVENT_FILES
+            generated_content_registry::event_entries_for_pool(EventPool::SystemEntry).len(),
+            generated_content_registry::SYSTEM_ENTRY_EVENT_FILES.len()
         );
         assert_eq!(
-            generated_content_registry::event_entries_for_pool(EventPool::ProximityStar),
-            generated_content_registry::PROXIMITY_STAR_EVENT_FILES
+            generated_content_registry::event_entries_for_pool(EventPool::ProximityStar).len(),
+            generated_content_registry::PROXIMITY_STAR_EVENT_FILES.len()
         );
         assert_eq!(
-            generated_content_registry::event_entries_for_pool(EventPool::ProximityBase),
-            generated_content_registry::PROXIMITY_BASE_EVENT_FILES
+            generated_content_registry::event_entries_for_pool(EventPool::ProximityBase).len(),
+            generated_content_registry::PROXIMITY_BASE_EVENT_FILES.len()
         );
         assert_eq!(
-            generated_content_registry::event_entries_for_pool(EventPool::PlanetLanding),
-            generated_content_registry::PLANET_LANDING_EVENT_FILES
+            generated_content_registry::event_entries_for_pool(EventPool::PlanetLanding).len(),
+            generated_content_registry::PLANET_LANDING_EVENT_FILES.len()
         );
         assert_eq!(
-            generated_content_registry::event_entries_for_pool(EventPool::DysonLanding),
-            generated_content_registry::DYSON_LANDING_EVENT_FILES
+            generated_content_registry::event_entries_for_pool(EventPool::DysonLanding).len(),
+            generated_content_registry::DYSON_LANDING_EVENT_FILES.len()
         );
         assert_eq!(
-            generated_content_registry::event_entries_for_pool(EventPool::TopopolisLanding),
-            generated_content_registry::TOPOPOLIS_LANDING_EVENT_FILES
+            generated_content_registry::event_entries_for_pool(EventPool::TopopolisLanding).len(),
+            generated_content_registry::TOPOPOLIS_LANDING_EVENT_FILES.len()
         );
     }
 
@@ -254,8 +254,8 @@ mod tests {
     }
 
     #[test]
-    fn representative_event_yaml_matches_generated_json() {
-        assert_yaml_fixture_matches_generated_json::<GameEvent>(
+    fn representative_event_yaml_matches_generated_bincode() {
+        assert_yaml_fixture_matches_generated_bincode::<GameEvent>(
             "landing/acquisition_proposal.yaml",
             include_str!("../content/events/landing/acquisition_proposal.yaml"),
             find_entry(
@@ -263,7 +263,7 @@ mod tests {
                 "landing/acquisition_proposal.yaml",
             ),
         );
-        assert_yaml_fixture_matches_generated_json::<GameEvent>(
+        assert_yaml_fixture_matches_generated_bincode::<GameEvent>(
             "triggered/rebel_contact_follows_up.yaml",
             include_str!("../content/events/triggered/rebel_contact_follows_up.yaml"),
             find_entry(
@@ -274,8 +274,8 @@ mod tests {
     }
 
     #[test]
-    fn representative_trigger_yaml_matches_generated_json() {
-        assert_yaml_fixture_matches_generated_json::<TriggerFile>(
+    fn representative_trigger_yaml_matches_generated_bincode() {
+        assert_yaml_fixture_matches_generated_bincode::<TriggerFile>(
             "triggers/rebel_chain.yaml",
             include_str!("../content/triggers/rebel_chain.yaml"),
             find_entry(generated_content_registry::TRIGGER_FILES, "triggers/rebel_chain.yaml"),
@@ -283,8 +283,8 @@ mod tests {
     }
 
     #[test]
-    fn representative_dialog_yaml_matches_generated_json() {
-        assert_yaml_fixture_matches_generated_json::<SystemEntryDialog>(
+    fn representative_dialog_yaml_matches_generated_bincode() {
+        assert_yaml_fixture_matches_generated_bincode::<SystemEntryDialog>(
             "dialogs/iron_star_arrival.yaml",
             include_str!("../content/dialogs/iron_star_arrival.yaml"),
             find_entry(generated_content_registry::DIALOG_FILES, "dialogs/iron_star_arrival.yaml"),

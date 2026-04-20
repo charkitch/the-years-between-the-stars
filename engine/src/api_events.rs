@@ -7,6 +7,17 @@ use crate::system_generator::generate_solar_system;
 use crate::events::{select_game_event, EventContext, EventPool};
 use crate::content;
 
+/// Strip internal-only `requires` conditions before sending events to the TS side.
+fn strip_requires(event: &mut GameEvent) {
+    event.requires.clear();
+    event.choices.iter_mut().for_each(|c| {
+        c.requires.clear();
+        if let Some(ref mut moment) = c.next_moment {
+            moment.choices.iter_mut().for_each(|mc| mc.requires.clear());
+        }
+    });
+}
+
 #[wasm_bindgen]
 pub fn get_game_event(
     system_id: u32,
@@ -73,7 +84,8 @@ pub fn get_game_event(
             current_system_id: system_id,
         };
 
-        let event = select_game_event(pool, &ctx, event_seed);
+        let event = select_game_event(pool, &ctx, event_seed)
+            .map(|mut e| { strip_requires(&mut e); e });
 
         serde_json::to_string(&event)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize: {}", e)))

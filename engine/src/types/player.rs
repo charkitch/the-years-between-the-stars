@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-use super::{GoodName, PoliticalType, SurfaceType};
+use super::GoodName;
 
 // ─── Player State ────────────────────────────────────────────────────────────
 
