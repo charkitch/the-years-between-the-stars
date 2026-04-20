@@ -77,20 +77,7 @@ impl StarType {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SurfaceType {
-    Continental,
-    Ocean,
-    Marsh,
-    Venus,
-    Barren,
-    Desert,
-    Ice,
-    Volcanic,
-    ForestMoon,
-    Mountain,
-}
+pub use content_types::SurfaceType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

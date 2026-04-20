@@ -1,91 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-// ─── Trade Goods ─────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum GoodName {
-    #[serde(rename = "Starwind Rations")]
-    StarwindRations,
-    #[serde(rename = "Hullskin Lace")]
-    HullskinLace,
-    #[serde(rename = "Burial Sunstone")]
-    BurialSunstone,
-    #[serde(rename = "Rain Choir Spools")]
-    RainChoirSpools,
-    #[serde(rename = "Reactor Salt")]
-    ReactorSalt,
-    #[serde(rename = "Pilgrim Maps")]
-    PilgrimMaps,
-    #[serde(rename = "Witness Ink")]
-    WitnessInk,
-    #[serde(rename = "Gravitic Bone")]
-    GraviticBone,
-    #[serde(rename = "Embassy Masks")]
-    EmbassyMasks,
-    #[serde(rename = "Dream Resin")]
-    DreamResin,
-    #[serde(rename = "Silence Vials")]
-    SilenceVials,
-    #[serde(rename = "Jurisdiction Seals")]
-    JurisdictionSeals,
-    #[serde(rename = "Debt Petals")]
-    DebtPetals,
-    #[serde(rename = "Memory Caskets")]
-    MemoryCaskets,
-    #[serde(rename = "Oath Filaments")]
-    OathFilaments,
-    #[serde(rename = "Quasar Glass")]
-    QuasarGlass,
-    #[serde(rename = "Weather Keys")]
-    WeatherKeys,
-    #[serde(rename = "Ancestral Backups")]
-    AncestralBackups,
-    #[serde(rename = "Surrender Codes")]
-    SurrenderCodes,
-    #[serde(rename = "Impossible Seeds")]
-    ImpossibleSeeds,
-    #[serde(rename = "Relativistic Ash")]
-    RelativisticAsh,
-    #[serde(rename = "Pulsar Silk")]
-    PulsarSilk,
-    #[serde(rename = "Combat Intelligence")]
-    CombatIntelligence,
-    #[serde(rename = "Transfer Plasma")]
-    TransferPlasma,
-}
-
-impl GoodName {
-    pub fn harvest_only(self) -> bool {
-        matches!(self, GoodName::RelativisticAsh | GoodName::PulsarSilk | GoodName::CombatIntelligence | GoodName::QuasarGlass | GoodName::TransferPlasma)
-    }
-
-    pub const ALL: &'static [GoodName] = &[
-        GoodName::StarwindRations,
-        GoodName::HullskinLace,
-        GoodName::BurialSunstone,
-        GoodName::RainChoirSpools,
-        GoodName::ReactorSalt,
-        GoodName::PilgrimMaps,
-        GoodName::WitnessInk,
-        GoodName::GraviticBone,
-        GoodName::EmbassyMasks,
-        GoodName::DreamResin,
-        GoodName::SilenceVials,
-        GoodName::JurisdictionSeals,
-        GoodName::DebtPetals,
-        GoodName::MemoryCaskets,
-        GoodName::OathFilaments,
-        GoodName::QuasarGlass,
-        GoodName::WeatherKeys,
-        GoodName::AncestralBackups,
-        GoodName::SurrenderCodes,
-        GoodName::ImpossibleSeeds,
-        GoodName::RelativisticAsh,
-        GoodName::PulsarSilk,
-        GoodName::CombatIntelligence,
-        GoodName::TransferPlasma,
-    ];
-}
+pub use content_types::{GoodName, PoliticalType};
 
 // ─── Civ / Economy / Trade Enums ─────────────────────────────────────────────
 
@@ -108,40 +23,6 @@ impl EconomyType {
         EconomyType::Tributary,
         EconomyType::Resonance,
         EconomyType::Synthesis,
-    ];
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum PoliticalType {
-    RemembranceCompact,
-    RequiemParliament,
-    Murmuration,
-    Kindness,
-    SilenceMandate,
-    Vigil,
-    CovenantOfEchoes,
-    WoundTithe,
-    PalimpsestAuthority,
-    TheAsking,
-    Arrival,
-    DriftSovereignty,
-    CrownPatchwork,
-}
-
-impl PoliticalType {
-    pub const ALL: &'static [PoliticalType] = &[
-        PoliticalType::RemembranceCompact,
-        PoliticalType::RequiemParliament,
-        PoliticalType::Murmuration,
-        PoliticalType::Kindness,
-        PoliticalType::SilenceMandate,
-        PoliticalType::Vigil,
-        PoliticalType::CovenantOfEchoes,
-        PoliticalType::WoundTithe,
-        PoliticalType::PalimpsestAuthority,
-        PoliticalType::TheAsking,
-        PoliticalType::Arrival,
-        PoliticalType::DriftSovereignty,
     ];
 }
 
