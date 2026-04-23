@@ -93,6 +93,7 @@ pub fn get_game_event(
             host_type,
             current_cluster: 0,
             current_system_id: system_id,
+            current_system_special_kind: star.special_kind,
         };
 
         let event = select_game_event(pool, &ctx, event_seed).map(|mut e| {

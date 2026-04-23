@@ -43,6 +43,7 @@ pub struct EventContext<'a> {
     pub host_type: Option<&'a str>,
     pub current_cluster: u32,
     pub current_system_id: u32,
+    pub current_system_special_kind: SpecialSystemKind,
 }
 
 fn system_choices_or_default<'a>(ctx: &'a EventContext<'a>) -> SystemChoices {
@@ -59,6 +60,9 @@ fn check_condition(cond: &EventCondition, ctx: &EventContext) -> bool {
     };
     match cond {
         EventCondition::PoliticsIs(pols) => pols.contains(&ctx.civ_state.politics),
+        EventCondition::SpecialSystemIs(system_kinds) => system_kinds
+            .iter()
+            .any(|kind| kind == ctx.current_system_special_kind.as_str()),
         EventCondition::MinGalaxyYear(y) => ctx.civ_state.galaxy_year >= *y,
         EventCondition::HasFactionTag(tag) => choices.faction_tag.as_deref() == Some(tag.as_str()),
         EventCondition::HasCargo(item) => ctx
@@ -229,6 +233,7 @@ pub fn select_game_event(pool: EventPool, ctx: &EventContext, seed: u32) -> Opti
 #[cfg(test)]
 mod tests {
     use super::*;
+    use content_types::Repeatability;
     use std::collections::{HashMap, HashSet};
 
     fn test_civ() -> CivilizationState {
@@ -293,6 +298,7 @@ mod tests {
             host_type: None,
             current_cluster: 0,
             current_system_id: 0,
+            current_system_special_kind: SpecialSystemKind::None,
         };
         assert!(select_game_event(EventPool::Landing, &ctx, 42).is_some());
     }
@@ -312,6 +318,7 @@ mod tests {
             host_type: None,
             current_cluster: 0,
             current_system_id: 0,
+            current_system_special_kind: SpecialSystemKind::None,
         };
 
         let first = select_game_event(EventPool::Landing, &ctx, 4242)
@@ -344,6 +351,7 @@ mod tests {
             host_type: None,
             current_cluster: 0,
             current_system_id: 0,
+            current_system_special_kind: SpecialSystemKind::None,
         };
         let no_event = select_game_event(EventPool::Triggered, &ctx_without_flag, 1);
         assert!(no_event.is_none());
@@ -360,6 +368,7 @@ mod tests {
             host_type: None,
             current_cluster: 0,
             current_system_id: 0,
+            current_system_special_kind: SpecialSystemKind::None,
         };
         let event = select_game_event(EventPool::Triggered, &ctx_with_flag, 2);
         assert!(event.is_some());
@@ -367,5 +376,63 @@ mod tests {
             event.expect("triggered event should be selected").id,
             "REBEL_CONTACT_FOLLOWS_UP"
         );
+    }
+
+    #[test]
+    fn special_system_condition_filters_events() {
+        let civ = test_civ();
+        let player = test_player();
+        let triggers = content::all_triggers();
+        let matching_ctx = EventContext {
+            civ_state: &civ,
+            player_state: &player,
+            system_choices: None,
+            triggers: &triggers,
+            surface: None,
+            site_class: None,
+            host_type: None,
+            current_cluster: 0,
+            current_system_id: 7,
+            current_system_special_kind: SpecialSystemKind::TheCrown,
+        };
+        let non_matching_ctx = EventContext {
+            current_system_special_kind: SpecialSystemKind::None,
+            ..matching_ctx
+        };
+        let event = GameEvent {
+            id: "TEST_SPECIAL_SYSTEM".to_string(),
+            title: "Test".to_string(),
+            narrative_lines: vec!["Only here.".to_string()],
+            choices: vec![EventChoice {
+                id: "ok".to_string(),
+                label: "Ok".to_string(),
+                description: "Continue".to_string(),
+                effect: ChoiceEffect {
+                    trading_reputation: 0,
+                    banned_goods: vec![],
+                    price_modifier: 1.0,
+                    faction_tag: None,
+                    credits_reward: 0,
+                    fuel_reward: 0.0,
+                    sets_flags: vec![],
+                    fires: vec![],
+                    sets_galactic_flags: vec![],
+                    galaxy_years_advance: 0,
+                },
+                requires: vec![],
+                requires_min_tech: None,
+                requires_credits: None,
+                next_moment: None,
+            }],
+            requires: vec![EventCondition::SpecialSystemIs(vec![
+                "the_crown".to_string()
+            ])],
+            triggered_by: None,
+            triggered_only: false,
+            repeatability: Repeatability::Unique,
+        };
+
+        assert_eq!(event_weight(&event, &matching_ctx), 1.0);
+        assert_eq!(event_weight(&event, &non_matching_ctx), 0.0);
     }
 }

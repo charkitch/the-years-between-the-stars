@@ -1,5 +1,7 @@
 id: CROWNS_EDGE_STATION
 title: CROWN'S EDGE STATION
+requires:
+  - !SpecialSystemIs [the_crown]
 narrativeLines:
   - >-
     The station is small. Absurdly small. A handful of docking bays, a canteen, a fuel depot, and a gift shop selling topopolis postcards. The staff are three people and a maintenance drone that seems to be in charge.

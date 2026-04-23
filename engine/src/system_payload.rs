@@ -215,6 +215,7 @@ pub fn build_system_payload(
         host_type: None,
         current_cluster: 0,
         current_system_id: star.id,
+        current_system_special_kind: star.special_kind,
     };
     let game_event = if let Some(base_id) = secret_base_id {
         let base_type = system

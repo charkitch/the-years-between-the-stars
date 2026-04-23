@@ -24,6 +24,16 @@ pub enum SpecialSystemKind {
     TheCrown,
 }
 
+impl SpecialSystemKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::IronStar => "iron_star",
+            Self::TheCrown => "the_crown",
+        }
+    }
+}
+
 // ─── Star / Planet Enums ─────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

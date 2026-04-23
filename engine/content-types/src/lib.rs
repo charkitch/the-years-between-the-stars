@@ -207,6 +207,7 @@ pub struct EventMoment {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum EventCondition {
     PoliticsIs(Vec<PoliticalType>),
+    SpecialSystemIs(Vec<String>),
     MinGalaxyYear(u32),
     HasFactionTag(String),
     HasCargo(String),
