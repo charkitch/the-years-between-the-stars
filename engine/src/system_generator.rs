@@ -73,17 +73,26 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
                 climate_intensity: 0.0,
             });
         }
-        let rocky_surface = if star.id == 0 && i == 0 {
+        let is_homeworld = star.id == 0 && i == 0;
+        let is_crown_retreat = star.special_kind == SpecialSystemKind::TheCrown && i == 0;
+        let rocky_surface = if is_homeworld {
             // Keep the first planet in the home system continental
+            let _ = pick_weighted_surface(&mut rng, profile.rocky_weights);
+            SurfaceType::Continental
+        } else if is_crown_retreat {
+            // The Crown keeps a deliberately pastoral world under open sky.
             let _ = pick_weighted_surface(&mut rng, profile.rocky_weights);
             SurfaceType::Continental
         } else {
             pick_weighted_surface(&mut rng, profile.rocky_weights)
         };
-        let (has_clouds, cloud_density) = if star.id == 0 && i == 0 {
+        let (has_clouds, cloud_density) = if is_homeworld {
             // Home planet always has clouds
             let _ = generate_rocky_clouds(&mut rng, rocky_surface);
             (true, 0.45)
+        } else if is_crown_retreat {
+            let _ = generate_rocky_clouds(&mut rng, rocky_surface);
+            (true, 0.58)
         } else {
             generate_rocky_clouds(&mut rng, rocky_surface)
         };
@@ -97,7 +106,11 @@ pub fn generate_solar_system(star: &StarSystemData) -> SolarSystemData {
         let has_station = star.tech_level >= 3 || i == 0;
         planets.push(PlanetData {
             id: format!("{}-p{}", star.id, i),
-            name: planet_name(&star.name, i as usize),
+            name: if is_crown_retreat {
+                "Sunmere".to_string()
+            } else {
+                planet_name(&star.name, i as usize)
+            },
             planet_type: PlanetType::Rocky,
             surface_type: rocky_surface,
             gas_type: GasGiantType::Jovian,
@@ -529,5 +542,25 @@ mod tests {
 
         let system = generate_solar_system(non_iron);
         assert!(system.dyson_shells.is_empty());
+    }
+
+    #[test]
+    fn crown_system_generates_sunmere_as_first_world() {
+        let cluster = generate_cluster();
+        let crown = cluster
+            .iter()
+            .find(|star| star.special_kind == SpecialSystemKind::TheCrown)
+            .expect("Expected Crown system in cluster");
+
+        let system = generate_solar_system(crown);
+        let first = system
+            .planets
+            .first()
+            .expect("Crown should generate at least one planet");
+
+        assert_eq!(first.name, "Sunmere");
+        assert_eq!(first.surface_type, SurfaceType::Continental);
+        assert!(first.has_clouds);
+        assert!(first.cloud_density >= 0.58);
     }
 }

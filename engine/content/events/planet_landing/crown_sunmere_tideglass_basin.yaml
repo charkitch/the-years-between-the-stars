@@ -1,0 +1,30 @@
+id: CROWN_SUNMERE_TIDEGLASS_BASIN
+title: TIDEGLASS BASIN
+requires:
+  - !HostTypeIs [planet]
+  - !SpecialSystemIs [the_crown]
+  - !SiteClassIs [crown_sunmere_basin]
+narrativeLines:
+  - >-
+    Tideglass Basin is a crescent of shallow water so clear that the clouds seem to drift beneath your feet. Hundreds of visitors stand ankle-deep in it, spread out with almost ceremonial care. No one speaks loudly. It would feel empty if it were not so obviously full of people.
+  - >-
+    The basin is natural in the way Crown engineering likes to use that word: the rock is old, the tides are real, and a lacework of submerged field generators keeps the surf gentle enough for nervous day-trippers and old enough to feel unscripted. Shoals of silver fish move between legs without fear. Somewhere farther down the shore, someone is laughing; here, the dominant emotion is a kind of public solitude.
+  - >-
+    A woman with a thermal flask asks whether you know why so many people come here alone. Before you can answer, she does it for you. "Because loneliness is easier when the sun can see it."
+choices:
+  - id: share_the_flask
+    label: Share tea and stay with her awhile
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1
+  - id: buy_basin_permit
+    label: Buy a long-stay tide permit (CR 180)
+    description: "CR -180, +Fuel"
+    effect:
+      creditsReward: -180
+      fuelReward: 0.4
+    requiresCredits: 180
+  - id: wade_in_silence
+    label: Wade out until the crowd feels far away
+    description: No effect
+    effect: {}

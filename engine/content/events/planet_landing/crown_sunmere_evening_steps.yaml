@@ -1,0 +1,30 @@
+id: CROWN_SUNMERE_EVENING_STEPS
+title: EVENING STEPS
+requires:
+  - !HostTypeIs [planet]
+  - !SpecialSystemIs [the_crown]
+  - !SiteClassIs [crown_sunmere_steps]
+narrativeLines:
+  - >-
+    The Evening Steps are broad terraces cut into a sea cliff, facing west. By local standards the place is crowded. Ten thousand people, maybe more, sit on warm stone with room to spare between them. Vendors move quietly through the aisles selling broth, fruit ice, folding blankets, and lens cloths for those who still do not trust their own eyes with sunset.
+  - >-
+    Beyond the cliff, the ocean darkens by increments. Above it, a real horizon draws a line no topopolis can fake. Families lean together. Solitary travelers sit with the posture of people being gently dismantled and rebuilt. High overhead, a thin procession of ferries returns to the Crown, their guidance lights coming on one by one as if someone is writing in the air.
+  - >-
+    The person beside you says they come here twice a year to feel small in a healthy way. "Not megastructure small," they clarify. "Human small."
+choices:
+  - id: stay_for_sunset
+    label: Stay through the last light
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1
+  - id: buy_a_blanket
+    label: Buy a cliff blanket and hot broth (CR 140)
+    description: "CR -140, +Fuel"
+    effect:
+      creditsReward: -140
+      fuelReward: 0.3
+    requiresCredits: 140
+  - id: catch_the_early_ferry
+    label: Leave before the sun is gone
+    description: No effect
+    effect: {}

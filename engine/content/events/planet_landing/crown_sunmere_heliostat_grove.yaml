@@ -1,0 +1,30 @@
+id: CROWN_SUNMERE_HELIOSTAT_GROVE
+title: HELIOSTAT GROVE
+requires:
+  - !HostTypeIs [planet]
+  - !SpecialSystemIs [the_crown]
+  - !SiteClassIs [crown_sunmere_grove]
+narrativeLines:
+  - >-
+    The grove begins as woodland and only gradually reveals itself as infrastructure. The trees are broad-canopied, salt-tolerant, and very old. Between them stand slender mirrors on articulated stems, tracking the sun with the patience of flowers. Their corrections are tiny: a little more light for moss here, a little less heat for the fern beds there.
+  - >-
+    Gardeners move through the understory with wrist projectors and hand shears, arguing amiably about shade ratios. Nothing about the place announces power, though enormous power is clearly present. That seems to be the point. In the Crown they can build a world around a star. Here they use the same competence to keep a footpath cool and a pond full of dragonflies.
+  - >-
+    One of the gardeners asks if you'll help re-angle a heliostat cluster before the afternoon school groups arrive. "If the lilies open too early," he says, "the children think we've rushed the day."
+choices:
+  - id: help_tune_the_grove
+    label: Help tune the heliostats
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1
+  - id: commission_a_light_map
+    label: Commission a personal light map (CR 260)
+    description: "CR -260, prices -10% locally"
+    effect:
+      creditsReward: -260
+      priceModifier: 0.90
+    requiresCredits: 260
+  - id: walk_the_shaded_paths
+    label: Walk until the machinery disappears again
+    description: No effect
+    effect: {}

@@ -278,6 +278,7 @@ mod tests {
         assert!(content::events_for_pool(EventPool::AsteroidBase).len() >= 9);
         assert!(content::events_for_pool(EventPool::OortCloudBase).len() >= 7);
         assert!(content::events_for_pool(EventPool::MaximumSpace).len() >= 8);
+        assert!(content::events_for_pool(EventPool::PlanetLanding).len() >= 8);
         assert!(!content::events_for_pool(EventPool::Triggered).is_empty());
         assert!(content::events_for_pool(EventPool::DysonLanding).len() >= 2);
         assert!(content::events_for_pool(EventPool::TopopolisLanding).len() >= 2);
@@ -434,5 +435,28 @@ mod tests {
 
         assert_eq!(event_weight(&event, &matching_ctx), 1.0);
         assert_eq!(event_weight(&event, &non_matching_ctx), 0.0);
+    }
+
+    #[test]
+    fn crown_sunmere_site_selects_its_authored_event() {
+        let civ = test_civ();
+        let player = test_player();
+        let triggers = content::all_triggers();
+        let ctx = EventContext {
+            civ_state: &civ,
+            player_state: &player,
+            system_choices: None,
+            triggers: &triggers,
+            surface: Some(SurfaceType::Continental),
+            site_class: Some("crown_sunmere_grove"),
+            host_type: Some("planet"),
+            current_cluster: 0,
+            current_system_id: 7,
+            current_system_special_kind: SpecialSystemKind::TheCrown,
+        };
+
+        let event = select_game_event(EventPool::PlanetLanding, &ctx, 9)
+            .expect("expected Crown Sunmere site event");
+        assert_eq!(event.id, "CROWN_SUNMERE_HELIOSTAT_GROVE");
     }
 }

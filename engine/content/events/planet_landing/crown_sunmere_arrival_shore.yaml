@@ -1,0 +1,30 @@
+id: CROWN_SUNMERE_ARRIVAL_SHORE
+title: ARRIVAL SHORE
+requires:
+  - !HostTypeIs [planet]
+  - !SpecialSystemIs [the_crown]
+  - !SiteClassIs [crown_sunmere_arrivals]
+narrativeLines:
+  - >-
+    The shuttle terraces are busy, but not in the way stations are busy. People arrive carrying towels, sketchbooks, picnic tins, children, grandparents, sealed pollen-safe hampers. They step off the ferries from the Crown and pause, almost all of them, for the same first ritual: looking up.
+  - >-
+    There is no ceiling here. No curated sky. Just a real yellow sun burning over a salt-blue ocean, and a wind that has crossed open water instead of climate ducts. The transit pylons are almost invisible: quiet grav-lifts, smart lockers, tide forecasts woven into the railings, a medical lattice under the sand in case anyone from the topopolis forgets what uneven ground feels like.
+  - >-
+    An attendant asks if you can help guide first-time visitors through the gravity acclimation walk. "They always think they're here for the scenery," she says. "Half the time they're here to remember their bodies still belong to a world."
+choices:
+  - id: help_with_arrivals
+    label: Walk the acclimation line with them
+    description: "+Reputation"
+    effect:
+      tradingReputation: 1
+  - id: rent_a_sunshade
+    label: Rent a woven sunshade and stay awhile (CR 120)
+    description: "CR -120, prices -5% locally"
+    effect:
+      creditsReward: -120
+      priceModifier: 0.95
+    requiresCredits: 120
+  - id: just_look_up
+    label: Join the line of people looking up
+    description: No effect
+    effect: {}
