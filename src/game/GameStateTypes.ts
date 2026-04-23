@@ -93,6 +93,7 @@ export interface GameStateData {
   ui: {
     mode: UIMode;
     alertMessage: string | null;
+    infoMessage: string | null;
     scanLabel: string | null;
     scanProgress: number;
     hyperspaceTarget: SystemId | null;
@@ -152,6 +153,7 @@ export interface GameActions {
   setCurrentSystemMarket: (market: MarketEntry[]) => void;
   setTarget: (id: string | null) => void;
   setAlert: (msg: string | null) => void;
+  setInfoMessage: (msg: string | null) => void;
   setScanProgress: (progress: number, label?: string | null) => void;
   setHyperspaceTarget: (id: SystemId | null) => void;
   setHyperspaceCountdown: (n: number) => void;

@@ -70,8 +70,9 @@ export class LandingSiteManager {
     hostCollisionRadius: number;
     field: InteractionFieldData;
     bodyKind: 'rocky' | 'gas_giant';
+    specialLayout?: 'crown_retreat';
   }): Set<string> {
-    const { hostId, hostLabel, hostGroup, hostCollisionRadius, field, bodyKind } = params;
+    const { hostId, hostLabel, hostGroup, hostCollisionRadius, field, bodyKind, specialLayout } = params;
     const siteRng = PRNG.fromIndex(CLUSTER_SEED ^ 0x51A17E, hashString32(hostId));
     const desired = bodyKind === 'gas_giant' ? 2 : 3;
     const spawnRadius = hostCollisionRadius + LANDING_SITE_CLEARANCE_PLANET;
@@ -79,6 +80,48 @@ export class LandingSiteManager {
     const classifications = new Set<string>();
     let created = 0;
     let attempts = 0;
+
+    if (specialLayout === 'crown_retreat' && bodyKind === 'rocky') {
+      const curatedSites = [
+        { u: 0.12, v: 0.50, cls: 'crown_sunmere_arrivals', label: `${hostLabel} - ARRIVAL SHORE` },
+        { u: 0.34, v: 0.43, cls: 'crown_sunmere_basin', label: `${hostLabel} - TIDEGLASS BASIN` },
+        { u: 0.62, v: 0.58, cls: 'crown_sunmere_grove', label: `${hostLabel} - HELIOSTAT GROVE` },
+        { u: 0.83, v: 0.49, cls: 'crown_sunmere_steps', label: `${hostLabel} - EVENING STEPS` },
+      ];
+
+      for (const site of curatedSites) {
+        const pos = sphereUvToLocal(spawnRadius, site.u, site.v);
+        const normal = pos.clone().normalize();
+        const marker = makeLandingSiteMarker(site.cls);
+        marker.position.copy(pos);
+        marker.lookAt(pos.clone().multiplyScalar(2));
+        marker.visible = false;
+        hostGroup.add(marker);
+
+        const idx = ++this.counter;
+        const id = `site-${hostId}-${idx}`;
+        this.entities.set(id, {
+          id,
+          name: site.label,
+          group: marker,
+          orbitRadius: 0,
+          orbitSpeed: 0,
+          orbitPhase: 0,
+          type: 'landing_site',
+          worldPos: new THREE.Vector3(),
+          collisionRadius: 0,
+          siteLabel: site.label,
+          siteClassification: site.cls,
+          siteHostLabel: hostLabel,
+          siteHostId: hostId,
+          siteDiscovered: false,
+        });
+        acceptedNormals.push(normal);
+        classifications.add(site.cls);
+      }
+
+      return classifications;
+    }
 
     while (created < desired && attempts < desired * 28) {
       attempts++;

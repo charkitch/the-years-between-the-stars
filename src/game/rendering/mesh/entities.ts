@@ -523,6 +523,10 @@ export function makeLandingSiteMarker(classification: string): THREE.Group {
     shell_hazard: 0xff7fb2,
     topopolis_entrance: 0xffdd44,
     topopolis_interior: 0xff9944,
+    crown_sunmere_arrivals: 0x9fe7ff,
+    crown_sunmere_basin: 0x59b8ff,
+    crown_sunmere_grove: 0x8fe28a,
+    crown_sunmere_steps: 0xffc97a,
   };
   const color = colorByClass[classification] ?? 0xffffff;
   const material = new THREE.MeshBasicMaterial({ color });

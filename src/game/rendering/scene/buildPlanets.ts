@@ -69,6 +69,7 @@ export function buildPlanets(params: {
   };
 
   for (const planet of data.planets) {
+    const isCrownRetreat = data.topopolisCoils.length > 0 && planet.id === data.planets[0]?.id;
     let planetGroup: THREE.Group;
     // Stable seed per planet — shared between continent shader and city lights
     const planetSeed = rng.next() * 100;
@@ -92,7 +93,9 @@ export function buildPlanets(params: {
     }
     // City lights + sun atmosphere for non-gas-giant planets
     if (planet.type !== 'gas_giant') {
-      addCityLights(planetGroup, planet.radius, planetSeed, planet.surfaceType, planet.polarCapSize);
+      if (!isCrownRetreat) {
+        addCityLights(planetGroup, planet.radius, planetSeed, planet.surfaceType, planet.polarCapSize);
+      }
       addSunAtmosphere(planetGroup, planet.radius);
     }
 
@@ -122,6 +125,7 @@ export function buildPlanets(params: {
       hostCollisionRadius: planet.radius * PLANET_COLLISION_SCALE,
       field: planet.interactionField,
       bodyKind: planet.type,
+      specialLayout: isCrownRetreat ? 'crown_retreat' : undefined,
     });
     const lightningRoll = rng.next();
     const forceStormLightning = planet.type === 'gas_giant' && siteClasses.has('gas_volatile');

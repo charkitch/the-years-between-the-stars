@@ -28,8 +28,13 @@ import type { SecretBaseType } from '../engine';
 
 const XB_STREAM_HAZARD_RADIUS = 40;
 const COMBAT_INTEL_INTERVAL = 8;
-const BEAM_HARVEST_INTERVAL = 5;
+const RELATIVISTIC_ASH_HARVEST_INTERVAL = 1;
+const TRANSFER_PLASMA_HARVEST_INTERVAL = 1;
 const HARVEST_CAP_PER_GOOD = 5;
+const COMBAT_INTELLIGENCE_INFO = 'COLLECTING COMBAT INTELLIGENCE FROM CROSSFIRE';
+const RELATIVISTIC_ASH_INFO = 'COLLECTING RELATIVISTIC ASH FROM JET CORE';
+const PULSAR_SILK_INFO = 'COLLECTING PULSAR SILK FROM BEAM CORE';
+const TRANSFER_PLASMA_INFO = 'COLLECTING TRANSFER PLASMA FROM DONOR STREAM';
 // Pulsar burst damage per sweep (flat amounts, not per-second rates)
 const PULSAR_LETHAL_SHIELD_BURST = [30, 80] as const; // [min, max] — proximity-scaled
 const PULSAR_LETHAL_HEAT_BURST = [25, 50] as const;
@@ -73,15 +78,107 @@ function pickActiveHazard(effects: HazardEffect[]): HazardType {
 
 const _vec = new THREE.Vector3();
 
+interface TimedHarvestParams {
+  active: boolean;
+  wasActive: boolean;
+  timer: number;
+  interval: number;
+  immediateOnEntry?: boolean;
+  good: GoodName;
+  message: string;
+  collectedThisPass: boolean;
+  cargoHarvests: CargoHarvest[];
+  canHarvest: (good: GoodName) => boolean;
+}
+
+interface TimedHarvestResult {
+  active: boolean;
+  timer: number;
+  collectedThisPass: boolean;
+  infoMessage: string | null;
+}
+
+function runTimedHarvest(params: TimedHarvestParams): TimedHarvestResult {
+  const {
+    active, wasActive, interval, immediateOnEntry = false,
+    good, message, cargoHarvests, canHarvest,
+  } = params;
+  let { timer, collectedThisPass } = params;
+
+  if (!active) {
+    return {
+      active: false,
+      timer: 0,
+      collectedThisPass: false,
+      infoMessage: null,
+    };
+  }
+
+  const entering = !wasActive;
+  if (entering && immediateOnEntry && canHarvest(good)) {
+    cargoHarvests.push({ good, qty: 1 });
+    collectedThisPass = true;
+  }
+
+  timer += 0;
+  while (timer >= interval && canHarvest(good)) {
+    cargoHarvests.push({ good, qty: 1 });
+    timer -= interval;
+    collectedThisPass = true;
+  }
+
+  return {
+    active: true,
+    timer,
+    collectedThisPass,
+    infoMessage: collectedThisPass ? message : null,
+  };
+}
+
+function runEntryHarvest(params: {
+  active: boolean;
+  wasActive: boolean;
+  good: GoodName;
+  message: string;
+  collectedThisPass: boolean;
+  cargoHarvests: CargoHarvest[];
+  canHarvest: (good: GoodName) => boolean;
+}): { active: boolean; collectedThisPass: boolean; infoMessage: string | null } {
+  const { active, wasActive, good, message, cargoHarvests, canHarvest } = params;
+  let { collectedThisPass } = params;
+
+  if (!active) {
+    return { active: false, collectedThisPass: false, infoMessage: null };
+  }
+
+  if (!wasActive && canHarvest(good)) {
+    cargoHarvests.push({ good, qty: 1 });
+    collectedThisPass = true;
+  }
+
+  return {
+    active: true,
+    collectedThisPass,
+    infoMessage: collectedThisPass ? message : null,
+  };
+}
+
 export class FlightHazardSystem {
   private scoopingFuel = false;
   private gasGiantScoopingFuel = false;
   private harvestingFuel = false;
   private insideTopopolis = false;
   combatIntelTimer = 0;
+  private combatIntelActive = false;
+  private combatIntelCollected = false;
   private jetHarvestTimer = 0;
+  private jetHarvestActive = false;
+  private jetHarvestCollected = false;
   private streamHarvestTimer = 0;
+  private streamHarvestActive = false;
+  private streamHarvestCollected = false;
   private pulsarInZone = false;
+  private pulsarHarvestCollected = false;
   private pulsarLethalHit = false;
 
   constructor(private sceneRenderer: SceneRenderer) {}
@@ -223,6 +320,7 @@ export class FlightHazardSystem {
     const canHarvest = (good: GoodName) =>
       cargoUsed + cargoHarvests.reduce((s, h) => s + h.qty, 0) < MAX_CARGO &&
       (cargo[good] ?? 0) + cargoHarvests.filter(h => h.good === good).reduce((s, h) => s + h.qty, 0) < HARVEST_CAP_PER_GOOD;
+    let infoMessage: string | null = null;
 
     const battleEffect = checkBattleZoneHazard({
       pos,
@@ -231,18 +329,23 @@ export class FlightHazardSystem {
     });
     if (battleEffect.alert) {
       effects.push(battleEffect);
-      // Combat intel harvesting — must be in the lethal (crossfire) zone
-      if (battleEffect.zone === 'lethal' && canHarvest(COMBAT_INTELLIGENCE_GOOD)) {
-        this.combatIntelTimer += dt;
-        while (this.combatIntelTimer >= COMBAT_INTEL_INTERVAL && canHarvest(COMBAT_INTELLIGENCE_GOOD)) {
-          cargoHarvests.push({ good: COMBAT_INTELLIGENCE_GOOD, qty: 1 });
-          this.combatIntelTimer -= COMBAT_INTEL_INTERVAL;
-        }
-      } else if (battleEffect.zone !== 'lethal') {
-        this.combatIntelTimer = 0;
-      }
-    } else {
-      this.combatIntelTimer = 0;
+    }
+    {
+      const combatHarvest = runTimedHarvest({
+        active: battleEffect.zone === 'lethal',
+        wasActive: this.combatIntelActive,
+        timer: this.combatIntelTimer + (battleEffect.zone === 'lethal' ? dt : 0),
+        interval: COMBAT_INTEL_INTERVAL,
+        good: COMBAT_INTELLIGENCE_GOOD,
+        message: COMBAT_INTELLIGENCE_INFO,
+        collectedThisPass: this.combatIntelCollected,
+        cargoHarvests,
+        canHarvest,
+      });
+      this.combatIntelActive = combatHarvest.active;
+      this.combatIntelTimer = combatHarvest.timer;
+      this.combatIntelCollected = combatHarvest.collectedThisPass;
+      if (combatHarvest.infoMessage) infoMessage = combatHarvest.infoMessage;
     }
 
     const xrayEffect = checkXRayStreamHazard({
@@ -251,15 +354,22 @@ export class FlightHazardSystem {
       hazardRadius: XB_STREAM_HAZARD_RADIUS,
     });
     if (xrayEffect.alert) effects.push(xrayEffect);
-
-    if (xrayEffect.zone === 'lethal') {
-      this.streamHarvestTimer += dt;
-      while (this.streamHarvestTimer >= BEAM_HARVEST_INTERVAL && canHarvest(TRANSFER_PLASMA_GOOD)) {
-        cargoHarvests.push({ good: TRANSFER_PLASMA_GOOD, qty: 1 });
-        this.streamHarvestTimer -= BEAM_HARVEST_INTERVAL;
-      }
-    } else {
-      this.streamHarvestTimer = 0;
+    {
+      const streamHarvest = runTimedHarvest({
+        active: xrayEffect.zone === 'lethal',
+        wasActive: this.streamHarvestActive,
+        timer: this.streamHarvestTimer + (xrayEffect.zone === 'lethal' ? dt : 0),
+        interval: TRANSFER_PLASMA_HARVEST_INTERVAL,
+        good: TRANSFER_PLASMA_GOOD,
+        message: TRANSFER_PLASMA_INFO,
+        collectedThisPass: this.streamHarvestCollected,
+        cargoHarvests,
+        canHarvest,
+      });
+      this.streamHarvestActive = streamHarvest.active;
+      this.streamHarvestTimer = streamHarvest.timer;
+      this.streamHarvestCollected = streamHarvest.collectedThisPass;
+      if (streamHarvest.infoMessage) infoMessage = streamHarvest.infoMessage;
     }
 
     const mqJet = this.sceneRenderer.getMicroquasarJetParams();
@@ -271,15 +381,28 @@ export class FlightHazardSystem {
         starWorldPos: mqStarEntity?.worldPos ?? null,
       });
       if (jetEffect.alert) effects.push(jetEffect);
-      if (jetEffect.zone === 'scooping') {
-        this.jetHarvestTimer += dt;
-        while (this.jetHarvestTimer >= BEAM_HARVEST_INTERVAL && canHarvest(RELATIVISTIC_ASH_GOOD)) {
-          cargoHarvests.push({ good: RELATIVISTIC_ASH_GOOD, qty: 1 });
-          this.jetHarvestTimer -= BEAM_HARVEST_INTERVAL;
-        }
-      } else {
-        this.jetHarvestTimer = 0;
+      {
+        const jetHarvest = runTimedHarvest({
+          active: jetEffect.zone === 'lethal',
+          wasActive: this.jetHarvestActive,
+          timer: this.jetHarvestTimer + (jetEffect.zone === 'lethal' ? dt : 0),
+          interval: RELATIVISTIC_ASH_HARVEST_INTERVAL,
+          immediateOnEntry: true,
+          good: RELATIVISTIC_ASH_GOOD,
+          message: RELATIVISTIC_ASH_INFO,
+          collectedThisPass: this.jetHarvestCollected,
+          cargoHarvests,
+          canHarvest,
+        });
+        this.jetHarvestActive = jetHarvest.active;
+        this.jetHarvestTimer = jetHarvest.timer;
+        this.jetHarvestCollected = jetHarvest.collectedThisPass;
+        if (jetHarvest.infoMessage) infoMessage = jetHarvest.infoMessage;
       }
+    } else {
+      this.jetHarvestActive = false;
+      this.jetHarvestTimer = 0;
+      this.jetHarvestCollected = false;
     }
 
     const pulsarBeam = this.sceneRenderer.getPulsarBeamParams();
@@ -311,8 +434,21 @@ export class FlightHazardSystem {
           this.pulsarLethalHit = false;
         }
 
+        const pulsarHarvest = runEntryHarvest({
+          active: sweep.zone === 'lethal',
+          wasActive: this.pulsarInZone,
+          good: PULSAR_SILK_GOOD,
+          message: PULSAR_SILK_INFO,
+          collectedThisPass: this.pulsarHarvestCollected,
+          cargoHarvests,
+          canHarvest,
+        });
+        this.pulsarInZone = pulsarHarvest.active;
+        this.pulsarHarvestCollected = pulsarHarvest.collectedThisPass;
+        if (pulsarHarvest.infoMessage) infoMessage = pulsarHarvest.infoMessage;
+
         if (sweep.zone === 'harvesting') {
-          // Harvest + small burst on sweep entry
+          // Near-beam warning band remains dangerous but non-harvestable.
           if (!this.pulsarInZone) {
             effects.push({
               heatRate: PULSAR_HARVEST_HEAT_BURST / dt,
@@ -322,16 +458,15 @@ export class FlightHazardSystem {
               hazardType: 'PulsarBeam',
               zone: 'harvesting',
             });
-            if (canHarvest(PULSAR_SILK_GOOD)) {
-              cargoHarvests.push({ good: PULSAR_SILK_GOOD, qty: 1 });
-            }
           }
-          this.pulsarInZone = true;
         } else if (sweep.zone !== 'lethal') {
-          // Reset harvest flag when fully out of both zones
           this.pulsarInZone = false;
+          this.pulsarHarvestCollected = false;
         }
       }
+    } else {
+      this.pulsarInZone = false;
+      this.pulsarHarvestCollected = false;
     }
 
     if (starType === 'BH' || starType === 'MQ') {
@@ -384,6 +519,7 @@ export class FlightHazardSystem {
     if (bestAlert) {
       state.setAlert(bestAlert);
     }
+    state.setInfoMessage(infoMessage);
 
     // ── Proximity alerts (only when no hazard/scooping alerts active) ──
     if (!bestAlert) {
@@ -406,9 +542,16 @@ export class FlightHazardSystem {
 
   resetTimers(): void {
     this.combatIntelTimer = 0;
+    this.combatIntelActive = false;
+    this.combatIntelCollected = false;
     this.jetHarvestTimer = 0;
+    this.jetHarvestActive = false;
+    this.jetHarvestCollected = false;
     this.streamHarvestTimer = 0;
+    this.streamHarvestActive = false;
+    this.streamHarvestCollected = false;
     this.pulsarInZone = false;
+    this.pulsarHarvestCollected = false;
     this.pulsarLethalHit = false;
   }
 }

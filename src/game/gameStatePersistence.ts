@@ -34,6 +34,7 @@ export function buildInitialState(mode: UIMode): Omit<GameStateData, 'cluster'> 
     ui: {
       mode,
       alertMessage: null,
+      infoMessage: null,
       scanLabel: null,
       scanProgress: 0,
       hyperspaceTarget: null,

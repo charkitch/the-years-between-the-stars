@@ -65,6 +65,7 @@ export const useGameState = create<GameStateData & GameActions>((set, get) => ({
   )),
   setTarget: (id) => set(s => ({ player: { ...s.player, targetId: id } })),
   setAlert: (msg) => set(s => ({ ui: { ...s.ui, alertMessage: msg } })),
+  setInfoMessage: (msg) => set(s => ({ ui: { ...s.ui, infoMessage: msg } })),
   setScanProgress: (progress, label = null) => set(s => ({
     ui: {
       ...s.ui,

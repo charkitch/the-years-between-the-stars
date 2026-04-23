@@ -70,9 +70,10 @@ export function HUD({
   );
 
   // UI state: changes during flight
-  const { alert, scanProgress, scanLabel, uiMode, hyperspaceTarget, canDockNow, canLandNow, canScanNow, canHailNow } = useGameState(
+  const { alert, info, scanProgress, scanLabel, uiMode, hyperspaceTarget, canDockNow, canLandNow, canScanNow, canHailNow } = useGameState(
     useShallow(s => ({
       alert: s.ui.alertMessage,
+      info: s.ui.infoMessage,
       scanProgress: s.ui.scanProgress,
       scanLabel: s.ui.scanLabel,
       uiMode: s.ui.mode,
@@ -137,6 +138,7 @@ export function HUD({
 
       {/* Alert */}
       {alert && <div className={`${styles.alertBanner} ${isLandingIntelAlert ? styles.alertBannerIntel : ''}`}>{alert}</div>}
+      {info && <div className={styles.infoBanner}>{info}</div>}
       {scanProgress > 0 && scanLabel && (
         <div className={styles.scanWidget}>
           <div className={styles.scanLabel}>{scanLabel}</div>
