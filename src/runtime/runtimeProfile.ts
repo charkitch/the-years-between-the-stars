@@ -2,6 +2,11 @@ export type QualityTier = 'ultra' | 'high' | 'medium';
 
 export interface RuntimeProfile {
   isMobile: boolean;
+  isPWA: boolean;
+  isIOS: boolean;
+  isAndroid: boolean;
+  isSafari: boolean;
+  isChromium: boolean;
   isTouchPrimary: boolean;
   isLandscape: boolean;
   pixelRatioCap: number;
@@ -22,6 +27,13 @@ export function detectRuntimeProfile(): RuntimeProfile {
   const hasMobileUA = /iphone|ipod|android.*mobile|mobile/.test(ua);
   const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
   const isMobile = hasMobileUA || coarsePointer;
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches
+    || window.matchMedia('(display-mode: fullscreen)').matches
+    || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  const isIOS = /iphone|ipad|ipod/.test(ua);
+  const isAndroid = /android/.test(ua);
+  const isSafari = /safari/.test(ua) && !/crios|fxios|edgios/.test(ua);
+  const isChromium = /chrome|chromium|crios|edg|edgios/.test(ua);
   const isTouchPrimary = coarsePointer || navigator.maxTouchPoints > 0;
   const { width, height } = getViewportSize();
   const isLandscape = width >= height;
@@ -35,6 +47,11 @@ export function detectRuntimeProfile(): RuntimeProfile {
 
   return {
     isMobile,
+    isPWA,
+    isIOS,
+    isAndroid,
+    isSafari,
+    isChromium,
     isTouchPrimary,
     isLandscape,
     pixelRatioCap,

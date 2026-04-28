@@ -343,8 +343,9 @@ export function App() {
             invertControls={invertControls}
             onToggleInvertControls={handleToggleInvertControls}
             buildLabel={BUILD_TAG_LABEL}
-          initialView={menuFromDeathRef.current ? 'load' : 'main'}
-        />
+            runtimeProfile={runtimeProfile!}
+            initialView={menuFromDeathRef.current ? 'load' : 'main'}
+          />
       )}
 
       {uiMode === 'dead' && <DeathScreen autosaveUnavailable={deathAutosaveUnavailable} onLoadAutosave={handleLoadAutosaveOnDeath} onLoadSave={() => { menuFromDeathRef.current = true; setUIMode('menu'); }} onNewGame={handleNewGame} />}

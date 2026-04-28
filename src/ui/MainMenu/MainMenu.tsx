@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { TRAVEL_TERMS } from '../../game/constants';
+import type { RuntimeProfile } from '../../runtime/runtimeProfile';
 import type { AutosaveKind, SlotMeta } from './saveSlots';
 import { readAllSlotMetas, readAutosaveMetas } from './saveSlots';
 import { SaveSlotGrid } from './SaveSlotGrid';
@@ -19,10 +20,22 @@ interface MainMenuProps {
   invertControls: boolean;
   onToggleInvertControls: () => void;
   buildLabel: string;
+  runtimeProfile: RuntimeProfile;
   initialView?: 'main' | 'load';
 }
 
-export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, onLoadAutosave, invertControls, onToggleInvertControls, buildLabel, initialView = 'main' }: MainMenuProps) {
+export function MainMenu({
+  onNewGame,
+  onResume,
+  onSaveToSlot,
+  onLoadFromSlot,
+  onLoadAutosave,
+  invertControls,
+  onToggleInvertControls,
+  buildLabel,
+  runtimeProfile,
+  initialView = 'main',
+}: MainMenuProps) {
   const [view, setView] = useState<'main' | 'controls' | 'fullscreen' | 'save' | 'load'>(initialView);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installMessage, setInstallMessage] = useState<string>('');
@@ -33,13 +46,7 @@ export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, on
     last_system_entry: null,
   });
 
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-  const ua = window.navigator.userAgent.toLowerCase();
-  const isIOS = /iphone|ipad|ipod/.test(ua);
-  const isAndroid = /android/.test(ua);
-  const isSafari = /safari/.test(ua) && !/crios|fxios|edgios/.test(ua);
-  const isChromium = /chrome|chromium|crios|edg|edgios/.test(ua);
-  const isMobile = isIOS || isAndroid;
+  const { isPWA, isIOS, isAndroid, isSafari, isChromium, isMobile } = runtimeProfile;
 
   const refreshSlots = useCallback(async () => {
     const [slotMetas, autoMetas] = await Promise.all([readAllSlotMetas(), readAutosaveMetas()]);
@@ -48,6 +55,7 @@ export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, on
   }, []);
 
   useEffect(() => {
+    if (isPWA || isIOS) return;
     const onBeforeInstallPrompt = (event: Event) => {
       const installEvent = event as BeforeInstallPromptEvent;
       installEvent.preventDefault();
@@ -63,7 +71,7 @@ export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, on
       window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
       window.removeEventListener('appinstalled', onAppInstalled);
     };
-  }, []);
+  }, [isPWA, isIOS]);
 
   useEffect(() => {
     if (view === 'save' || view === 'load') {
@@ -207,41 +215,23 @@ export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, on
             Add this game to your home screen to run it like an app in fullscreen, with faster launch and fewer browser UI distractions.
           </p>
 
-          {isStandalone && (
+          {isPWA ? (
             <p className={styles.statusText}>
               This app is already running in standalone mode from your home screen.
             </p>
-          )}
-
-          {!isStandalone && deferredPrompt && (
+          ) : deferredPrompt ? (
             <button className={styles.menuBtn} onClick={handleInstallPrompt}>
               SHOW INSTALL OPTION
             </button>
-          )}
-
-          {!isStandalone && !deferredPrompt && isIOS && isSafari && (
+          ) : isIOS ? (
             <p className={styles.statusText}>
-              iPhone/iPad tip: Tap Share, then Add to Home Screen.
+              iPhone/iPad: Tap Share in Safari, then Add to Home Screen.
             </p>
-          )}
-
-          {!isStandalone && !deferredPrompt && isIOS && !isSafari && (
-            <p className={styles.statusText}>
-              iPhone/iPad: open this page in Safari, then tap Share and Add to Home Screen.
-            </p>
-          )}
-
-          {!isStandalone && !deferredPrompt && isAndroid && isChromium && (
+          ) : isAndroid && isChromium ? (
             <p className={styles.statusText}>
               Android: open browser menu and use Install app or Add to Home screen.
             </p>
-          )}
-
-          {!isStandalone && !deferredPrompt && !isIOS && !(isAndroid && isChromium) && (
-            <p className={styles.statusText}>
-              Install is not currently available in this browser session. Try from a supported mobile browser over HTTPS.
-            </p>
-          )}
+          ) : null}
 
           {installMessage && <p className={styles.statusText}>{installMessage}</p>}
 
@@ -273,7 +263,7 @@ export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, on
           <button className={styles.menuBtn} onClick={() => setView('load')}>
             LOAD GAME
           </button>
-          {isMobile && !isStandalone && (
+          {isMobile && !isPWA && (
             <button className={styles.menuBtn} onClick={() => setView('fullscreen')}>
               FIND OUT ABOUT FULL SCREEN
             </button>
@@ -281,7 +271,7 @@ export function MainMenu({ onNewGame, onResume, onSaveToSlot, onLoadFromSlot, on
           <button className={styles.menuBtn} onClick={onNewGame}>
             NEW GAME
           </button>
-          {isStandalone && (
+          {isPWA && (
             <button className={styles.menuBtn} onClick={() => window.location.reload()}>
               CHECK FOR UPDATES
             </button>
