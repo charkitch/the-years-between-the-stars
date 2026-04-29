@@ -27,11 +27,12 @@ export function detectRuntimeProfile(): RuntimeProfile {
   const hasMobileUA = /iphone|ipod|android.*mobile|mobile/.test(ua);
   const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
   const isMobile = hasMobileUA || coarsePointer;
-  const isPWA = window.matchMedia('(display-mode: standalone)').matches
-    || window.matchMedia('(display-mode: fullscreen)').matches
-    || (navigator as Navigator & { standalone?: boolean }).standalone === true;
   const isIOS = /iphone|ipad|ipod/.test(ua);
   const isAndroid = /android/.test(ua);
+  const standaloneDisplay = window.matchMedia('(display-mode: standalone)').matches;
+  const fullscreenDisplay = window.matchMedia('(display-mode: fullscreen)').matches;
+  const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  const isPWA = standaloneDisplay || iosStandalone || (isMobile && fullscreenDisplay);
   const isSafari = /safari/.test(ua) && !/crios|fxios|edgios/.test(ua);
   const isChromium = /chrome|chromium|crios|edg|edgios/.test(ua);
   const isTouchPrimary = coarsePointer || navigator.maxTouchPoints > 0;
