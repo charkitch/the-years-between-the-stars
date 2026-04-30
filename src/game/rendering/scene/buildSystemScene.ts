@@ -4,11 +4,11 @@ import { makeAsteroidBelt } from '../meshFactory';
 import type { SolarSystemData, SystemFactionState } from '../../engine';
 import type { NPCShipState } from '../../mechanics/NPCSystem';
 import { PRNG } from '../../generation/prng';
-import { CLUSTER_SEED } from '../../constants';
+import { CLUSTER_SEED, STAR_COLORS, PALETTE } from '../../constants';
 import type { SceneEntity } from './types';
 import type { RuntimeProfile } from '../../../runtime/runtimeProfile';
 import { LandingSiteManager } from './LandingSiteManager';
-import type { DysonShellMaterialEntry, TopopolisMaterialEntry, BeamParams } from './tickSceneAnimations';
+import type { AsteroidBeltMaterialEntry, DysonShellMaterialEntry, TopopolisMaterialEntry, BeamParams } from './tickSceneAnimations';
 import type { BattleExplosions } from '../effects';
 import type { FleetBattle } from '../../mechanics/FleetBattleSystem';
 import type { XRayTransferStream } from './types';
@@ -29,6 +29,7 @@ export { hashString32 } from './buildSystemSceneUtils';
 export interface SystemSceneState {
   systemObjects: THREE.Object3D[];
   lightningMaterials: THREE.ShaderMaterial[];
+  asteroidBeltMaterials: AsteroidBeltMaterialEntry[];
   dysonShellMaterials: DysonShellMaterialEntry[];
   topopolisMaterials: TopopolisMaterialEntry[];
   xRayTransferStreams: XRayTransferStream[];
@@ -75,6 +76,7 @@ export function buildSystemScene(params: {
 
   const systemObjects: THREE.Object3D[] = [];
   const lightningMaterials: THREE.ShaderMaterial[] = [];
+  const asteroidBeltMaterials: AsteroidBeltMaterialEntry[] = [];
   const dysonShellMaterials: DysonShellMaterialEntry[] = [];
   const topopolisMaterials: TopopolisMaterialEntry[] = [];
   const collisionOnlyEntities: SceneEntity[] = [];
@@ -101,9 +103,11 @@ export function buildSystemScene(params: {
   // Asteroid belt
   if (data.asteroidBelt) {
     const ab = data.asteroidBelt;
-    const belt = makeAsteroidBelt(ab.innerRadius, ab.outerRadius, ab.count, () => rng.next());
+    const starColor = STAR_COLORS[data.starType] ?? PALETTE.starG;
+    const belt = makeAsteroidBelt(ab.innerRadius, ab.outerRadius, ab.count, () => rng.next(), starColor);
     scene.add(belt.mesh);
     systemObjects.push(belt.mesh);
+    asteroidBeltMaterials.push({ material: belt.material });
     const beltId = 'asteroid-belt';
     collisionOnlyEntities.push({
       id: beltId,
@@ -168,6 +172,7 @@ export function buildSystemScene(params: {
   const state: SystemSceneState = {
     systemObjects,
     lightningMaterials,
+    asteroidBeltMaterials,
     dysonShellMaterials,
     topopolisMaterials,
     xRayTransferStreams: starResult.xRayTransferStreams,

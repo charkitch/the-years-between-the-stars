@@ -30,6 +30,7 @@ export class SceneRenderer {
   private systemState: SystemSceneState = {
     systemObjects: [],
     lightningMaterials: [],
+    asteroidBeltMaterials: [],
     dysonShellMaterials: [],
     topopolisMaterials: [],
     xRayTransferStreams: [],
@@ -210,6 +211,7 @@ export class SceneRenderer {
       xRayTransferStreams: this.systemState.xRayTransferStreams,
       xbDiskGroup: this.systemState.xbDiskGroup,
       lightningMaterials: this.systemState.lightningMaterials,
+      asteroidBeltMaterials: this.systemState.asteroidBeltMaterials,
       dysonShellMaterials: this.systemState.dysonShellMaterials,
       topopolisMaterials: this.systemState.topopolisMaterials,
       pulsarBeamGroup: this.systemState.pulsarBeamGroup,

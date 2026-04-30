@@ -336,9 +336,80 @@ export function makeGlowSprite(color: number, size: number): THREE.Sprite {
 /** Instanced asteroid field */
 export interface AsteroidBeltMeshResult {
   mesh: THREE.InstancedMesh;
+  material: THREE.ShaderMaterial;
   collisionSpheres: Array<{ center: THREE.Vector3; radius: number }>;
   halfHeight: number;
   maxAsteroidRadius: number;
+}
+
+export function makeAsteroidBeltMaterial(lightColor = 0xFFFFFF): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uLightPos: { value: new THREE.Vector3(0, 0, 0) },
+      uLightColor: { value: new THREE.Color(lightColor) },
+      uBaseColor: { value: new THREE.Color(0x4d4b43) },
+      uAmbientFloor: { value: 0.018 },
+      uDayStrength: { value: 1.35 },
+    },
+    vertexShader: `
+      #include <common>
+
+      varying vec3 vWorldPosition;
+      varying vec3 vWorldNormal;
+      varying vec3 vLocalNormal;
+      varying vec3 vLocalPosition;
+
+      void main() {
+        vec3 transformed = position;
+        vec3 transformedNormal = normal;
+
+        #ifdef USE_INSTANCING
+          transformed = (instanceMatrix * vec4(transformed, 1.0)).xyz;
+          transformedNormal = mat3(instanceMatrix) * transformedNormal;
+        #endif
+
+        vec4 worldPosition = modelMatrix * vec4(transformed, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        vWorldNormal = normalize(mat3(modelMatrix) * transformedNormal);
+        vLocalNormal = normalize(normal);
+        vLocalPosition = position;
+
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uLightPos;
+      uniform vec3 uLightColor;
+      uniform vec3 uBaseColor;
+      uniform float uAmbientFloor;
+      uniform float uDayStrength;
+
+      varying vec3 vWorldPosition;
+      varying vec3 vWorldNormal;
+      varying vec3 vLocalNormal;
+      varying vec3 vLocalPosition;
+
+      float hash(vec3 p) {
+        return fract(sin(dot(p, vec3(17.31, 59.73, 113.17))) * 43758.5453123);
+      }
+
+      void main() {
+        vec3 normal = normalize(vWorldNormal);
+        vec3 toLight = normalize(uLightPos - vWorldPosition);
+        float ndl = dot(normal, toLight);
+        float day = smoothstep(-0.02, 0.72, ndl);
+        float rim = pow(max(0.0, 1.0 - abs(ndl)), 2.2) * 0.08;
+
+        float facet = mix(0.82, 1.12, hash(floor(vLocalNormal * 7.0 + vLocalPosition * 0.09)));
+        vec3 starTint = mix(vec3(1.0), normalize(uLightColor + vec3(0.18)), 0.58);
+        vec3 litRock = uBaseColor * starTint * (day * uDayStrength * facet + rim);
+        vec3 nightRock = uBaseColor * uAmbientFloor * facet;
+        vec3 color = max(litRock, nightRock);
+
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
+  });
 }
 
 export function makeAsteroidBelt(
@@ -346,9 +417,10 @@ export function makeAsteroidBelt(
   outerRadius: number,
   count: number,
   rng: () => number,
+  lightColor = 0xFFFFFF,
 ): AsteroidBeltMeshResult {
   const geo = new THREE.IcosahedronGeometry(1, 0);
-  const mat = new THREE.MeshLambertMaterial({ color: 0x888877 });
+  const mat = makeAsteroidBeltMaterial(lightColor);
   const mesh = new THREE.InstancedMesh(geo, mat, count);
 
   const dummy = new THREE.Object3D();
@@ -369,7 +441,7 @@ export function makeAsteroidBelt(
     maxAsteroidRadius = Math.max(maxAsteroidRadius, scale);
   }
   mesh.instanceMatrix.needsUpdate = true;
-  return { mesh, collisionSpheres, halfHeight, maxAsteroidRadius };
+  return { mesh, material: mat, collisionSpheres, halfHeight, maxAsteroidRadius };
 }
 
 function shipScale(sizeClass: NPCShipSizeClass): number {

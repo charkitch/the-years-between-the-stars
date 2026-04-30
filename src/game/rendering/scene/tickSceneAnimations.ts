@@ -33,6 +33,10 @@ export interface TopopolisMaterialEntry {
   coilCount: number;
 }
 
+export interface AsteroidBeltMaterialEntry {
+  material: THREE.ShaderMaterial;
+}
+
 export interface BeamParams {
   axis: THREE.Vector3;
   halfAngle: number;
@@ -52,6 +56,7 @@ export function tickSceneAnimations(params: {
   xRayTransferStreams: XRayTransferStream[];
   xbDiskGroup: THREE.Group | null;
   lightningMaterials: THREE.ShaderMaterial[];
+  asteroidBeltMaterials: AsteroidBeltMaterialEntry[];
   dysonShellMaterials: DysonShellMaterialEntry[];
   topopolisMaterials: TopopolisMaterialEntry[];
   pulsarBeamGroup: THREE.Group | null;
@@ -67,7 +72,7 @@ export function tickSceneAnimations(params: {
   const {
     entities, npcShips, collidables, camera,
     xRayTransferStreams, xbDiskGroup,
-    lightningMaterials, dysonShellMaterials, topopolisMaterials,
+    lightningMaterials, asteroidBeltMaterials, dysonShellMaterials, topopolisMaterials,
     pulsarBeamGroup, pulsarBeamParams,
     mqJetGroup,
     battleProjectiles, battleExplosions,
@@ -92,6 +97,16 @@ export function tickSceneAnimations(params: {
     mat.uniforms.uTime.value = time;
   }
 
+  const starEntity = entities.get('star');
+  if (starEntity) {
+    starEntity.group.getWorldPosition(_starPos);
+  } else {
+    _starPos.set(0, 0, 0);
+  }
+  for (const entry of asteroidBeltMaterials) {
+    entry.material.uniforms.uLightPos.value.copy(_starPos);
+  }
+
   for (const entry of dysonShellMaterials) {
     entry.miniStar.getWorldPosition(_worldPos);
     entry.shellMat.uniforms.uLightPos.value.copy(_worldPos);
@@ -101,7 +116,6 @@ export function tickSceneAnimations(params: {
   }
 
   // Topopolis materials — lit by the star at origin, with t-space distance culling
-  _starPos.set(0, 0, 0);
   for (const entry of topopolisMaterials) {
     // Project camera onto helix curve in local space to find current t-value.
     // Full scan over ~300 samples — cheaper than a single snoise evaluation.
